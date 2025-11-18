@@ -295,6 +295,24 @@ def generate_index_page(talents, products, total_raised):
           gtag('config', 'G-RP1612BFV9');
         </script>
 
+        <!-- Meta Pixel Code -->
+        <script>
+        !function(f,b,e,v,n,t,s)
+        {{if(f.fbq)return;n=f.fbq=function(){{n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)}};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '738718761834602');
+        fbq('track', 'PageView');
+        </script>
+        <noscript><img height="1" width="1" style="display:none"
+        src="https://www.facebook.com/tr?id=738718761834602&ev=PageView&noscript=1"
+        /></noscript>
+        <!-- End Meta Pixel Code -->
+
         <style>
             * {{
                 margin: 0;
@@ -876,6 +894,24 @@ def generate_talent_page(talent, all_products, all_talents):
           gtag('js', new Date());
           gtag('config', 'G-RP1612BFV9');
         </script>
+
+        <!-- Meta Pixel Code -->
+        <script>
+        !function(f,b,e,v,n,t,s)
+        {{if(f.fbq)return;n=f.fbq=function(){{n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)}};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '738718761834602');
+        fbq('track', 'PageView');
+        </script>
+        <noscript><img height="1" width="1" style="display:none"
+        src="https://www.facebook.com/tr?id=738718761834602&ev=PageView&noscript=1"
+        /></noscript>
+        <!-- End Meta Pixel Code -->
 
         <style>
             * {{
@@ -1487,6 +1523,24 @@ def generate_product_page(product, talent, all_products, all_talents):
           gtag('js', new Date());
           gtag('config', 'G-RP1612BFV9');
         </script>
+
+        <!-- Meta Pixel Code -->
+        <script>
+        !function(f,b,e,v,n,t,s)
+        {{if(f.fbq)return;n=f.fbq=function(){{n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)}};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '738718761834602');
+        fbq('track', 'PageView');
+        </script>
+        <noscript><img height="1" width="1" style="display:none"
+        src="https://www.facebook.com/tr?id=738718761834602&ev=PageView&noscript=1"
+        /></noscript>
+        <!-- End Meta Pixel Code -->
 
         <style>
             * {{
