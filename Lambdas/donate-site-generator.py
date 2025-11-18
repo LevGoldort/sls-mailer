@@ -25,17 +25,17 @@ FUNDRAISING_GOAL = 30000  # ₪30,000
 PROJECTS = [
     {
         'name': 'Изотоп Комедия',
-        'description': 'Научное шоу Льва Гольдорта, где три комика обсуждают новости науки с настоящим ученым и пытаются понять, куда катится мир и объяснить что вообще происходит.',
+        'description': 'Научное шоу Льва Гольдорта, где комики обсуждают новости науки с учёным и пытаются понять, куда катится мир.',
         'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/5bdf8d33e440e60c518ece0be8dd1498.png'
     },
     {
         'name': 'Еврейский заговор',
-        'description': 'Шоу Максима Сотникова, которое признает очевидно - еврейский заговор существует, ему бесполезно сопротивляться, придется возглавить. В Шоу Максим отбирает самого главного еврея-заговорщика.',
+        'description': 'Шоу Максима Сотникова, которое признаёт: еврейский заговор существует, и его нужно возглавить.',
         'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/2025-11-02+21.46.26.jpg'
     },
     {
         'name': 'Шоу Крайней Плотности',
-        'description': 'Проект Кирилла Селегея, где три опытных комика слушают и анализируют, как молодые и не очень комики рассказывают минуту своего лучшего материала.',
+        'description': 'Проект Кирилла Селегея, где три опытных комика слушают и анализируют, как начинаюшие комики рассказывают минуту шуток.',
         'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/2025-11-02+21.47.13.jpg'
     },
     {
@@ -445,7 +445,7 @@ def generate_index_page(talents, products, total_raised):
             }}
 
             .project-info h3 {{
-                font-size: 20px;
+                font-size: 16px;
                 margin-bottom: 8px;
                 color: white;
                 font-weight: 700;
@@ -453,7 +453,7 @@ def generate_index_page(talents, products, total_raised):
 
             .project-description {{
                 color: rgba(255,255,255,0.9);
-                font-size: 14px;
+                font-size: 11px;
                 line-height: 1.4;
                 overflow: hidden;
                 display: -webkit-box;
@@ -1109,7 +1109,7 @@ def generate_talent_page(talent, all_products, all_talents):
                 margin-bottom: 10px;
                 overflow: hidden;
                 display: -webkit-box;
-                -webkit-line-clamp: 2;
+                -webkit-line-clamp: 4;
                 -webkit-box-orient: vertical;
                 text-overflow: ellipsis;
             }}
@@ -1342,7 +1342,7 @@ def generate_talent_page(talent, all_products, all_talents):
                 </aside>
 
                 <main class="products-section">
-                    <h2>Поддержи {talent['name']}</h2>
+                    <h2>{talent['name']} предлагает вот такие товары:</h2>
                     {products_html}
                 </main>
             </div>
