@@ -176,9 +176,11 @@ def get_active_products():
 
 
 def calculate_total_raised(products):
-    """Считает общую сумму собранных денег"""
+    """Считает общую сумму собранных денег (за вычетом НДС 18%)"""
     total = sum(p['sold_slots'] * p['price_ils'] for p in products)
-    return total
+    # Вычитаем НДС 18%
+    total_without_vat = int(total * 0.82)
+    return total_without_vat
 
 
 def generate_progress_bar(total_raised, goal):
@@ -283,6 +285,15 @@ def generate_index_page(talents, products, total_raised):
         <meta property="og:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи крутые награды!">
         <meta property="og:image" content="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/og-image.jpg">
         <meta property="og:url" content="https://donate.yallabalagan.org">
+
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', 'G-RP1612BFV9');
+        </script>
 
         <style>
             * {{
@@ -666,6 +677,7 @@ def generate_index_page(talents, products, total_raised):
                     </p>
                     <p>
                         Ниже вы можете ознакомиться с проектами, на которые мы собираем средства, и с талантами, которые предлагают всякие штуки!
+                        Если вы хотите стать нашим талантом и предложить свои приколы на продажу во имя съемок - свяжитесь с нами по контактм снизу!
                     </p>
 
                 </div>
@@ -855,6 +867,15 @@ def generate_talent_page(talent, all_products, all_talents):
         <meta property="og:description" content="{talent['role']}">
         <meta property="og:image" content="{talent['photo_url']}">
         <meta property="og:url" content="https://donate.yallabalagan.org/talent/{talent['slug']}/">
+
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', 'G-RP1612BFV9');
+        </script>
 
         <style>
             * {{
@@ -1457,6 +1478,15 @@ def generate_product_page(product, talent, all_products, all_talents):
         <meta property="og:description" content="{product['short_description']}">
         <meta property="og:image" content="{product['photo_url']}">
         <meta property="og:url" content="https://donate.yallabalagan.org/product/{product['slug']}/">
+
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', 'G-RP1612BFV9');
+        </script>
 
         <style>
             * {{
