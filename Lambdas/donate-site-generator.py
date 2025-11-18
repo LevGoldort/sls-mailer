@@ -165,7 +165,7 @@ def get_active_products():
             'group_size': props.get('Group_Size', {}).get('number'),
             'photo_url': props.get('Photo_URL', {}).get('url', ''),
             'gallery_urls': get_text_from_rich_text(props.get('Gallery_URLs', {}).get('rich_text', [])),
-            'tg_post_link': props.get('Tg_Post_link', {}).get('url', ''),
+            'tg_post_link': props.get('Tg_Post_link', {}).get('url') or '',
             'tg_code': get_text_from_rich_text(props.get('Tg_Code', {}).get('rich_text', []))
         }
 
@@ -2464,7 +2464,7 @@ def generate_product_page(product, talent, all_products, all_talents):
                         <button class="telegram-button" onclick="openTelegramModal()" {'disabled' if available_slots == 0 or not product.get('tg_code') else ''}>
                             ⭐ Оплатить звёздами Telegram ({product['price_stars']} ⭐)
                         </button>
-                        ''' if product.get('tg_code') and product.get('price_stars') else ''}
+                        ''' if product.get('tg_code') and product.get('price_stars') and product.get('tg_post_link') else ''}
                     </div>                    
                 </div>
             </div>
