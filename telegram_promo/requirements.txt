@@ -1,0 +1,8 @@
+# Playwright для скриншотов
+playwright==1.40.0
+
+# Python Telegram Bot для постинга
+python-telegram-bot==20.7
+
+# Requests для работы с Notion API
+requests==2.31.0
