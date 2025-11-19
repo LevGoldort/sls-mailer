@@ -1155,15 +1155,20 @@ def generate_index_page(talents, products, total_raised):
                 }}
 
                 .tabs-container {{
-                    flex-direction: column;
-                    gap: 0;
+                    flex-direction: row;
+                    gap: 5px;
+                    flex-wrap: wrap;
                 }}
 
                 .tab-button {{
-                    width: 100%;
+                    flex: 1;
+                    min-width: 0;
                     text-align: center;
-                    padding: 15px;
+                    padding: 10px 8px;
+                    font-size: 13px;
+                    line-height: 1.3;
                     border-bottom: 2px solid #e2e8f0;
+                    white-space: normal;
                 }}
 
                 .tab-button.active {{
