@@ -44,8 +44,8 @@ PROJECTS = [
         'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/58e77288172e45f81075143274df3bc4.png'
     },
     {
-        'name': 'Проект Саши Гришаева',
-        'description': 'Комедийная викторина с элементами настольного RPG: страдания, броски кубика, гейм мастер - мудак.',
+        'name': 'Подземелья и вопросы',
+        'description': 'Проект Саши Гришаева: Комедийная викторина с элементами настольного RPG: страдания, броски кубика, гейм мастер - мудак.',
         'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/sasha-grishaev-rpg.jpg'
     }
 ]
@@ -199,7 +199,8 @@ def calculate_total_raised(products):
 
 def generate_progress_bar(total_raised, goal):
     """Генерирует HTML прогресс-бара"""
-    percentage = min(int((total_raised / goal) * 100), 100)
+    percentage = min((total_raised / goal) * 100, 100)
+    percentage_display = f"{percentage:.1f}"
 
     return f"""
     <div class="fundraising-progress">
@@ -210,7 +211,7 @@ def generate_progress_bar(total_raised, goal):
         <div class="progress-bar">
             <div class="progress-fill" style="width: {percentage}%"></div>
         </div>
-        <div class="progress-percentage">{percentage}%</div>
+        <div class="progress-percentage">{percentage_display}%</div>
     </div>
     """
 
@@ -1125,8 +1126,8 @@ def generate_index_page(talents, products, total_raised):
                 }}
 
                 .main-title {{
-                    font-size: 28px;
-                    margin-bottom: 20px;
+                    font-size: 22px;
+                    margin-bottom: 15px;
                 }}
 
                 .hero-section {{
@@ -1170,7 +1171,16 @@ def generate_index_page(talents, products, total_raised):
                 }}
 
                 .section-header {{
-                    font-size: 24px;
+                    font-size: 20px;
+                }}
+
+                .projects-section h2 {{
+                    font-size: 18px;
+                    margin-bottom: 20px;
+                }}
+
+                .campaign-description h2 {{
+                    font-size: 18px;
                 }}
 
                 .contact-item {{
@@ -1852,7 +1862,7 @@ def generate_talent_page(talent, all_products, all_talents):
                 }}
 
                 .sidebar h1 {{
-                    font-size: 24px;
+                    font-size: 20px;
                 }}
 
                 .products-section {{
@@ -1991,7 +2001,8 @@ def generate_product_page(product, talent, all_products, all_talents):
 
     # Прогресс продаж
     available_slots = product['total_slots'] - product['sold_slots']
-    percentage = int((product['sold_slots'] / product['total_slots']) * 100) if product['total_slots'] > 0 else 0
+    percentage = (product['sold_slots'] / product['total_slots']) * 100 if product['total_slots'] > 0 else 0
+    percentage_display = f"{percentage:.1f}"
 
     # Галерея (если есть)
     gallery_html = ""
@@ -2649,6 +2660,10 @@ def generate_product_page(product, talent, all_products, all_talents):
                     padding: 25px;
                 }}
 
+                .product-details h1 {{
+                    font-size: 20px;
+                }}
+
                 .modal-content {{
                     margin: 10% auto;
                     padding: 30px 20px;
@@ -3048,7 +3063,7 @@ def generate_product_page(product, talent, all_products, all_talents):
                     <div class="progress-section">
                         <div class="progress-text">
                             <span>Продано: {product['sold_slots']} из {product['total_slots']}</span>
-                            <span>{percentage}%</span>
+                            <span>{percentage_display}%</span>
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: {percentage}%"></div>
