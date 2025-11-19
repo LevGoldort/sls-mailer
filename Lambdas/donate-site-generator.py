@@ -42,6 +42,11 @@ PROJECTS = [
         'name': 'Съемки Стендапа',
         'description': 'Мы постоянно пишем стендап и постоянно выступаем, пришло наконец-то время более ли менее системно его снимать!',
         'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/58e77288172e45f81075143274df3bc4.png'
+    },
+    {
+        'name': 'Проект Саши Гришаева',
+        'description': 'Комедийная викторина с элементами настольного RPG: страдания, броски кубика, гейм мастер - мудак.',
+        'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/sasha-grishaev-rpg.jpg'
     }
 ]
 
@@ -105,10 +110,19 @@ def get_active_talents():
             'facebook': props.get('Facebook', {}).get('url', ''),
             'featured_video': props.get('Featured_Video', {}).get('url', ''),
             'products_count': props.get('Products_Count', {}).get('rollup', {}).get('number', 0),
-            'total_sold': props.get('Total_Sold', {}).get('rollup', {}).get('number', 0)
+            'total_sold': props.get('Total_Sold', {}).get('rollup', {}).get('number', 0),
+            'order': props.get('Order', {}).get('number', 999)
         }
 
         talents.append(talent)
+
+    # Добавляем рандомный люфт к порядку (±4 позиции)
+    for talent in talents:
+        random_offset = random.randint(-4, 4)
+        talent['shuffled_order'] = talent['order'] + random_offset
+
+    # Сортируем по рандомизированному порядку
+    talents.sort(key=lambda t: t['shuffled_order'])
 
     print(f"Found {len(talents)} active talents")
     return talents
@@ -189,7 +203,6 @@ def generate_progress_bar(total_raised, goal):
 
     return f"""
     <div class="fundraising-progress">
-        <h2 class="progress-title">🎬 Поддержи съемки нового сезона!</h2>
         <div class="progress-stats">
             <span class="raised">Собрано: ₪{total_raised:,}</span>
             <span class="goal">из ₪{goal:,}</span>
@@ -224,6 +237,243 @@ def generate_footer_html():
             <a href="https://yallabalagan.org/terms" target="_blank">Terms & Conditions</a>
         </div>
     </div>
+    """
+
+
+def generate_404_page():
+    """Генерирует страницу 404"""
+    footer_html = generate_footer_html()
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>404 - Страница не найдена | Ялла, Балаган</title>
+        <link rel="icon" type="image/png" href="/favicon.png">
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }}
+
+            .container {{
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 40px 20px;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                text-align: center;
+            }}
+
+            .error-code {{
+                font-size: 120px;
+                font-weight: 900;
+                color: white;
+                text-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                line-height: 1;
+                margin-bottom: 20px;
+            }}
+
+            .error-title {{
+                font-size: 32px;
+                color: white;
+                margin-bottom: 20px;
+                font-weight: 700;
+            }}
+
+            .error-message {{
+                font-size: 18px;
+                color: rgba(255,255,255,0.9);
+                margin-bottom: 40px;
+                line-height: 1.6;
+            }}
+
+            .btn-home {{
+                display: inline-block;
+                padding: 15px 40px;
+                background: #e535ab;
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(229, 53, 171, 0.4);
+            }}
+
+            .btn-home:hover {{
+                background: #c42a92;
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(229, 53, 171, 0.6);
+            }}
+
+            .promo-frame {{
+                background: white;
+                border: 3px dashed #e535ab;
+                border-radius: 16px;
+                padding: 30px;
+                margin: 30px 0;
+                max-width: 500px;
+                width: 100%;
+                box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            }}
+
+            .promo-icon {{
+                font-size: 80px;
+                margin-bottom: 15px;
+                display: block;
+            }}
+
+            .promo-text {{
+                font-size: 18px;
+                color: #1a202c;
+                margin-bottom: 20px;
+                line-height: 1.5;
+                font-weight: 600;
+            }}
+
+            .promo-link {{
+                display: inline-block;
+                padding: 12px 30px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            }}
+
+            .promo-link:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+            }}
+
+            .site-footer {{
+                background: white;
+                padding: 40px;
+                margin-top: auto;
+            }}
+
+            .footer-contacts {{
+                text-align: center;
+            }}
+
+            .footer-contacts h3 {{
+                font-size: 20px;
+                margin-bottom: 20px;
+                color: #1a202c;
+            }}
+
+            .contact-item {{
+                margin: 10px 0;
+                color: #4a5568;
+            }}
+
+            .contact-item a {{
+                color: #e535ab;
+                text-decoration: none;
+            }}
+
+            .contact-item a:hover {{
+                text-decoration: underline;
+            }}
+
+            .footer-links {{
+                margin-top: 20px;
+                color: #718096;
+            }}
+
+            .footer-links a {{
+                color: #e535ab;
+                text-decoration: none;
+            }}
+
+            .footer-links a:hover {{
+                text-decoration: underline;
+            }}
+
+            .separator {{
+                margin: 0 10px;
+                color: #cbd5e0;
+            }}
+
+            @media (max-width: 768px) {{
+                .error-code {{
+                    font-size: 80px;
+                }}
+
+                .error-title {{
+                    font-size: 24px;
+                }}
+
+                .error-message {{
+                    font-size: 16px;
+                }}
+
+                .btn-home {{
+                    padding: 12px 30px;
+                    font-size: 16px;
+                }}
+
+                .promo-frame {{
+                    padding: 20px;
+                    margin: 20px 0;
+                }}
+
+                .promo-icon {{
+                    font-size: 60px;
+                }}
+
+                .promo-text {{
+                    font-size: 16px;
+                }}
+
+                .promo-link {{
+                    padding: 10px 20px;
+                    font-size: 14px;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-code">404</div>
+            <h1 class="error-title">Страница не найдена</h1>
+            <p class="error-message">
+                Кажется, вы попали на страницу, которой не существует.<br>
+                Возможно, ссылка устарела или содержит опечатку.
+            </p>
+
+            <div class="promo-frame">
+                <span class="promo-icon">❓</span>
+                <p class="promo-text">Хотите чтобы ваше лицо оказалось тут? Можем организовать!</p>
+                <a href="https://donate.yallabalagan.org/product/lev_unknown_face/" class="promo-link">Узнать больше</a>
+            </div>
+
+            <a href="/" class="btn-home">Вернуться на главную</a>
+        </div>
+
+        <footer class="site-footer">
+            {footer_html}
+        </footer>
+    </body>
+    </html>
     """
 
 
@@ -270,6 +520,45 @@ def generate_index_page(talents, products, total_raised):
 
     talents_html += '</div>'
 
+    # Создаем маппинг талантов по ID для быстрого доступа
+    talent_map = {talent['id']: talent['name'] for talent in talents}
+
+    # Генерируем карточки всех продуктов в случайном порядке для вкладки "Все приколы"
+    shuffled_products = random.sample(products, len(products))
+    all_products_html = '<div class="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">'
+
+    for product in shuffled_products:
+        available_slots = product['total_slots'] - product['sold_slots']
+        percentage = int((product['sold_slots'] / product['total_slots']) * 100) if product['total_slots'] > 0 else 0
+
+        # Получаем имена талантов для продукта
+        talent_names = [talent_map.get(tid, '') for tid in product['talent_ids'] if tid in talent_map]
+        author_text = ', '.join(talent_names) if talent_names else ''
+
+        all_products_html += f"""
+        <div class="product-card">
+            <a href="/product/{product['slug']}/" class="product-link">
+                <div class="product-photo">
+                    <img src="{product['photo_url']}" alt="{product['name']}">
+                </div>
+                <div class="product-info">
+                    <h3>{product['name']}</h3>
+                    <p class="product-description">{product['short_description']}</p>
+                    {'<p class="product-author">Автор: ' + author_text + '</p>' if author_text else ''}
+                    <p class="product-price">₪{product['price_ils']}</p>
+                    <div class="product-progress">
+                        <div class="progress-bar-small">
+                            <div class="progress-fill-small" style="width: {percentage}%"></div>
+                        </div>
+                        <p class="slots-info">Осталось: {available_slots} из {product['total_slots']}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        """
+
+    all_products_html += '</div>'
+
     footer_html = generate_footer_html()
 
     html = f"""
@@ -284,7 +573,15 @@ def generate_index_page(talents, products, total_raised):
         <meta property="og:title" content="Поддержи Ялла, Балаган!">
         <meta property="og:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи крутые награды!">
         <meta property="og:image" content="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/og-image.jpg">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:type" content="website">
         <meta property="og:url" content="https://donate.yallabalagan.org">
+        <meta property="og:site_name" content="Ялла, Балаган - Фандрайзинг">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Поддержи Ялла, Балаган!">
+        <meta name="twitter:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи крутые награды!">
+        <meta name="twitter:image" content="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/og-image.jpg">
 
         <!-- Google Analytics -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
@@ -327,16 +624,31 @@ def generate_index_page(talents, products, total_raised):
                 color: #1a202c;
             }}
 
+            .top-banner {{
+                width: 100%;
+                height: 165px;
+                background: url('https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/top_banner.jpg') center center;
+                background-size: cover;
+            }}
+
             .container {{
                 max-width: 1400px;
                 margin: 0 auto;
                 padding: 40px 20px;
             }}
 
-            /* Параллельный лейаут для прогресса и описания */
+            .main-title {{
+                font-size: 42px;
+                font-weight: 700;
+                color: #1a202c;
+                text-align: center;
+                margin-bottom: 30px;
+            }}
+
+            /* Вертикальный лейаут */
             .hero-section {{
-                display: grid;
-                grid-template-columns: 1fr 1fr;
+                display: flex;
+                flex-direction: column;
                 gap: 30px;
                 margin-bottom: 40px;
             }}
@@ -359,7 +671,7 @@ def generate_index_page(talents, products, total_raised):
                 display: flex;
                 justify-content: space-between;
                 margin-bottom: 15px;
-                font-size: 18px;
+                font-size: 24px;
                 font-weight: 600;
             }}
 
@@ -581,6 +893,170 @@ def generate_index_page(talents, products, total_raised):
                 text-overflow: ellipsis;
             }}
 
+            /* Табы */
+            .section-header {{
+                font-size: 32px;
+                margin-bottom: 20px;
+                color: #1a202c;
+                text-align: center;
+            }}
+
+            .tabs-container {{
+                display: flex;
+                justify-content: center;
+                gap: 10px;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #e2e8f0;
+            }}
+
+            .tab-button {{
+                padding: 12px 30px;
+                background: transparent;
+                border: none;
+                border-bottom: 3px solid transparent;
+                font-size: 16px;
+                font-weight: 600;
+                color: #718096;
+                cursor: pointer;
+                transition: all 0.3s;
+                font-family: inherit;
+            }}
+
+            .tab-button:hover {{
+                color: #e535ab;
+            }}
+
+            .tab-button.active {{
+                color: #e535ab;
+                border-bottom-color: #e535ab;
+            }}
+
+            .tab-content {{
+                display: none;
+            }}
+
+            .tab-content.active {{
+                display: block;
+            }}
+
+            /* Стили для карточек продуктов */
+            .products-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 24px;
+            }}
+
+            .product-card {{
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                transition: all 0.3s ease;
+                aspect-ratio: 4/5;
+                position: relative;
+            }}
+
+            .product-card:hover {{
+                transform: translateY(-5px);
+                box-shadow: 0 12px 24px rgba(229, 53, 171, 0.3);
+            }}
+
+            .product-link {{
+                text-decoration: none;
+                color: inherit;
+                display: block;
+                height: 100%;
+                position: relative;
+            }}
+
+            .product-photo {{
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }}
+
+            .product-photo img {{
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }}
+
+            .product-info {{
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                padding: 20px;
+                background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 70%, transparent 100%);
+                color: white;
+            }}
+
+            .product-info h3 {{
+                font-size: 18px;
+                margin-bottom: 8px;
+                color: white;
+                font-weight: 700;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                text-overflow: ellipsis;
+                line-height: 1.3;
+            }}
+
+            .product-description {{
+                color: rgba(255,255,255,0.85);
+                font-size: 13px;
+                line-height: 1.3;
+                margin-bottom: 10px;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 4;
+                -webkit-box-orient: vertical;
+                text-overflow: ellipsis;
+            }}
+
+            .product-author {{
+                color: rgba(255,255,255,0.7);
+                font-size: 11px;
+                margin-bottom: 8px;
+                font-style: italic;
+            }}
+
+            .product-price {{
+                color: #ffd700;
+                font-size: 16px;
+                font-weight: 600;
+                margin-bottom: 10px;
+            }}
+
+            .product-progress {{
+                margin-top: 8px;
+            }}
+
+            .progress-bar-small {{
+                width: 100%;
+                height: 8px;
+                background: rgba(255,255,255,0.3);
+                border-radius: 4px;
+                overflow: hidden;
+                margin-bottom: 5px;
+            }}
+
+            .progress-fill-small {{
+                height: 100%;
+                background: #e535ab;
+                transition: width 0.3s ease;
+            }}
+
+            .slots-info {{
+                font-size: 12px;
+                color: rgba(255,255,255,0.8);
+                margin: 0;
+            }}
+
             .site-footer {{
                 background: white;
                 padding: 40px;
@@ -640,12 +1116,20 @@ def generate_index_page(talents, products, total_raised):
             }}
 
             @media (max-width: 768px) {{
+                .top-banner {{
+                    height: 100px;
+                }}
+
                 .container {{
                     padding: 20px 15px;
                 }}
 
+                .main-title {{
+                    font-size: 28px;
+                    margin-bottom: 20px;
+                }}
+
                 .hero-section {{
-                    grid-template-columns: 1fr;
                     gap: 20px;
                 }}
 
@@ -669,6 +1153,26 @@ def generate_index_page(talents, products, total_raised):
                     grid-template-columns: 1fr;
                 }}
 
+                .tabs-container {{
+                    flex-direction: column;
+                    gap: 0;
+                }}
+
+                .tab-button {{
+                    width: 100%;
+                    text-align: center;
+                    padding: 15px;
+                    border-bottom: 2px solid #e2e8f0;
+                }}
+
+                .tab-button.active {{
+                    border-bottom-color: #e535ab;
+                }}
+
+                .section-header {{
+                    font-size: 24px;
+                }}
+
                 .contact-item {{
                     display: flex;
                     margin: 10px 0;
@@ -677,28 +1181,31 @@ def generate_index_page(talents, products, total_raised):
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="hero-section">
-                {progress_bar_html}
+        <div class="top-banner"></div>
 
+        <div class="container">
+            <h1 class="main-title">Поддержи съемки нового сезона!</h1>
+
+            <div class="hero-section">
                 <div class="campaign-description">
                     <h2>О кампании</h2>
                     <p>
-                        Мы — Ялла, Балаган, творческое объединение израильтян. В основном мы занимаемся комедией — 
-                        делаем стендап-шоу и выпускаем контент на YouTube. Здесь мы собираем средства на новый сезон съёмок. 
+                        Мы — Ялла, Балаган, творческое объединение израильтян. В основном мы занимаемся комедией —
+                        делаем стендап-шоу и выпускаем контент на YouTube. Здесь мы собираем средства на новый сезон съёмок.
                         Помоги нам — круто будет!
                     </p>
                     <p>
-                        Мы решили, что просто делать донаты — это уныло, поэтому каждый талант в нашей орбите предлагает «товары» — 
-                        что-то, что он готов сделать для вас за ваш донат. Плейлист от Кирилла Селегея, футболка от Вовы Тамаркина, 
+                        Мы решили, что просто делать донаты — это уныло, поэтому каждый талант в нашей орбите предлагает «товары» —
+                        что-то, что он готов сделать для вас за ваш донат. Плейлист от Кирилла Селегея, футболка от Вовы Тамаркина,
                         экскурсия от Льва Гольдорта и многое другое. Поддержите нас и получите что-то крутое и уникальное!
                     </p>
                     <p>
                         Ниже вы можете ознакомиться с проектами, на которые мы собираем средства, и с талантами, которые предлагают всякие штуки!
                         Если вы хотите стать нашим талантом и предложить свои приколы на продажу во имя съемок - свяжитесь с нами по контактм снизу!
                     </p>
-
                 </div>
+
+                {progress_bar_html}
             </div>
 
             <div class="projects-section">
@@ -706,14 +1213,50 @@ def generate_index_page(talents, products, total_raised):
                 {projects_html}
             </div>
 
-            <div class="talents-section">
-                <h2>🎭 Наши таланты (кликайте на них, там приколы!)</h2>
-                {talents_html}
+            <div class="talents-section" id="talents">
+                <h2 class="section-header">Наши таланты и друзья</h2>
+
+                <div class="tabs-container">
+                    <button class="tab-button active" onclick="switchTab(event, 'talents')">
+                        Наши таланты
+                    </button>
+                    <button class="tab-button" onclick="switchTab(event, 'products')">
+                        Все приколы от всех талантов
+                    </button>
+                </div>
+
+                <div id="talents-tab" class="tab-content active">
+                    {talents_html}
+                </div>
+
+                <div id="products-tab" class="tab-content">
+                    {all_products_html}
+                </div>
             </div>
             <footer class="site-footer">
             {footer_html}
             </footer>
         </div>
+
+        <script>
+            function switchTab(event, tabName) {{
+                // Скрыть все табы
+                document.querySelectorAll('.tab-content').forEach(tab => {{
+                    tab.classList.remove('active');
+                }});
+
+                // Убрать активное состояние у всех кнопок
+                document.querySelectorAll('.tab-button').forEach(btn => {{
+                    btn.classList.remove('active');
+                }});
+
+                // Показать выбранный таб
+                document.getElementById(tabName + '-tab').classList.add('active');
+
+                // Активировать нажатую кнопку
+                event.target.classList.add('active');
+            }}
+        </script>
     </body>
     </html>
     """
@@ -782,12 +1325,19 @@ def generate_talent_page(talent, all_products, all_talents):
     print(f"Talent ID: {talent['id']}")
     print(f"Products for this talent: {len(talent_products)}")
 
+    # Создаем маппинг талантов по ID для быстрого доступа
+    talent_map = {t['id']: t['name'] for t in all_talents}
+
     # Генерируем карточки товаров
     products_html = '<div class="products-grid">'
 
     for product in talent_products:
         available_slots = product['total_slots'] - product['sold_slots']
         percentage = int((product['sold_slots'] / product['total_slots']) * 100) if product['total_slots'] > 0 else 0
+
+        # Получаем имена талантов для продукта
+        talent_names = [talent_map.get(tid, '') for tid in product['talent_ids'] if tid in talent_map]
+        author_text = ', '.join(talent_names) if talent_names else ''
 
         products_html += f"""
         <div class="product-card">
@@ -798,6 +1348,7 @@ def generate_talent_page(talent, all_products, all_talents):
                 <div class="product-info">
                     <h3>{product['name']}</h3>
                     <p class="product-description">{product['short_description']}</p>
+                    {'<p class="product-author">Автор: ' + author_text + '</p>' if author_text else ''}
                     <p class="product-price">₪{product['price_ils']}</p>
                     <div class="product-progress">
                         <div class="progress-bar-small">
@@ -884,7 +1435,15 @@ def generate_talent_page(talent, all_products, all_talents):
         <meta property="og:title" content="{talent['name']} - Поддержи Ялла, Балаган!">
         <meta property="og:description" content="{talent['role']}">
         <meta property="og:image" content="{talent['photo_url']}">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:type" content="profile">
         <meta property="og:url" content="https://donate.yallabalagan.org/talent/{talent['slug']}/">
+        <meta property="og:site_name" content="Ялла, Балаган - Фандрайзинг">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{talent['name']} - Поддержи Ялла, Балаган!">
+        <meta name="twitter:description" content="{talent['role']}">
+        <meta name="twitter:image" content="{talent['photo_url']}">
 
         <!-- Google Analytics -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
@@ -1155,8 +1714,11 @@ def generate_talent_page(talent, all_products, all_talents):
                 color: white;
                 font-weight: 700;
                 overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
                 text-overflow: ellipsis;
-                white-space: nowrap;
+                line-height: 1.3;
             }}
 
             .product-description {{
@@ -1169,6 +1731,13 @@ def generate_talent_page(talent, all_products, all_talents):
                 -webkit-line-clamp: 4;
                 -webkit-box-orient: vertical;
                 text-overflow: ellipsis;
+            }}
+
+            .product-author {{
+                color: rgba(255,255,255,0.7);
+                font-size: 11px;
+                margin-bottom: 8px;
+                font-style: italic;
             }}
 
             .product-price {{
@@ -1375,7 +1944,7 @@ def generate_talent_page(talent, all_products, all_talents):
                 <a href="/">Главная</a> → {talent['name']}
             </div>
 
-            <a href="/" class="back-button">
+            <a href="/#talents" class="back-button">
                 ← Назад к талантам
             </a>
 
@@ -1438,8 +2007,21 @@ def generate_product_page(product, talent, all_products, all_talents):
     full_desc_html = simple_markdown(product['full_description'])
     what_you_get_html = simple_markdown(product['what_you_get'])
 
-    # Типы товара
-    type_name = get_type_name(product['type'])
+    # Типы товара и описание
+    if product['type'] == 'Group':
+        type_info_html = """
+        <div class="product-type-info group">
+            <strong>🎭 Групповой товар</strong>
+            <p>Вы получите его когда наберется группа, позовите друзей! Если полная группа не наберется за месяц, значит сделаем всё с неполной группой!</p>
+        </div>
+        """
+    else:  # Individual
+        type_info_html = """
+        <div class="product-type-info individual">
+            <strong>⭐ Персональный товар</strong>
+            <p>После покупки свяжемся с вами в течение суток и обсудим получение.</p>
+        </div>
+        """
 
     # Информация о группе
     group_info_html = ""
@@ -1513,7 +2095,17 @@ def generate_product_page(product, talent, all_products, all_talents):
         <meta property="og:title" content="{product['name']} - {talent['name']}">
         <meta property="og:description" content="{product['short_description']}">
         <meta property="og:image" content="{product['photo_url']}">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:type" content="product">
         <meta property="og:url" content="https://donate.yallabalagan.org/product/{product['slug']}/">
+        <meta property="og:site_name" content="Ялла, Балаган - Фандрайзинг">
+        <meta property="og:price:amount" content="{product['price_ils']}">
+        <meta property="og:price:currency" content="ILS">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{product['name']} - {talent['name']}">
+        <meta name="twitter:description" content="{product['short_description']}">
+        <meta name="twitter:image" content="{product['photo_url']}">
 
         <!-- Google Analytics -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
@@ -1646,15 +2238,36 @@ def generate_product_page(product, talent, all_products, all_talents):
                 color: #1a202c;
             }}
 
-            .product-type {{
-                display: inline-block;
-                padding: 6px 12px;
-                background: #e535ab;
-                color: white;
-                border-radius: 6px;
-                font-size: 14px;
-                font-weight: 600;
+            .product-type-info {{
+                padding: 16px 20px;
+                border-radius: 12px;
                 margin-bottom: 20px;
+                border-left: 4px solid;
+            }}
+
+            .product-type-info.group {{
+                background: #f0f9ff;
+                border-left-color: #3b82f6;
+                color: #1e40af;
+            }}
+
+            .product-type-info.individual {{
+                background: #fef3c7;
+                border-left-color: #f59e0b;
+                color: #92400e;
+            }}
+
+            .product-type-info strong {{
+                display: block;
+                font-size: 16px;
+                margin-bottom: 8px;
+                font-weight: 700;
+            }}
+
+            .product-type-info p {{
+                margin: 0;
+                font-size: 14px;
+                line-height: 1.5;
             }}
 
             .product-price {{
@@ -2417,7 +3030,8 @@ def generate_product_page(product, talent, all_products, all_talents):
 
                 <div class="product-details">
                     <h1>{product['name']}</h1>
-                    <span class="product-type">{type_name}</span>
+
+                    {type_info_html}
 
                     <div class="product-price">₪{product['price_ils']}</div>
 
@@ -2609,6 +3223,11 @@ def lambda_handler(event, context):
         # Генерируем главную страницу
         index_html = generate_index_page(talents, products, total_raised)
         upload_to_s3('index.html', index_html)
+
+        # Генерируем страницу 404
+        error_404_html = generate_404_page()
+        upload_to_s3('404.html', error_404_html)
+        print("404 page generated and uploaded")
 
         # Генерируем страницы талантов
         for talent in talents:
