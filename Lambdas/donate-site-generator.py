@@ -228,10 +228,6 @@ def generate_footer_html():
             <span class="contact-icon">📱</span>
             <a href="https://wa.me/{CONTACT_PHONE.replace('+', '')}" target="_blank">{CONTACT_PHONE}</a>
         </div>
-        <div class="contact-item">
-            <span class="contact-icon">📍</span>
-            <span>{CONTACT_ADDRESS}</span>
-        </div>
         <div class="footer-links">
             <a href="https://yallabalagan.org/privacy" target="_blank">Privacy Policy</a>
             <span class="separator">•</span>
