@@ -8,7 +8,7 @@ import requests
 from pathlib import Path
 from collections import defaultdict
 from telegram import Bot, InputMediaPhoto
-from telegram.error import TelegramError
+from telegram.error import TelegramError, RetryAfter
 import asyncio
 import config
 
@@ -57,6 +57,8 @@ def get_active_talents():
     pages = response.json().get('results', [])
     talents_dict = {}
 
+    print(f"  📊 Fetched {len(pages)} talents from Notion")
+
     for page in pages:
         props = page['properties']
         slug = get_text_from_rich_text(props.get('Slug', {}).get('rich_text', []))
@@ -67,13 +69,20 @@ def get_active_talents():
                 'name': name,
                 'slug': slug
             }
+            print(f"  ✓ Loaded: {slug} -> {name}")
+        else:
+            print(f"  ⚠️  Skipped talent without slug: {name}")
 
+    print(f"  📋 Total talents in dict: {len(talents_dict)}")
     return talents_dict
 
 
-def group_screenshots_by_talent():
+def group_screenshots_by_talent(talents_dict):
     """
     Группирует скриншоты по талантам
+
+    Args:
+        talents_dict: dict с информацией о талантах {slug: {...}}
 
     Returns:
         dict: {talent_slug: [screenshot_paths]}
@@ -90,18 +99,25 @@ def group_screenshots_by_talent():
     for screenshot_path in screenshots_dir.glob("*.png"):
         filename = screenshot_path.stem  # имя без расширения
 
-        # Формат: talent_slug_product_slug.png
-        # Разделяем по первому подчеркиванию
-        parts = filename.split('_', 1)
+        # Формат: {talent_slug}_{product_slug}.png
+        # Находим подходящий talent_slug среди известных из Notion
+        matched_slug = None
+        for talent_slug in talents_dict.keys():
+            # Проверяем, начинается ли имя файла с этого slug
+            if filename.startswith(talent_slug + '_'):
+                matched_slug = talent_slug
+                break
 
-        if len(parts) >= 1:
-            talent_slug = parts[0]
-            screenshots_by_talent[talent_slug].append(str(screenshot_path))
+        if matched_slug:
+            screenshots_by_talent[matched_slug].append(str(screenshot_path))
+        else:
+            print(f"  ⚠️  Could not match screenshot to talent: {filename}")
 
+    print(f"  📸 Screenshot slugs matched: {list(screenshots_by_talent.keys())}")
     return dict(screenshots_by_talent)
 
 
-async def post_to_telegram(bot, chat_id, talent_info, screenshot_paths):
+async def post_to_telegram(bot, chat_id, talent_info, screenshot_paths, max_retries=3):
     """
     Постит скриншоты в Telegram для одного таланта
 
@@ -110,55 +126,70 @@ async def post_to_telegram(bot, chat_id, talent_info, screenshot_paths):
         chat_id: ID чата куда постить
         talent_info: dict с информацией о таланте
         screenshot_paths: list путей к скриншотам
+        max_retries: максимальное количество попыток при flood control
     """
-    try:
-        # Формируем текст сообщения
-        message_text = config.MESSAGE_TEMPLATE.format(
-            talent_name=talent_info['name'],
-            site_url=config.DONATE_SITE_URL,
-            talent_slug=talent_info['slug']
-        )
+    # Получаем первое имя (первое слово из полного имени)
+    first_name = talent_info['name'].split()[0] if talent_info['name'] else talent_info['name']
 
-        print(f"  📤 Posting {len(screenshot_paths)} screenshots for {talent_info['name']}")
+    # Формируем текст сообщения
+    message_text = config.MESSAGE_TEMPLATE.format(
+        talent_name=first_name,
+        site_url=config.DONATE_SITE_URL,
+        talent_slug=talent_info['slug']
+    )
 
-        if len(screenshot_paths) == 1:
-            # Одна фотография - отправляем с текстом
-            with open(screenshot_paths[0], 'rb') as photo:
-                await bot.send_photo(
+    print(f"  📤 Posting {len(screenshot_paths)} screenshots for {talent_info['name']}")
+
+    for attempt in range(max_retries):
+        try:
+            if len(screenshot_paths) == 1:
+                # Одна фотография - отправляем с текстом
+                with open(screenshot_paths[0], 'rb') as photo:
+                    await bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        caption=message_text
+                    )
+            else:
+                # Несколько фотографий - отправляем media group
+                media_group = []
+
+                for idx, path in enumerate(screenshot_paths):
+                    with open(path, 'rb') as photo:
+                        # Первое фото с caption
+                        if idx == 0:
+                            media_group.append(
+                                InputMediaPhoto(media=photo.read(), caption=message_text)
+                            )
+                        else:
+                            media_group.append(
+                                InputMediaPhoto(media=photo.read())
+                            )
+
+                await bot.send_media_group(
                     chat_id=chat_id,
-                    photo=photo,
-                    caption=message_text
+                    media=media_group
                 )
-        else:
-            # Несколько фотографий - отправляем media group
-            media_group = []
 
-            for idx, path in enumerate(screenshot_paths):
-                with open(path, 'rb') as photo:
-                    # Первое фото с caption
-                    if idx == 0:
-                        media_group.append(
-                            InputMediaPhoto(media=photo.read(), caption=message_text)
-                        )
-                    else:
-                        media_group.append(
-                            InputMediaPhoto(media=photo.read())
-                        )
+            print(f"  ✅ Posted successfully!")
+            return True
 
-            await bot.send_media_group(
-                chat_id=chat_id,
-                media=media_group
-            )
+        except RetryAfter as e:
+            retry_after = e.retry_after
+            print(f"  ⚠️  Flood control: waiting {retry_after} seconds...")
+            await asyncio.sleep(retry_after)
+            # Попробуем еще раз после ожидания
+            continue
 
-        print(f"  ✅ Posted successfully!")
-        return True
+        except TelegramError as e:
+            print(f"  ❌ Telegram error: {e}")
+            return False
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+            return False
 
-    except TelegramError as e:
-        print(f"  ❌ Telegram error: {e}")
-        return False
-    except Exception as e:
-        print(f"  ❌ Error: {e}")
-        return False
+    print(f"  ❌ Failed after {max_retries} attempts")
+    return False
 
 
 async def main():
@@ -178,16 +209,6 @@ async def main():
         print("   Set CHAT_ID in config.py or environment variable")
         return
 
-    # Проверяем наличие скриншотов
-    screenshots_by_talent = group_screenshots_by_talent()
-
-    if not screenshots_by_talent:
-        print("❌ No screenshots found!")
-        print(f"   Run screenshot_products.py first to generate screenshots")
-        return
-
-    print(f"✅ Found screenshots for {len(screenshots_by_talent)} talents")
-
     # Получаем информацию о талантах из Notion
     print("\n📥 Fetching talent information from Notion...")
     talents_info = get_active_talents()
@@ -195,6 +216,17 @@ async def main():
     if not talents_info:
         print("❌ Could not fetch talents from Notion!")
         return
+
+    # Проверяем наличие скриншотов и группируем по талантам
+    print("\n📸 Grouping screenshots by talents...")
+    screenshots_by_talent = group_screenshots_by_talent(talents_info)
+
+    if not screenshots_by_talent:
+        print("❌ No screenshots found!")
+        print(f"   Run screenshot_products.py first to generate screenshots")
+        return
+
+    print(f"✅ Found screenshots for {len(screenshots_by_talent)} talents")
 
     # Создаем бота
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN)

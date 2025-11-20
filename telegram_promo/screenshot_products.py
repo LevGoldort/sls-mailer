@@ -136,8 +136,14 @@ def screenshot_product_cards(talent, products):
     with sync_playwright() as p:
         # Запускаем браузер
         browser = p.chromium.launch(headless=True)
+
+        # Создаем страницу с мобильными настройками (эмуляция iPhone)
         page = browser.new_page(
-            viewport={'width': config.VIEWPORT_WIDTH, 'height': config.VIEWPORT_HEIGHT}
+            viewport={'width': config.VIEWPORT_WIDTH, 'height': config.VIEWPORT_HEIGHT},
+            user_agent=config.USER_AGENT,
+            is_mobile=True,
+            has_touch=True,
+            device_scale_factor=3  # Retina display
         )
 
         # Открываем страницу таланта
