@@ -318,9 +318,9 @@ def generate_404_page():
                 box-shadow: 0 6px 20px rgba(229, 53, 171, 0.6);
             }}
 
-            .promo-frame {{
+            .customer-frame {{
                 background: white;
-                border: 3px dashed #e535ab;
+                border: 3px solid #ffd700;
                 border-radius: 16px;
                 padding: 30px;
                 margin: 30px 0;
@@ -329,36 +329,22 @@ def generate_404_page():
                 box-shadow: 0 8px 30px rgba(0,0,0,0.2);
             }}
 
-            .promo-icon {{
-                font-size: 80px;
-                margin-bottom: 15px;
+            .customer-photo {{
+                width: 200px;
+                height: 200px;
+                border-radius: 50%;
+                object-fit: cover;
+                margin: 0 auto 20px;
                 display: block;
+                border: 4px solid #e535ab;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             }}
 
-            .promo-text {{
+            .customer-text {{
                 font-size: 18px;
                 color: #1a202c;
-                margin-bottom: 20px;
                 line-height: 1.5;
                 font-weight: 600;
-            }}
-
-            .promo-link {{
-                display: inline-block;
-                padding: 12px 30px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                text-decoration: none;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            }}
-
-            .promo-link:hover {{
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
             }}
 
             .site-footer {{
@@ -428,22 +414,18 @@ def generate_404_page():
                     font-size: 16px;
                 }}
 
-                .promo-frame {{
+                .customer-frame {{
                     padding: 20px;
                     margin: 20px 0;
                 }}
 
-                .promo-icon {{
-                    font-size: 60px;
+                .customer-photo {{
+                    width: 150px;
+                    height: 150px;
                 }}
 
-                .promo-text {{
+                .customer-text {{
                     font-size: 16px;
-                }}
-
-                .promo-link {{
-                    padding: 10px 20px;
-                    font-size: 14px;
                 }}
             }}
         </style>
@@ -452,15 +434,12 @@ def generate_404_page():
         <div class="container">
             <div class="error-code">404</div>
             <h1 class="error-title">Страница не найдена</h1>
-            <p class="error-message">
-                Кажется, вы попали на страницу, которой не существует.<br>
-                Возможно, ссылка устарела или содержит опечатку.
-            </p>
 
-            <div class="promo-frame">
-                <span class="promo-icon">❓</span>
-                <p class="promo-text">Хотите чтобы ваше лицо оказалось тут? Можем организовать!</p>
-                <a href="https://donate.yallabalagan.org/product/lev_unknown_face/" class="promo-link">Узнать больше</a>
+            <div class="customer-frame">
+                <img src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/404/customer.jpg" alt="Счастливый покупатель" class="customer-photo">
+                <p class="customer-text">
+                    Запрос данных страницы этого сайта был украден евреем - пожалуйста, повторите попытку позже.
+                </p>
             </div>
 
             <a href="/" class="btn-home">Вернуться на главную</a>

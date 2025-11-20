@@ -155,10 +155,6 @@ def generate_footer_html():
                         <span class="contact-icon">📱</span>
                         <a href="https://wa.me/{CONTACT_PHONE.replace('+', '')}" target="_blank">{CONTACT_PHONE}</a>
                     </div>
-                    <div class="contact-item">
-                        <span class="contact-icon">📍</span>
-                        <span>{CONTACT_ADDRESS}</span>
-                    </div>
                     <div class="footer-links">
                         <a href="/privacy">Privacy Policy</a>
                         <span class="separator">•</span>
@@ -407,6 +403,44 @@ def generate_html(events, youtube_video=None):
                 height: 250px;
                 background: url('https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/top_banner.jpg') center center;
                 background-size: cover;
+            }}
+
+            .donation-banner {{
+                background: linear-gradient(135deg, #e535ab 0%, #c72d93 100%);
+                padding: 20px;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(229, 53, 171, 0.3);
+            }}
+
+            .donation-content {{
+                max-width: 1200px;
+                margin: 0 auto;
+                color: white;
+                font-size: 16px;
+                font-weight: 600;
+                line-height: 1.6;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                align-items: center;
+            }}
+
+            .donation-content a {{
+                display: inline-block;
+                padding: 12px 30px;
+                background: white;
+                color: #e535ab;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 700;
+                transition: all 0.3s ease;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            }}
+
+            .donation-content a:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                background: #fff;
             }}
 
             .container {{
@@ -745,6 +779,20 @@ def generate_html(events, youtube_video=None):
                     height: 150px;
                 }}
 
+                .donation-banner {{
+                    padding: 15px 10px;
+                }}
+
+                .donation-content {{
+                    font-size: 14px;
+                    gap: 12px;
+                }}
+
+                .donation-content a {{
+                    padding: 10px 20px;
+                    font-size: 14px;
+                }}
+
                 .container {{
                     padding: 20px 15px;
                 }}
@@ -778,6 +826,13 @@ def generate_html(events, youtube_video=None):
     </head>
     <body>
         <div class="top-banner"></div>
+
+        <div class="donation-banner">
+            <div class="donation-content">
+                <span>⚠️ ВНИМАНИЕ! У нас идет кампания по сбору денег на съемки нового сезона наших шоу! Там можно получить уникальные товары от наших комиков и друзей!</span>
+                <a href="https://donate.yallabalagan.org" target="_blank">Узнать больше и поддержать →</a>
+            </div>
+        </div>
 
         <div class="container">
             <aside class="sidebar">
