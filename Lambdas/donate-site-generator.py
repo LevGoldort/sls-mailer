@@ -572,17 +572,17 @@ def generate_index_page(talents, products, total_raised):
         <link rel="icon" type="image/png" href="/favicon.png">
         <link rel="apple-touch-icon" href="/favicon.png">
         <meta property="og:title" content="Поддержи Ялла, Балаган!">
-        <meta property="og:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи крутые награды!">
-        <meta property="og:image" content="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/og-image.jpg">
+        <meta property="og:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи уникальные штуки!">
+        <meta property="og:image" content="https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg">
         <meta property="og:image:width" content="1200">
-        <meta property="og:image:height" content="630">
+        <meta property="og:image:height" content="1200">
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://donate.yallabalagan.org">
         <meta property="og:site_name" content="Ялла, Балаган - Фандрайзинг">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="Поддержи Ялла, Балаган!">
-        <meta name="twitter:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи крутые награды!">
-        <meta name="twitter:image" content="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/og-image.jpg">
+        <meta name="twitter:description" content="Собираем средства на съемки нового сезона. Поддержи комиков и получи уникальные штуки!">
+        <meta name="twitter:image" content="https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg">
 
         <!-- Google Analytics -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
@@ -1205,18 +1205,19 @@ def generate_index_page(talents, products, total_raised):
                 <div class="campaign-description">
                     <h2>О кампании</h2>
                     <p>
-                        Мы — Ялла, Балаган, творческое объединение израильтян. В основном мы занимаемся комедией —
-                        делаем стендап-шоу и выпускаем контент на YouTube. Здесь мы собираем средства на новый сезон съёмок.
-                        Помоги нам — круто будет!
+                        Мы – Ялла, Балаган, творческое объединение русскоязычных израильтян. Возможно, вы слышали наш подкаст <strong>«Че там у евреев»</strong> или шоу <strong>«Олег Смоукс»</strong>, а может, приходили на концерты комиков, которых мы привозим в Израиль. Концерты <strong>Гарика Оганисяна</strong>, <strong>Дениса Чужого</strong>, <strong>Андрея Айрапетова</strong>, <strong>Саши Долгополова</strong> и <strong>Виталия Косарева</strong> – это Ялла. Также мы продвигаем местную комедию.
                     </p>
                     <p>
-                        Мы решили, что просто делать донаты — это уныло, поэтому каждый талант в нашей орбите предлагает «товары» —
-                        что-то, что он готов сделать для вас за ваш донат. Плейлист от Кирилла Селегея, футболка от Вовы Тамаркина,
-                        экскурсия от Льва Гольдорта и многое другое. Поддержите нас и получите что-то крутое и уникальное!
+                        Мы очень хотим делать больше комедийного контента для YouTube, но расходы на продакшн не окупаются доходами от билетов, поэтому хотим попросить о небольшой помощи у вас.
                     </p>
                     <p>
-                        Ниже вы можете ознакомиться с проектами, на которые мы собираем средства, и с талантами, которые предлагают всякие штуки!
-                        Если вы хотите стать нашим талантом и предложить свои приколы на продажу во имя съемок - свяжитесь с нами по контактм снизу!
+                        Просто сделать донаты — это уныло, поэтому мы попросили каждого таланта в нашей орбите (комика, гостя подкаста, друга) предложить «товары» — то, что он готов сделать для вас за донат на продакшн. <strong>Кирилл Селегей</strong> готов собрать уникальный плейлист, <strong>Аня Ром</strong> – поругаться на иврите, <strong>Лев Гольдорт</strong> – провести экскурсию по выдуманному Тель-Авиву.
+                    </p>
+                    <p>
+                        Ниже - проекты, на которые мы собираем деньги, и люди, которые предлагают товары. Если хотите стать талантом и предложить товар, чтобы поддержать съемки, напишите по контактам внизу.
+                    </p>
+                    <p>
+                        Поддержите нас и получите что-то крутое и уникальное!
                     </p>
                 </div>
 
