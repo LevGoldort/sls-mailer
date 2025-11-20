@@ -700,6 +700,30 @@ def generate_index_page(talents, products, total_raised):
                 margin-bottom: 15px;
             }}
 
+            .campaign-action {{
+                margin-top: 30px;
+                text-align: center;
+            }}
+
+            .btn-view-products {{
+                display: inline-block;
+                padding: 16px 40px;
+                background: linear-gradient(135deg, #e535ab 0%, #c72d93 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: 700;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(229, 53, 171, 0.4);
+            }}
+
+            .btn-view-products:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(229, 53, 171, 0.6);
+                background: linear-gradient(135deg, #c72d93 0%, #a82478 100%);
+            }}
+
             /* Секция проектов */
             .projects-section {{
                 background: white;
@@ -1163,6 +1187,11 @@ def generate_index_page(talents, products, total_raised):
                     font-size: 18px;
                 }}
 
+                .btn-view-products {{
+                    padding: 14px 30px;
+                    font-size: 16px;
+                }}
+
                 .contact-item {{
                     display: flex;
                     margin: 10px 0;
@@ -1194,6 +1223,11 @@ def generate_index_page(talents, products, total_raised):
                     <p>
                         Поддержите нас и получите что-то крутое и уникальное!
                     </p>
+                    <div class="campaign-action">
+                        <a href="#talents" class="btn-view-products" onclick="showAllProducts(event)">
+                            🎁 Смотреть все товары
+                        </a>
+                    </div>
                 </div>
 
                 {progress_bar_html}
@@ -1246,6 +1280,27 @@ def generate_index_page(talents, products, total_raised):
 
                 // Активировать нажатую кнопку
                 event.target.classList.add('active');
+            }}
+
+            function showAllProducts(event) {{
+                event.preventDefault();
+
+                // Переключаемся на таб "Все приколы"
+                document.querySelectorAll('.tab-content').forEach(tab => {{
+                    tab.classList.remove('active');
+                }});
+                document.querySelectorAll('.tab-button').forEach(btn => {{
+                    btn.classList.remove('active');
+                }});
+
+                document.getElementById('products-tab').classList.add('active');
+                document.querySelectorAll('.tab-button')[1].classList.add('active');
+
+                // Скроллим к секции талантов
+                document.getElementById('talents').scrollIntoView({{
+                    behavior: 'smooth',
+                    block: 'start'
+                }});
             }}
         </script>
     </body>

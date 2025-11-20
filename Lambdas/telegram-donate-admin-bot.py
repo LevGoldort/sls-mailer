@@ -481,6 +481,32 @@ def handle_generate_codes(chat_id, username):
 def get_orders():
     """Получает заказы из Notion со статусом New или In Progress"""
     try:
+        # Сначала загружаем все продукты и таланты один раз
+        print("Loading all products and talents...")
+        all_products = query_notion_database(PRODUCTS_DB_ID)
+        all_talents = query_notion_database(TALENTS_DB_ID)
+
+        # Создаем словари для быстрого поиска
+        products_map = {}
+        for product in all_products:
+            product_id = product['id']
+            product_name = get_text_from_rich_text(product['properties'].get('Name', {}).get('title', []))
+            talent_relation = product['properties'].get('Talent', {}).get('relation', [])
+            talent_id = talent_relation[0]['id'] if talent_relation else None
+            products_map[product_id] = {
+                'name': product_name,
+                'talent_id': talent_id
+            }
+
+        talents_map = {}
+        for talent in all_talents:
+            talent_id = talent['id']
+            talent_name = get_text_from_rich_text(talent['properties'].get('Name', {}).get('title', []))
+            talents_map[talent_id] = talent_name
+
+        print(f"Loaded {len(products_map)} products and {len(talents_map)} talents")
+
+        # Теперь загружаем заказы
         response = requests.post(
             f"{NOTION_API_URL}/databases/{ORDERS_DB_ID}/query",
             headers=notion_headers(),
@@ -525,14 +551,15 @@ def get_orders():
 
             product_relation = props.get('Product', {}).get('relation', [])
             product_id = product_relation[0]['id'] if product_relation else None
+
+            # Быстрый поиск в словарях вместо API запросов
             product_name = ''
-
-            if product_id:
-                product_name = get_product_name(product_id)
-
             talent_name = ''
-            if product_id:
-                talent_name = get_talent_from_product(product_id)
+            if product_id and product_id in products_map:
+                product_name = products_map[product_id]['name']
+                talent_id = products_map[product_id]['talent_id']
+                if talent_id and talent_id in talents_map:
+                    talent_name = talents_map[talent_id]
 
             created_time = page.get('created_time', '')
             created_date = ''
@@ -545,10 +572,34 @@ def get_orders():
 
             status = props.get('Status', {}).get('select', {}).get('name', 'Unknown')
 
-            # Получаем информацию о покупателе
-            customer_name = get_text_from_rich_text(props.get('Customer_Name', {}).get('rich_text', []))
-            customer_email = props.get('Customer_Email', {}).get('email', '')
-            customer_telegram = get_text_from_rich_text(props.get('Customer_Telegram', {}).get('rich_text', []))
+            # Получаем информацию о покупателях из Buyers_Info (JSON)
+            buyers_info_text = get_text_from_rich_text(props.get('Buyers_Info', {}).get('rich_text', []))
+            buyers_count = props.get('Buyers_Count', {}).get('number', 0)
+
+            customer_name = ''
+            customer_email = ''
+            customer_telegram = ''
+            customer_phone = ''
+
+            # Парсим JSON из Buyers_Info
+            if buyers_info_text:
+                try:
+                    buyers_list = json.loads(buyers_info_text)
+                    if buyers_list and len(buyers_list) > 0:
+                        # Берем данные первого покупателя для отображения
+                        first_buyer = buyers_list[0]
+                        customer_name = first_buyer.get('name', '')
+                        customer_email = first_buyer.get('email', '')
+                        customer_telegram = first_buyer.get('telegram', '')
+                        customer_phone = first_buyer.get('phone', '')
+
+                        # Если покупателей больше одного, добавляем инфо
+                        if len(buyers_list) > 1:
+                            customer_name = f"{customer_name} (+{len(buyers_list)-1} еще)"
+                except json.JSONDecodeError:
+                    print(f"Failed to parse Buyers_Info JSON for order {order_id}")
+
+            print(f"Order {order_id}: {buyers_count} buyers, first: name='{customer_name}', email='{customer_email}', telegram='{customer_telegram}'")
 
             order = {
                 'order_id': order_id,
@@ -558,7 +609,9 @@ def get_orders():
                 'status': status,
                 'customer_name': customer_name,
                 'customer_email': customer_email,
-                'customer_telegram': customer_telegram
+                'customer_telegram': customer_telegram,
+                'customer_phone': customer_phone,
+                'buyers_count': buyers_count
             }
 
             orders.append(order)
@@ -647,10 +700,17 @@ def format_orders_message(orders):
 
         # Информация о покупателе
         customer_lines = []
+
+        # Если это групповой заказ (больше 1 покупателя), показываем количество
+        if order.get('buyers_count', 1) > 1:
+            customer_lines.append(f"👥 Покупателей: {order['buyers_count']}")
+
         if order['customer_name']:
             customer_lines.append(f"Покупатель: {order['customer_name']}")
         if order['customer_email']:
             customer_lines.append(f"Email: {order['customer_email']}")
+        if order['customer_phone']:
+            customer_lines.append(f"Телефон: {order['customer_phone']}")
         if order['customer_telegram']:
             customer_lines.append(f"Telegram: {order['customer_telegram']}")
 
