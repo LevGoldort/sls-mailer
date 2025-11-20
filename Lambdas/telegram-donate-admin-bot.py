@@ -545,12 +545,20 @@ def get_orders():
 
             status = props.get('Status', {}).get('select', {}).get('name', 'Unknown')
 
+            # Получаем информацию о покупателе
+            customer_name = get_text_from_rich_text(props.get('Customer_Name', {}).get('rich_text', []))
+            customer_email = props.get('Customer_Email', {}).get('email', '')
+            customer_telegram = get_text_from_rich_text(props.get('Customer_Telegram', {}).get('rich_text', []))
+
             order = {
                 'order_id': order_id,
                 'product_name': product_name,
                 'talent_name': talent_name,
                 'created': created_date,
-                'status': status
+                'status': status,
+                'customer_name': customer_name,
+                'customer_email': customer_email,
+                'customer_telegram': customer_telegram
             }
 
             orders.append(order)
@@ -636,7 +644,30 @@ def format_orders_message(orders):
         message += f"├ Продукт: {order['product_name']}\n"
         message += f"├ Талант: {order['talent_name']}\n"
         message += f"├ Создан: {order['created']}\n"
-        message += f"└ Статус: <i>{order['status']}</i>\n"
+
+        # Информация о покупателе
+        customer_lines = []
+        if order['customer_name']:
+            customer_lines.append(f"Покупатель: {order['customer_name']}")
+        if order['customer_email']:
+            customer_lines.append(f"Email: {order['customer_email']}")
+        if order['customer_telegram']:
+            customer_lines.append(f"Telegram: {order['customer_telegram']}")
+
+        # Если есть информация о покупателе, статус не последний
+        if customer_lines:
+            message += f"├ Статус: <i>{order['status']}</i>\n"
+            # Добавляем строки с правильными символами
+            for i, line in enumerate(customer_lines):
+                if i == len(customer_lines) - 1:
+                    # Последняя строка
+                    message += f"└ {line}\n"
+                else:
+                    message += f"├ {line}\n"
+        else:
+            # Если нет информации о покупателе, статус последний
+            message += f"└ Статус: <i>{order['status']}</i>\n"
+
         message += f"\n"
 
     return message
