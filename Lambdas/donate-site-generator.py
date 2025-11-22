@@ -8,6 +8,7 @@ import random
 NOTION_TOKEN = os.environ['NOTION_TOKEN']
 TALENTS_DB_ID = os.environ['TALENTS_DB_ID']
 PRODUCTS_DB_ID = os.environ['PRODUCTS_DB_ID']
+PROJECTS_DB_ID = os.environ['PROJECTS_DB_ID']
 S3_BUCKET_NAME = os.environ['S3_BUCKET_NAME']
 
 NOTION_API_URL = "https://api.notion.com/v1"
@@ -18,37 +19,7 @@ s3_client = boto3.client('s3')
 # Contact info
 CONTACT_EMAIL = "yalla@yallabalagan.org"
 CONTACT_PHONE = "+972506491680"
-CONTACT_ADDRESS = "Bat Yam, Rothschild 17"
 FUNDRAISING_GOAL = 30000  # ₪30,000
-
-# Projects data
-PROJECTS = [
-    {
-        'name': 'Изотоп Комедия',
-        'description': 'Научное шоу Льва Гольдорта, где комики обсуждают новости науки с учёным и пытаются понять, куда катится мир.',
-        'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/5bdf8d33e440e60c518ece0be8dd1498.png'
-    },
-    {
-        'name': 'Еврейский заговор',
-        'description': 'Шоу Максима Сотникова, которое признаёт: еврейский заговор существует, и его нужно возглавить.',
-        'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/2025-11-02+21.46.26.jpg'
-    },
-    {
-        'name': 'Шоу Крайней Плотности',
-        'description': 'Проект Кирилла Селегея, где три опытных комика слушают и анализируют, как начинаюшие комики рассказывают минуту шуток.',
-        'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/2025-11-02+21.47.13.jpg'
-    },
-    {
-        'name': 'Съемки Стендапа',
-        'description': 'Мы постоянно пишем стендап и постоянно выступаем, пришло наконец-то время более ли менее системно его снимать!',
-        'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/58e77288172e45f81075143274df3bc4.png'
-    },
-    {
-        'name': 'Подземелья и вопросы',
-        'description': 'Проект Саши Гришаева: Комедийная викторина с элементами настольного RPG: страдания, броски кубика, гейм мастер - мудак.',
-        'photo_url': 'https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/projects/sasha-grishaev-rpg.jpg'
-    }
-]
 
 
 def notion_headers():
@@ -187,6 +158,45 @@ def get_active_products():
 
     print(f"Found {len(products)} active products")
     return products
+
+
+def get_active_projects():
+    """Получает все проекты из Notion"""
+    response = requests.post(
+        f"{NOTION_API_URL}/databases/{PROJECTS_DB_ID}/query",
+        headers=notion_headers(),
+        json={}
+    )
+
+    if response.status_code != 200:
+        print(f"Error fetching projects: {response.text}")
+        return []
+
+    pages = response.json().get('results', [])
+    projects = []
+
+    for page in pages:
+        props = page['properties']
+
+        # Получаем все ID связанных талантов из Relation
+        talent_relation = props.get('Related_Talents', {}).get('relation', [])
+        talent_ids = [rel['id'] for rel in talent_relation] if talent_relation else []
+
+        project = {
+            'id': page['id'],
+            'name': get_text_from_rich_text(props.get('Name', {}).get('title', [])),
+            'slug': get_text_from_rich_text(props.get('Slug', {}).get('rich_text', [])),
+            'short_description': get_text_from_rich_text(props.get('Short_Description', {}).get('rich_text', [])),
+            'description': get_text_from_rich_text(props.get('Description', {}).get('rich_text', [])),
+            'image_url': props.get('Image_Url', {}).get('url', ''),
+            'youtube_url': props.get('Youtube_Url', {}).get('url', ''),
+            'talent_ids': talent_ids
+        }
+
+        projects.append(project)
+
+    print(f"Found {len(projects)} projects")
+    return projects
 
 
 def calculate_total_raised(products):
@@ -453,7 +463,7 @@ def generate_404_page():
     """
 
 
-def generate_index_page(talents, products, total_raised):
+def generate_index_page(talents, products, projects, total_raised):
     """Генерирует главную страницу"""
 
     progress_bar_html = generate_progress_bar(total_raised, FUNDRAISING_GOAL)
@@ -461,16 +471,18 @@ def generate_index_page(talents, products, total_raised):
     # Генерируем карточки проектов
     projects_html = '<div class="projects-grid">'
 
-    for project in PROJECTS:
+    for project in projects:
         projects_html += f"""
         <div class="project-card">
-            <div class="project-photo">
-                <img src="{project['photo_url']}" alt="{project['name']}">
-            </div>
-            <div class="project-info">
-                <h3>{project['name']}</h3>
-                <p class="project-description">{project['description']}</p>
-            </div>
+            <a href="/project/{project['slug']}/" class="project-link">
+                <div class="project-photo">
+                    <img src="{project['image_url']}" alt="{project['name']}">
+                </div>
+                <div class="project-info">
+                    <h3>{project['name']}</h3>
+                    <p class="project-description">{project['short_description']}</p>
+                </div>
+            </a>
         </div>
         """
 
@@ -499,8 +511,9 @@ def generate_index_page(talents, products, total_raised):
     # Создаем маппинг талантов по ID для быстрого доступа
     talent_map = {talent['id']: talent['name'] for talent in talents}
 
-    # Генерируем карточки всех продуктов в случайном порядке для вкладки "Все приколы"
-    shuffled_products = random.sample(products, len(products))
+    # Генерируем карточки всех продуктов в случайном порядке для вкладки "Все приколы" (исключая закончившиеся)
+    available_products_main = [p for p in products if (p['total_slots'] - p['sold_slots']) > 0]
+    shuffled_products = random.sample(available_products_main, len(available_products_main))
     all_products_html = '<div class="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">'
 
     for product in shuffled_products:
@@ -758,6 +771,14 @@ def generate_index_page(talents, products, total_raised):
             .project-card:hover {{
                 transform: translateY(-5px);
                 box-shadow: 0 12px 24px rgba(229, 53, 171, 0.3);
+            }}
+
+            .project-link {{
+                text-decoration: none;
+                color: inherit;
+                display: block;
+                height: 100%;
+                position: relative;
             }}
 
             .project-photo {{
@@ -1310,6 +1331,549 @@ def generate_index_page(talents, products, total_raised):
     return html
 
 
+def generate_project_page(project, all_talents, all_products):
+    """Генерирует страницу проекта"""
+
+    # Получаем связанных талантов
+    related_talents = [t for t in all_talents if t['id'] in project['talent_ids']]
+
+    # Генерируем HTML для связанных талантов
+    talents_html = ''
+    if related_talents:
+        talents_html = '<div class="related-talents"><h3>Связанные таланты</h3><div class="talents-grid-small">'
+        for talent in related_talents:
+            talents_html += f"""
+            <a href="/talent/{talent['slug']}/" class="talent-mini-card">
+                <div class="talent-mini-photo">
+                    <img src="{talent['photo_url']}" alt="{talent['name']}">
+                </div>
+                <div class="talent-mini-info">
+                    <div class="talent-mini-name">{talent['name']}</div>
+                    <div class="talent-mini-role">{talent['role']}</div>
+                </div>
+            </a>
+            """
+        talents_html += '</div></div>'
+
+    # YouTube видео
+    video_html = ""
+    if project['youtube_url']:
+        video_id = extract_youtube_id(project['youtube_url'])
+        if video_id:
+            video_html = f"""
+            <div class="project-video">
+                <h3>Видео проекта</h3>
+                <div class="video-container">
+                    <iframe
+                        src="https://www.youtube.com/embed/{video_id}"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen>
+                    </iframe>
+                </div>
+            </div>
+            """
+
+    # Выбираем 9 случайных товаров (исключая закончившиеся)
+    available_products = [p for p in all_products if (p['total_slots'] - p['sold_slots']) > 0]
+    random_products = random.sample(available_products, min(9, len(available_products)))
+    products_html = '<div class="products-grid">'
+
+    # Создаем маппинг талантов для отображения автора
+    talent_map = {t['id']: t['name'] for t in all_talents}
+
+    for product in random_products:
+        available_slots = product['total_slots'] - product['sold_slots']
+        percentage = int((product['sold_slots'] / product['total_slots']) * 100) if product['total_slots'] > 0 else 0
+
+        talent_names = [talent_map.get(tid, '') for tid in product['talent_ids'] if tid in talent_map]
+        author_text = ', '.join(talent_names) if talent_names else ''
+
+        products_html += f"""
+        <div class="product-card">
+            <a href="/product/{product['slug']}/" class="product-link">
+                <div class="product-photo">
+                    <img src="{product['photo_url']}" alt="{product['name']}">
+                </div>
+                <div class="product-info">
+                    <h3>{product['name']}</h3>
+                    <p class="product-description">{product['short_description']}</p>
+                    {'<p class="product-author">Автор: ' + author_text + '</p>' if author_text else ''}
+                    <p class="product-price">₪{product['price_ils']}</p>
+                    <div class="product-progress">
+                        <div class="progress-bar-small">
+                            <div class="progress-fill-small" style="width: {percentage}%"></div>
+                        </div>
+                        <p class="slots-info">Осталось: {available_slots} из {product['total_slots']}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        """
+
+    products_html += '</div>'
+
+    footer_html = generate_footer_html()
+
+    # Конвертируем description в HTML (поддержка переносов строк)
+    description_html = simple_markdown(project['description'])
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{project['name']} - Поддержи Ялла, Балаган!</title>
+        <link rel="icon" type="image/png" href="/favicon.png">
+        <link rel="apple-touch-icon" href="/favicon.png">
+        <meta property="og:title" content="{project['name']} - Поддержи Ялла, Балаган!">
+        <meta property="og:description" content="{project['short_description']}">
+        <meta property="og:image" content="{project['image_url']}">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://donate.yallabalagan.org/project/{project['slug']}/">
+
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-RP1612BFV9"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', 'G-RP1612BFV9');
+        </script>
+
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+                line-height: 1.6;
+                color: #1a202c;
+            }}
+
+            .container {{
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 40px 20px;
+            }}
+
+            .breadcrumbs {{
+                margin-bottom: 20px;
+                color: #718096;
+                font-size: 14px;
+            }}
+
+            .breadcrumbs a {{
+                color: #e535ab;
+                text-decoration: none;
+            }}
+
+            .breadcrumbs a:hover {{
+                text-decoration: underline;
+            }}
+
+            .back-button {{
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 20px;
+                padding: 10px 20px;
+                background: white;
+                border: 2px solid #e2e8f0;
+                border-radius: 8px;
+                color: #1a202c;
+                text-decoration: none;
+                font-weight: 500;
+                transition: all 0.2s;
+            }}
+
+            .back-button:hover {{
+                border-color: #e535ab;
+                color: #e535ab;
+            }}
+
+            .project-header {{
+                background: white;
+                padding: 40px;
+                border-radius: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-bottom: 40px;
+            }}
+
+            .project-title {{
+                font-size: 36px;
+                margin-bottom: 20px;
+                color: #1a202c;
+            }}
+
+            .project-image {{
+                width: 100%;
+                max-height: 500px;
+                object-fit: cover;
+                border-radius: 12px;
+                margin-bottom: 30px;
+            }}
+
+            .project-description {{
+                color: #4a5568;
+                line-height: 1.8;
+                font-size: 16px;
+            }}
+
+            .project-description p {{
+                margin-bottom: 15px;
+            }}
+
+            .related-talents {{
+                background: white;
+                padding: 40px;
+                border-radius: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-bottom: 40px;
+            }}
+
+            .related-talents h3 {{
+                font-size: 24px;
+                margin-bottom: 20px;
+                color: #1a202c;
+            }}
+
+            .talents-grid-small {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 20px;
+            }}
+
+            .talent-mini-card {{
+                text-decoration: none;
+                color: inherit;
+                display: block;
+                border-radius: 12px;
+                overflow: hidden;
+                transition: all 0.3s ease;
+                background: white;
+                border: 1px solid #e2e8f0;
+            }}
+
+            .talent-mini-card:hover {{
+                transform: translateY(-5px);
+                box-shadow: 0 8px 16px rgba(229, 53, 171, 0.2);
+                border-color: #e535ab;
+            }}
+
+            .talent-mini-photo {{
+                width: 100%;
+                aspect-ratio: 4/5;
+                overflow: hidden;
+            }}
+
+            .talent-mini-photo img {{
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }}
+
+            .talent-mini-info {{
+                padding: 15px;
+                text-align: center;
+            }}
+
+            .talent-mini-name {{
+                font-size: 16px;
+                font-weight: 600;
+                color: #1a202c;
+                margin-bottom: 5px;
+            }}
+
+            .talent-mini-role {{
+                font-size: 13px;
+                color: #718096;
+            }}
+
+            .project-video {{
+                background: white;
+                padding: 40px;
+                border-radius: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-bottom: 40px;
+            }}
+
+            .project-video h3 {{
+                font-size: 24px;
+                margin-bottom: 20px;
+                color: #1a202c;
+            }}
+
+            .video-container {{
+                position: relative;
+                padding-bottom: 56.25%;
+                height: 0;
+                overflow: hidden;
+                border-radius: 8px;
+            }}
+
+            .video-container iframe {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }}
+
+            .products-section {{
+                background: white;
+                padding: 40px;
+                border-radius: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-bottom: 40px;
+            }}
+
+            .products-section h2 {{
+                font-size: 28px;
+                margin-bottom: 30px;
+                color: #1a202c;
+                text-align: center;
+            }}
+
+            .products-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 24px;
+            }}
+
+            .product-card {{
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                transition: all 0.3s ease;
+                aspect-ratio: 4/5;
+                position: relative;
+            }}
+
+            .product-card:hover {{
+                transform: translateY(-5px);
+                box-shadow: 0 12px 24px rgba(229, 53, 171, 0.3);
+            }}
+
+            .product-link {{
+                text-decoration: none;
+                color: inherit;
+                display: block;
+                height: 100%;
+                position: relative;
+            }}
+
+            .product-photo {{
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }}
+
+            .product-photo img {{
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }}
+
+            .product-info {{
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                padding: 20px;
+                background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 70%, transparent 100%);
+                color: white;
+            }}
+
+            .product-info h3 {{
+                font-size: 18px;
+                margin-bottom: 8px;
+                color: white;
+                font-weight: 700;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                text-overflow: ellipsis;
+                line-height: 1.3;
+            }}
+
+            .product-description {{
+                color: rgba(255,255,255,0.85);
+                font-size: 13px;
+                line-height: 1.3;
+                margin-bottom: 10px;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 4;
+                -webkit-box-orient: vertical;
+                text-overflow: ellipsis;
+            }}
+
+            .product-author {{
+                color: rgba(255,255,255,0.7);
+                font-size: 11px;
+                margin-bottom: 8px;
+                font-style: italic;
+            }}
+
+            .product-price {{
+                color: #ffd700;
+                font-size: 16px;
+                font-weight: 600;
+                margin-bottom: 10px;
+            }}
+
+            .product-progress {{
+                margin-top: 8px;
+            }}
+
+            .progress-bar-small {{
+                width: 100%;
+                height: 8px;
+                background: rgba(255,255,255,0.3);
+                border-radius: 4px;
+                overflow: hidden;
+                margin-bottom: 5px;
+            }}
+
+            .progress-fill-small {{
+                height: 100%;
+                background: #e535ab;
+                transition: width 0.3s ease;
+            }}
+
+            .slots-info {{
+                font-size: 12px;
+                color: rgba(255,255,255,0.8);
+                margin: 0;
+            }}
+
+            .site-footer {{
+                background: white;
+                padding: 40px;
+                border-radius: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }}
+
+            .footer-contacts h3 {{
+                font-size: 18px;
+                margin-bottom: 15px;
+                color: #1a202c;
+            }}
+
+            .contact-item {{
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin: 0 15px 10px 15px;
+                color: #4a5568;
+                font-size: 14px;
+            }}
+
+            .contact-item a {{
+                color: #4a5568;
+                text-decoration: none;
+                transition: color 0.2s;
+            }}
+
+            .contact-item a:hover {{
+                color: #e535ab;
+            }}
+
+            .footer-links {{
+                margin-top: 20px;
+                font-size: 13px;
+            }}
+
+            .footer-links a {{
+                color: #718096;
+                text-decoration: none;
+                margin: 0 10px;
+            }}
+
+            .footer-links a:hover {{
+                color: #e535ab;
+            }}
+
+            .separator {{
+                color: #cbd5e0;
+            }}
+
+            @media (max-width: 768px) {{
+                .container {{
+                    padding: 20px 15px;
+                }}
+
+                .project-header {{
+                    padding: 25px 20px;
+                }}
+
+                .project-title {{
+                    font-size: 24px;
+                }}
+
+                .products-grid {{
+                    grid-template-columns: 1fr;
+                }}
+
+                .talents-grid-small {{
+                    grid-template-columns: 1fr;
+                }}
+
+                .contact-item {{
+                    display: flex;
+                    margin: 10px 0;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="/">Главная</a> → {project['name']}
+            </div>
+
+            <a href="/" class="back-button">
+                ← Назад на главную
+            </a>
+
+            <div class="project-header">
+                <h1 class="project-title">{project['name']}</h1>
+                <img src="{project['image_url']}" alt="{project['name']}" class="project-image">
+                <div class="project-description">
+                    {description_html}
+                </div>
+            </div>
+
+            {talents_html}
+
+            {video_html}
+
+            <div class="products-section">
+                <h2>Поддержи реализацию этого проекта:</h2>
+                {products_html}
+            </div>
+
+            <footer class="site-footer">
+                {footer_html}
+            </footer>
+        </div>
+    </body>
+    </html>
+    """
+
+    return html
+
+
 def upload_to_s3(key, content, content_type='text/html'):
     """Загружает файл в S3"""
     try:
@@ -1334,7 +1898,7 @@ def extract_youtube_id(url):
 
     import re
     patterns = [
-        r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{{11}})',
+        r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})',
     ]
 
     for pattern in patterns:
@@ -2094,8 +2658,8 @@ def generate_product_page(product, talent, all_products, all_talents):
             </div>
             """
 
-    # Генерируем галерею из 5 случайных продуктов от других талантов
-    other_products = [p for p in all_products if not any(tid in product['talent_ids'] for tid in p['talent_ids'])]
+    # Генерируем галерею из 5 случайных продуктов от других талантов (исключая закончившиеся)
+    other_products = [p for p in all_products if not any(tid in product['talent_ids'] for tid in p['talent_ids']) and (p['total_slots'] - p['sold_slots']) > 0]
     random_products = random.sample(other_products, min(5, len(other_products)))
 
     products_gallery_html = ""
@@ -3263,6 +3827,7 @@ def lambda_handler(event, context):
         # Получаем данные из Notion
         talents = get_active_talents()
         products = get_active_products()
+        projects = get_active_projects()
 
         # Создаем словарь талантов для быстрого поиска
         talents_dict = {t['id']: t for t in talents}
@@ -3272,7 +3837,7 @@ def lambda_handler(event, context):
         print(f"Total raised: ₪{total_raised:,}")
 
         # Генерируем главную страницу
-        index_html = generate_index_page(talents, products, total_raised)
+        index_html = generate_index_page(talents, products, projects, total_raised)
         upload_to_s3('index.html', index_html)
 
         # Генерируем страницу 404
@@ -3294,6 +3859,12 @@ def lambda_handler(event, context):
             else:
                 print(f"Warning: Talent not found for product {product['name']}")
 
+        # Генерируем страницы проектов
+        for project in projects:
+            project_html = generate_project_page(project, talents, products)
+            upload_to_s3(f"project/{project['slug']}/index.html", project_html)
+            print(f"Generated project page: {project['name']}")
+
         # TODO: Генерация страницы активации
 
         return {
@@ -3302,6 +3873,7 @@ def lambda_handler(event, context):
                 'message': 'Site generated successfully',
                 'talents': len(talents),
                 'products': len(products),
+                'projects': len(projects),
                 'total_raised': total_raised
             })
         }
