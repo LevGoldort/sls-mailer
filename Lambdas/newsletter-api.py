@@ -100,7 +100,10 @@ def create_campaign(event):
             'campaign_id': campaign_id,
             'subject': body['subject'],
             'html_body': body['html_body'],
+            'preview_text': body.get('preview_text', ''),  # NEW: Email preview text
             'tags_filter': body.get('tags_filter', []),
+            'tags_match_mode': body.get('tags_match_mode', 'ANY'),  # NEW: ANY or ALL
+            'exclude_tags': body.get('exclude_tags', []),  # NEW: Tags to exclude
             'status': 'draft',
             'sent_count': 0,
             'opened_count': 0,
@@ -224,11 +227,15 @@ def send_campaign(event):
 
 
 def preview_contacts(event):
-    """GET /contacts/preview - Preview contacts by tags"""
+    """GET /contacts/preview - Preview contacts by tags with advanced filtering"""
     try:
         query_params = event.get('queryStringParameters', {}) or {}
         tags_str = query_params.get('tags', '')
+        exclude_tags_str = query_params.get('exclude_tags', '')
+        match_mode = query_params.get('match_mode', 'ANY')  # ANY or ALL
+
         tags = [t.strip() for t in tags_str.split(',') if t.strip()]
+        exclude_tags = [t.strip() for t in exclude_tags_str.split(',') if t.strip()]
 
         # Scan contacts
         response = contacts_table.scan()
@@ -242,11 +249,34 @@ def preview_contacts(event):
             filtered_contacts = []
             for contact in active_contacts:
                 contact_tags = contact.get('tags', [])
-                # Check if any of the requested tags match
-                if any(tag in contact_tags for tag in tags):
+
+                # Check match mode
+                if match_mode == 'ALL':
+                    # ALL: contact must have all specified tags
+                    tags_match = all(tag in contact_tags for tag in tags)
+                else:
+                    # ANY: contact must have at least one specified tag
+                    tags_match = any(tag in contact_tags for tag in tags)
+
+                # Check exclude tags
+                if exclude_tags:
+                    has_excluded_tag = any(tag in contact_tags for tag in exclude_tags)
+                    if has_excluded_tag:
+                        continue  # Skip this contact
+
+                if tags_match:
                     filtered_contacts.append(contact)
         else:
-            filtered_contacts = active_contacts
+            # No tags filter - use all active contacts (but still check exclude)
+            if exclude_tags:
+                filtered_contacts = []
+                for contact in active_contacts:
+                    contact_tags = contact.get('tags', [])
+                    has_excluded_tag = any(tag in contact_tags for tag in exclude_tags)
+                    if not has_excluded_tag:
+                        filtered_contacts.append(contact)
+            else:
+                filtered_contacts = active_contacts
 
         # Get sample emails
         sample_emails = [c['email'] for c in filtered_contacts[:5]]

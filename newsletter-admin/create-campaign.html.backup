@@ -223,15 +223,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="preview_text">Preview Text (опционально)</label>
-                    <input type="text" id="preview_text" name="preview_text"
-                           placeholder="Текст который будет виден в inbox после subject line" maxlength="100">
-                    <p class="help-text">
-                        Этот текст будет показан в почтовом ящике после заголовка (макс. 100 символов)
-                    </p>
-                </div>
-
-                <div class="form-group">
                     <label for="html_body">Email HTML Body *</label>
                     <p class="help-text">
                         Use {{UNSUBSCRIBE_LINK}} for unsubscribe link. Tracking will be added automatically.
@@ -252,31 +243,8 @@
                     <p class="help-text">
                         Leave empty to send to all active subscribers, or select specific tags
                     </p>
-
-                    <div style="margin: 15px 0;">
-                        <label style="font-weight: normal; font-size: 14px;">Match mode:</label><br>
-                        <label style="font-weight: normal; margin-right: 20px;">
-                            <input type="radio" name="match_mode" value="ANY" checked>
-                            Match ANY (OR) - contacts with at least one selected tag
-                        </label>
-                        <label style="font-weight: normal;">
-                            <input type="radio" name="match_mode" value="ALL">
-                            Match ALL (AND) - contacts must have all selected tags
-                        </label>
-                    </div>
-
                     <div class="tags-container" id="tags-container">
                         <p style="color: #999;">Loading tags...</p>
-                    </div>
-
-                    <div style="margin-top: 20px;">
-                        <label>Exclude Tags (optional)</label>
-                        <p class="help-text">
-                            Exclude contacts with any of these tags
-                        </p>
-                        <div class="tags-container" id="exclude-tags-container">
-                            <p style="color: #999;">Loading...</p>
-                        </div>
                     </div>
                 </div>
 
@@ -325,26 +293,15 @@
         // Display tags as checkboxes
         function displayTags(tags) {
             const container = document.getElementById('tags-container');
-            const excludeContainer = document.getElementById('exclude-tags-container');
 
             if (tags.length === 0) {
                 container.innerHTML = '<p style="color: #999;">No tags available</p>';
-                excludeContainer.innerHTML = '<p style="color: #999;">No tags available</p>';
                 return;
             }
 
-            // Include tags
             container.innerHTML = tags.map(tag => `
                 <label class="tag-checkbox">
                     <input type="checkbox" name="tag" value="${tag}" onchange="previewRecipients()">
-                    ${tag}
-                </label>
-            `).join('');
-
-            // Exclude tags
-            excludeContainer.innerHTML = tags.map(tag => `
-                <label class="tag-checkbox">
-                    <input type="checkbox" name="exclude_tag" value="${tag}" onchange="previewRecipients()">
                     ${tag}
                 </label>
             `).join('');
@@ -354,19 +311,11 @@
         async function previewRecipients() {
             const selectedTags = Array.from(document.querySelectorAll('input[name="tag"]:checked'))
                 .map(cb => cb.value);
-            const excludeTags = Array.from(document.querySelectorAll('input[name="exclude_tag"]:checked'))
-                .map(cb => cb.value);
-            const matchMode = document.querySelector('input[name="match_mode"]:checked')?.value || 'ANY';
 
-            const params = new URLSearchParams();
-            if (selectedTags.length > 0) params.append('tags', selectedTags.join(','));
-            if (excludeTags.length > 0) params.append('exclude_tags', excludeTags.join(','));
-            params.append('match_mode', matchMode);
-
-            const queryString = params.toString() ? `?${params.toString()}` : '';
+            const tagsQuery = selectedTags.length > 0 ? `?tags=${selectedTags.join(',')}` : '';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/contacts/preview${queryString}`);
+                const response = await fetch(`${API_BASE_URL}/contacts/preview${tagsQuery}`);
                 if (!response.ok) throw new Error('Failed to preview');
 
                 const data = await response.json();
@@ -393,22 +342,11 @@
             console.log('Form submitted!');
 
             const subject = document.getElementById('subject').value.trim();
-            const preview_text = document.getElementById('preview_text').value.trim();
             const html_body = document.getElementById('html_body').value.trim();
             const selectedTags = Array.from(document.querySelectorAll('input[name="tag"]:checked'))
                 .map(cb => cb.value);
-            const excludeTags = Array.from(document.querySelectorAll('input[name="exclude_tag"]:checked'))
-                .map(cb => cb.value);
-            const matchMode = document.querySelector('input[name="match_mode"]:checked')?.value || 'ANY';
 
-            console.log('Form data:', {
-                subject,
-                preview_text,
-                html_body_length: html_body.length,
-                selectedTags,
-                excludeTags,
-                matchMode
-            });
+            console.log('Form data:', { subject, html_body_length: html_body.length, selectedTags });
 
             if (!subject || !html_body) {
                 showAlert('Please fill in all required fields', 'error');
@@ -428,11 +366,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         subject,
-                        preview_text,
                         html_body,
-                        tags_filter: selectedTags,
-                        tags_match_mode: matchMode,
-                        exclude_tags: excludeTags
+                        tags_filter: selectedTags
                     })
                 });
 

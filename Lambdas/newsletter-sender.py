@@ -65,8 +65,11 @@ def generate_email_hash(email):
     ).hexdigest()[:16]
 
 
-def get_active_contacts(tags_filter):
-    """Get all active contacts matching tags filter"""
+def get_active_contacts(tags_filter, match_mode='ANY', exclude_tags=None):
+    """Get all active contacts matching tags filter with advanced logic"""
+    if exclude_tags is None:
+        exclude_tags = []
+
     response = contacts_table.scan()
     all_contacts = response.get('Items', [])
 
@@ -78,22 +81,61 @@ def get_active_contacts(tags_filter):
         filtered_contacts = []
         for contact in active_contacts:
             contact_tags = contact.get('tags', [])
-            # Check if any of the requested tags match
-            if any(tag in contact_tags for tag in tags_filter):
+
+            # Check match mode
+            if match_mode == 'ALL':
+                # ALL: contact must have all specified tags
+                tags_match = all(tag in contact_tags for tag in tags_filter)
+            else:
+                # ANY: contact must have at least one specified tag
+                tags_match = any(tag in contact_tags for tag in tags_filter)
+
+            # Check exclude tags
+            if exclude_tags:
+                has_excluded_tag = any(tag in contact_tags for tag in exclude_tags)
+                if has_excluded_tag:
+                    continue  # Skip this contact
+
+            if tags_match:
                 filtered_contacts.append(contact)
         return filtered_contacts
     else:
-        return active_contacts
+        # No tags filter - use all active contacts (but still check exclude)
+        if exclude_tags:
+            filtered_contacts = []
+            for contact in active_contacts:
+                contact_tags = contact.get('tags', [])
+                has_excluded_tag = any(tag in contact_tags for tag in exclude_tags)
+                if not has_excluded_tag:
+                    filtered_contacts.append(contact)
+            return filtered_contacts
+        else:
+            return active_contacts
 
 
-def personalize_html(html_body, email, campaign_id):
-    """Personalize HTML with tracking links and unsubscribe"""
+def personalize_html(html_body, email, campaign_id, preview_text=''):
+    """Personalize HTML with tracking links, unsubscribe, and preview text"""
     email_hash = generate_email_hash(email)
     token = generate_token(email)
 
+    # Add preview text at the beginning if provided
+    if preview_text:
+        preview_div = f'<div style="display:none;max-height:0px;overflow:hidden;mso-hide:all;">{preview_text}</div>'
+        # Insert after <body> tag
+        if '<body>' in html_body:
+            html = html_body.replace('<body>', f'<body>{preview_div}', 1)
+        elif '<body ' in html_body:
+            # Handle <body with attributes>
+            html = re.sub(r'(<body[^>]*>)', r'\1' + preview_div, html_body, count=1)
+        else:
+            # No body tag - prepend
+            html = preview_div + html_body
+    else:
+        html = html_body
+
     # Replace unsubscribe link
     unsubscribe_url = f"https://newsletter.yallabalagan.org/unsubscribe.html?email={quote(email)}&token={token}"
-    html = html_body.replace('{{UNSUBSCRIBE_LINK}}', unsubscribe_url)
+    html = html.replace('{{UNSUBSCRIBE_LINK}}', unsubscribe_url)
 
     # Add tracking pixel before </body>
     tracking_pixel = f'<img src="{TRACKING_BASE_URL}/track/open/{campaign_id}/{email_hash}" width="1" height="1" style="display:none;" />'
@@ -189,13 +231,16 @@ def lambda_handler(event, context):
 
         subject = campaign['subject']
         html_body = campaign['html_body']
+        preview_text = campaign.get('preview_text', '')
         tags_filter = campaign.get('tags_filter', [])
+        tags_match_mode = campaign.get('tags_match_mode', 'ANY')
+        exclude_tags = campaign.get('exclude_tags', [])
 
         print(f"Processing campaign: {campaign_id}")
-        print(f"Tags filter: {tags_filter}")
+        print(f"Tags filter: {tags_filter}, Match mode: {tags_match_mode}, Exclude: {exclude_tags}")
 
         # Get contacts
-        contacts = get_active_contacts(tags_filter)
+        contacts = get_active_contacts(tags_filter, tags_match_mode, exclude_tags)
         total_contacts = len(contacts)
 
         print(f"Found {total_contacts} contacts to send to")
@@ -221,7 +266,7 @@ def lambda_handler(event, context):
             email = contact['email']
 
             # Personalize HTML
-            personalized_html = personalize_html(html_body, email, campaign_id)
+            personalized_html = personalize_html(html_body, email, campaign_id, preview_text)
 
             # Send email
             success, message_id = send_email(email, subject, personalized_html)

@@ -23,6 +23,24 @@ contacts = [
         'name': 'Glev Go',
         'tags': ['stand-up', 'tel-aviv'],
         'status': 'active',
+    },
+    {
+        'email': 'test-improv@example.com',
+        'name': 'Improv Fan',
+        'tags': ['improv', 'tel-aviv'],
+        'status': 'active',
+    },
+    {
+        'email': 'test-vip-only@example.com',
+        'name': 'VIP Only',
+        'tags': ['vip'],
+        'status': 'active',
+    },
+    {
+        'email': 'test-all-tags@example.com',
+        'name': 'All Tags',
+        'tags': ['stand-up', 'improv', 'tel-aviv', 'vip'],
+        'status': 'active',
     }
 ]
 
