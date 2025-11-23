@@ -180,8 +180,10 @@ def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Event: {json.dumps(event)}")
 
-    path = event.get('rawPath', '')
-    print(f"Path: {path}")
+    raw_path = event.get('rawPath', '')
+    # Remove /prod prefix if present
+    path = raw_path.replace('/prod', '') if raw_path.startswith('/prod') else raw_path
+    print(f"Raw Path: {raw_path}, Normalized Path: {path}")
 
     try:
         if '/track/open/' in path:
@@ -191,11 +193,13 @@ def lambda_handler(event, context):
         else:
             return {
                 'statusCode': 404,
-                'body': json.dumps({'error': 'Not found'})
+                'body': json.dumps({'error': 'Not found', 'path': raw_path})
             }
 
     except Exception as e:
         print(f"Unhandled error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})

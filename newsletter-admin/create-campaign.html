@@ -312,7 +312,7 @@
             const selectedTags = Array.from(document.querySelectorAll('input[name="tag"]:checked'))
                 .map(cb => cb.value);
 
-            const tagsQuery = selectedTags.length > 0 ? `?tags=${selectedTags.join(',)}` : '';
+            const tagsQuery = selectedTags.length > 0 ? `?tags=${selectedTags.join(',')}` : '';
 
             try {
                 const response = await fetch(`${API_BASE_URL}/contacts/preview${tagsQuery}`);
@@ -339,11 +339,14 @@
         // Handle form submission
         document.getElementById('campaign-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            console.log('Form submitted!');
 
             const subject = document.getElementById('subject').value.trim();
             const html_body = document.getElementById('html_body').value.trim();
             const selectedTags = Array.from(document.querySelectorAll('input[name="tag"]:checked'))
                 .map(cb => cb.value);
+
+            console.log('Form data:', { subject, html_body_length: html_body.length, selectedTags });
 
             if (!subject || !html_body) {
                 showAlert('Please fill in all required fields', 'error');
@@ -355,6 +358,8 @@
             createBtn.textContent = 'Creating...';
 
             try {
+                console.log('Sending request to:', `${API_BASE_URL}/campaigns`);
+
                 // Create campaign
                 const response = await fetch(`${API_BASE_URL}/campaigns`, {
                     method: 'POST',
@@ -366,9 +371,16 @@
                     })
                 });
 
-                if (!response.ok) throw new Error('Failed to create campaign');
+                console.log('Response status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error Response:', errorText);
+                    throw new Error(`API Error ${response.status}: ${errorText}`);
+                }
 
                 const data = await response.json();
+                console.log('Campaign created:', data);
                 createdCampaignId = data.campaign_id;
 
                 showAlert('Campaign created successfully!', 'success');

@@ -77,7 +77,8 @@ def cors_response(status_code, body):
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS,PUT,DELETE',
+            'Access-Control-Max-Age': '3600'
         },
         'body': json.dumps(body, cls=DecimalEncoder)
     }
@@ -312,10 +313,12 @@ def lambda_handler(event, context):
         return cors_response(200, {})
 
     # Route based on path and method
-    path = event.get('rawPath', '')
+    raw_path = event.get('rawPath', '')
+    # Remove /prod prefix if present
+    path = raw_path.replace('/prod', '') if raw_path.startswith('/prod') else raw_path
     method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
 
-    print(f"Method: {method}, Path: {path}")
+    print(f"Method: {method}, Raw Path: {raw_path}, Normalized Path: {path}")
 
     try:
         if method == 'POST' and path == '/campaigns':
@@ -337,8 +340,10 @@ def lambda_handler(event, context):
             return unsubscribe_contact(event)
 
         else:
-            return cors_response(404, {'error': 'Not found'})
+            return cors_response(404, {'error': 'Not found', 'path': raw_path, 'method': method})
 
     except Exception as e:
         print(f"Unhandled error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return cors_response(500, {'error': str(e)})
