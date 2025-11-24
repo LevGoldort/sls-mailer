@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Images - Newsletter Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .back-btn {
+            padding: 8px 16px;
+            background: white;
+            color: #666;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-right: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #e535ab;
+        }
+
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .drop-zone {
+            border: 3px dashed #ddd;
+            border-radius: 8px;
+            padding: 60px 20px;
+            text-align: center;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone.dragover {
+            border-color: #e535ab;
+            background: #fef5fb;
+        }
+
+        .drop-zone-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #999;
+        }
+
+        .drop-zone h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .drop-zone p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .select-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #e535ab;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .select-btn:hover {
+            background: #c72d94;
+        }
+
+        .paste-hint {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            color: #1976d2;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .image-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .image-preview {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .image-url {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .copy-btn {
+            padding: 8px 16px;
+            background: #e535ab;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: #c72d94;
+        }
+
+        .copy-btn.copied {
+            background: #55efc4;
+            color: #00b894;
+        }
+
+        .status {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status.uploading {
+            color: #1976d2;
+        }
+
+        .status.success {
+            color: #00b894;
+        }
+
+        .status.error {
+            color: #d63031;
+        }
+
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #e535ab;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #55efc4;
+            color: #00b894;
+        }
+
+        .alert-error {
+            background: #ff7675;
+            color: white;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .stat {
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e535ab;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← Back</a>
+            <h1>Upload Images</h1>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <div class="upload-section">
+            <div class="drop-zone" id="drop-zone">
+                <div class="drop-zone-icon">📸</div>
+                <h3>Drop images here</h3>
+                <p>or click to select files</p>
+                <label for="file-input" class="select-btn">Select Images</label>
+                <input type="file" id="file-input" class="file-input" accept="image/*" multiple>
+            </div>
+
+            <div class="paste-hint">
+                💡 <strong>Tip:</strong> You can also paste images from clipboard (Ctrl+V or Cmd+V)
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="total-uploads">0</div>
+                    <div class="stat-label">Total Uploads</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="successful-uploads">0</div>
+                    <div class="stat-label">Successful</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="failed-uploads">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="images-grid" id="images-grid"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
+
+        let totalUploads = 0;
+        let successfulUploads = 0;
+        let failedUploads = 0;
+
+        // Get elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const imagesGrid = document.getElementById('images-grid');
+
+        // Click to select files
+        dropZone.addEventListener('click', (e) => {
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(Array.from(e.target.files));
+            fileInput.value = ''; // Reset input
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            handleFiles(files);
+        });
+
+        // Paste from clipboard
+        document.addEventListener('paste', (e) => {
+            const items = Array.from(e.clipboardData.items);
+            const imageItems = items.filter(item => item.type.startsWith('image/'));
+
+            if (imageItems.length > 0) {
+                e.preventDefault();
+                const files = imageItems.map(item => item.getAsFile());
+                handleFiles(files);
+            }
+        });
+
+        // Handle files
+        async function handleFiles(files) {
+            if (files.length === 0) return;
+
+            for (const file of files) {
+                await uploadImage(file);
+            }
+        }
+
+        // Upload single image
+        async function uploadImage(file) {
+            totalUploads++;
+            updateStats();
+
+            // Create image card
+            const cardId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const card = createImageCard(cardId, file);
+            imagesGrid.insertBefore(card, imagesGrid.firstChild);
+
+            try {
+                // Get pre-signed URL
+                const response = await fetch(`${API_BASE_URL}/images/upload-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        contentType: file.type
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to get upload URL: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Upload to S3
+                const uploadResponse = await fetch(data.uploadUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type },
+                    body: file
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`Upload failed: ${uploadResponse.status}`);
+                }
+
+                // Update card with success
+                updateImageCard(cardId, data.publicUrl, 'success');
+                successfulUploads++;
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                updateImageCard(cardId, null, 'error', error.message);
+                failedUploads++;
+            }
+
+            updateStats();
+        }
+
+        // Create image card
+        function createImageCard(cardId, file) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.id = cardId;
+
+            // Create preview
+            const preview = document.createElement('img');
+            preview.className = 'image-preview';
+            preview.src = URL.createObjectURL(file);
+
+            const status = document.createElement('div');
+            status.className = 'status uploading';
+            status.innerHTML = '<div class="spinner"></div><span>Uploading...</span>';
+
+            card.appendChild(preview);
+            card.appendChild(status);
+
+            return card;
+        }
+
+        // Update image card
+        function updateImageCard(cardId, publicUrl, state, errorMsg = '') {
+            const card = document.getElementById(cardId);
+            const status = card.querySelector('.status');
+
+            if (state === 'success') {
+                status.className = 'status success';
+                status.textContent = '✓ Uploaded successfully';
+
+                // Add URL input and copy button
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'image-url';
+                urlDiv.innerHTML = `
+                    <input type="text" class="url-input" value="${publicUrl}" readonly>
+                    <button class="copy-btn" onclick="copyUrl('${publicUrl}', this)">Copy</button>
+                `;
+                card.appendChild(urlDiv);
+
+            } else if (state === 'error') {
+                status.className = 'status error';
+                status.textContent = `✗ Failed: ${errorMsg}`;
+            }
+        }
+
+        // Copy URL to clipboard
+        function copyUrl(url, button) {
+            navigator.clipboard.writeText(url).then(() => {
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('total-uploads').textContent = totalUploads;
+            document.getElementById('successful-uploads').textContent = successfulUploads;
+            document.getElementById('failed-uploads').textContent = failedUploads;
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

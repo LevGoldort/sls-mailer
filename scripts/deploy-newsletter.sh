@@ -18,10 +18,10 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Configuration
-LAMBDAS_DIR="./Lambdas"
+LAMBDAS_DIR="../newsletter/lambdas"
 S3_BUCKET="yallabalagan-newsletter-admin"
 REGION="eu-north-1"
-ADMIN_DIR="./newsletter-admin"
+ADMIN_DIR="../newsletter/admin"
 
 # Newsletter Lambda functions
 NEWSLETTER_LAMBDAS=(
