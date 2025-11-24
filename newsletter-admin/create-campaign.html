@@ -18,8 +18,25 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
+        }
+
+        .content-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        @media (max-width: 1200px) {
+            .content-wrapper {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-column {
+                order: -1;
+            }
         }
 
         .header {
@@ -285,6 +302,46 @@
             font-family: 'Monaco', 'Courier New', monospace;
             font-size: 14px;
         }
+
+        .preview-column {
+            position: sticky;
+            top: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .preview-header {
+            padding: 15px 20px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .preview-iframe-wrapper {
+            padding: 20px;
+            background: #f9f9f9;
+            min-height: 600px;
+            max-height: calc(100vh - 140px);
+            overflow: auto;
+        }
+
+        .preview-iframe-wrapper iframe {
+            width: 100%;
+            min-height: 500px;
+            border: none;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .preview-placeholder {
+            padding: 40px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -296,7 +353,9 @@
 
         <div id="alert-container"></div>
 
-        <div class="form-card">
+        <div class="content-wrapper">
+            <div class="form-column">
+                <div class="form-card">
             <form id="campaign-form">
                 <div class="form-group">
                     <label for="subject">Email Subject *</label>
@@ -396,6 +455,18 @@
                     </button>
                 </div>
             </form>
+                </div>
+            </div>
+
+            <div class="preview-column">
+                <div class="preview-header">Email Preview</div>
+                <div class="preview-iframe-wrapper">
+                    <div class="preview-placeholder" id="preview-placeholder">
+                        Start typing in the HTML Body field to see a preview...
+                    </div>
+                    <iframe id="email-preview-iframe" style="display:none;" sandbox="allow-same-origin"></iframe>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -533,7 +604,9 @@
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {
-            if (!event.target.matches('.add-tag-btn')) {
+            // Don't close if clicking the button or inside the dropdown
+            if (!event.target.matches('.add-tag-btn') &&
+                !event.target.closest('.dropdown-content')) {
                 const dropdowns = document.getElementsByClassName('dropdown-content');
                 for (let dropdown of dropdowns) {
                     if (dropdown.classList.contains('show')) {
@@ -686,6 +759,25 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // Update email preview
+        function updateEmailPreview() {
+            const htmlBody = document.getElementById('html_body').value.trim();
+            const iframe = document.getElementById('email-preview-iframe');
+            const placeholder = document.getElementById('preview-placeholder');
+
+            if (htmlBody) {
+                iframe.style.display = 'block';
+                placeholder.style.display = 'none';
+                iframe.srcdoc = htmlBody;
+            } else {
+                iframe.style.display = 'none';
+                placeholder.style.display = 'block';
+            }
+        }
+
+        // Add event listener to html_body textarea for live preview
+        document.getElementById('html_body').addEventListener('input', updateEmailPreview);
 
         // Load tags on page load
         loadTags();

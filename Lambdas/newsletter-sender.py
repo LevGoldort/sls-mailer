@@ -159,8 +159,11 @@ def personalize_html(html_body, email, campaign_id, preview_text=''):
 def send_email(email, subject, html_body):
     """Send single email via SES"""
     try:
+        # Format sender with display name
+        sender = f'"Ялла, Балаган" <{SES_FROM_EMAIL}>'
+
         response = ses_client.send_email(
-            Source=SES_FROM_EMAIL,
+            Source=sender,
             Destination={'ToAddresses': [email]},
             Message={
                 'Subject': {'Data': subject, 'Charset': 'UTF-8'},

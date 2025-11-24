@@ -339,6 +339,55 @@ def unsubscribe_contact(event):
         return cors_response(500, {'error': str(e)})
 
 
+def delete_campaign(event):
+    """DELETE /campaigns/{campaign_id} - Delete campaign and all related events"""
+    try:
+        campaign_id = event['pathParameters']['campaign_id']
+
+        # Get campaign to verify it exists
+        response = campaigns_table.get_item(Key={'campaign_id': campaign_id})
+        campaign = response.get('Item')
+
+        if not campaign:
+            return cors_response(404, {'error': 'Campaign not found'})
+
+        # Delete campaign
+        campaigns_table.delete_item(Key={'campaign_id': campaign_id})
+        print(f"Deleted campaign: {campaign_id}")
+
+        # Delete all related events
+        # Query events by campaign_id
+        events_response = events_table.query(
+            KeyConditionExpression='campaign_id = :cid',
+            ExpressionAttributeValues={':cid': campaign_id}
+        )
+        events = events_response.get('Items', [])
+
+        # Delete events in batches
+        deleted_count = 0
+        with events_table.batch_writer() as batch:
+            for event_item in events:
+                batch.delete_item(Key={
+                    'campaign_id': event_item['campaign_id'],
+                    'event_id': event_item['event_id']
+                })
+                deleted_count += 1
+
+        print(f"Deleted {deleted_count} events for campaign {campaign_id}")
+
+        return cors_response(200, {
+            'success': True,
+            'campaign_id': campaign_id,
+            'events_deleted': deleted_count
+        })
+
+    except Exception as e:
+        print(f"Error deleting campaign: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return cors_response(500, {'error': str(e)})
+
+
 def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Event: {json.dumps(event)}")
@@ -367,6 +416,9 @@ def lambda_handler(event, context):
 
         elif method == 'POST' and path.endswith('/send'):
             return send_campaign(event)
+
+        elif method == 'DELETE' and path.startswith('/campaigns/'):
+            return delete_campaign(event)
 
         elif method == 'GET' and path == '/contacts/preview':
             return preview_contacts(event)

@@ -82,6 +82,16 @@
             background: #c72d94;
         }
 
+        .btn-danger {
+            background: #d63031;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .btn-danger:hover {
+            background: #b71c1c;
+        }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -228,6 +238,51 @@
             max-height: 400px;
             overflow-y: auto;
         }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .email-preview-card {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .email-preview-card h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .preview-iframe {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            width: 100%;
+            min-height: 600px;
+            background: white;
+        }
+
+        @media (max-width: 1200px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .email-preview-card {
+                position: static;
+                max-height: 600px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -240,9 +295,14 @@
                     <span class="status-badge" id="campaign-status"></span>
                 </div>
             </div>
-            <button class="btn btn-primary" id="send-btn" onclick="sendCampaign()" style="display: none;">
-                Send Campaign
-            </button>
+            <div>
+                <button class="btn btn-primary" id="send-btn" onclick="sendCampaign()" style="display: none;">
+                    Send Campaign
+                </button>
+                <button class="btn btn-danger" onclick="deleteCampaign()">
+                    Delete Campaign
+                </button>
+            </div>
         </div>
 
         <div id="alert-container"></div>
@@ -269,36 +329,43 @@
             </div>
         </div>
 
-        <div class="info-card">
-            <h2>Campaign Information</h2>
-            <div class="info-row">
-                <div class="info-label">Campaign ID:</div>
-                <div class="info-value" id="info-id"></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Subject:</div>
-                <div class="info-value" id="info-subject"></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Created:</div>
-                <div class="info-value" id="info-created"></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Tags Filter:</div>
-                <div class="info-value">
-                    <div class="tags" id="info-tags"></div>
+        <div class="content-grid">
+            <!-- Left Column: Campaign Info -->
+            <div>
+                <div class="info-card">
+                    <h2>Campaign Information</h2>
+                    <div class="info-row">
+                        <div class="info-label">Campaign ID:</div>
+                        <div class="info-value" id="info-id"></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Subject:</div>
+                        <div class="info-value" id="info-subject"></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Created:</div>
+                        <div class="info-value" id="info-created"></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Tags Filter:</div>
+                        <div class="info-value">
+                            <div class="tags" id="info-tags"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h2>Link Click Summary</h2>
+                    <div id="clicks-summary" class="loading">
+                        Loading data...
+                    </div>
                 </div>
             </div>
-            <div class="info-row">
-                <div class="info-label">HTML Body:</div>
-            </div>
-            <div class="html-preview" id="html-preview"></div>
-        </div>
 
-        <div class="info-card">
-            <h2>Events Log</h2>
-            <div id="events-container" class="loading">
-                Loading events...
+            <!-- Right Column: Email Preview -->
+            <div class="email-preview-card">
+                <h2>📧 Email Preview</h2>
+                <iframe id="email-preview-iframe" class="preview-iframe" sandbox="allow-same-origin"></iframe>
             </div>
         </div>
     </div>
@@ -376,54 +443,103 @@
                 tagsContainer.innerHTML = '<span style="color: #999;">All subscribers</span>';
             }
 
-            // HTML preview
-            document.getElementById('html-preview').innerHTML =
-                `<pre style="white-space: pre-wrap; font-size: 12px;">${escapeHtml(campaign.html_body)}</pre>`;
+            // Email preview in iframe
+            const iframe = document.getElementById('email-preview-iframe');
+            iframe.srcdoc = campaign.html_body;
 
-            // Events
-            displayEvents(campaign.events || []);
+            // Link click summary
+            displayClickSummary(campaign.events || []);
         }
 
-        // Display events
-        function displayEvents(events) {
-            const container = document.getElementById('events-container');
+        // Display link click summary
+        function displayClickSummary(events) {
+            const container = document.getElementById('clicks-summary');
 
-            if (events.length === 0) {
-                container.innerHTML = '<p style="color: #999; padding: 20px;">No events yet</p>';
+            // Filter only click events
+            const clickEvents = events.filter(e => e.event && e.event.startsWith('clicked#'));
+
+            if (clickEvents.length === 0) {
+                container.innerHTML = '<p style="color: #999; padding: 20px;">No link clicks yet</p>';
                 return;
             }
 
-            // Sort events by timestamp descending
-            events.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            // Separate unsubscribe links from regular links
+            const linkStats = {};
+            const unsubscribeUsers = new Set();
+
+            clickEvents.forEach(event => {
+                const url = event.metadata?.url || 'Unknown URL';
+                const user = event.email || event.email_hash;
+
+                // Check if this is an unsubscribe link
+                if (url.includes('/unsubscribe.html')) {
+                    unsubscribeUsers.add(user);
+                } else {
+                    // Regular link
+                    if (!linkStats[url]) {
+                        linkStats[url] = {
+                            url: url,
+                            users: new Set()
+                        };
+                    }
+                    linkStats[url].users.add(user);
+                }
+            });
+
+            // Convert to array and sort by click count
+            const sortedLinks = Object.values(linkStats)
+                .map(stat => ({
+                    url: stat.url,
+                    clicks: stat.users.size
+                }))
+                .sort((a, b) => b.clicks - a.clicks);
+
+            // Build table rows
+            let tableRows = '';
+
+            // Add unsubscribe row first if any
+            if (unsubscribeUsers.size > 0) {
+                tableRows += `
+                    <tr style="background: #fff3cd;">
+                        <td style="font-weight: bold; color: #856404;">
+                            📧 UNSUBSCRIBED
+                        </td>
+                        <td style="text-align: center; font-weight: bold; color: #856404;">
+                            ${unsubscribeUsers.size}
+                        </td>
+                    </tr>
+                `;
+            }
+
+            // Add regular links
+            tableRows += sortedLinks.map(link => `
+                <tr>
+                    <td style="word-break: break-all;">
+                        <a href="${link.url}" target="_blank" style="color: #e535ab;">
+                            ${link.url}
+                        </a>
+                    </td>
+                    <td style="text-align: center; font-weight: bold; color: #e535ab;">
+                        ${link.clicks}
+                    </td>
+                </tr>
+            `).join('');
 
             const tableHTML = `
                 <table class="events-table">
                     <thead>
                         <tr>
-                            <th>Event</th>
-                            <th>Email/Hash</th>
-                            <th>Time</th>
-                            <th>Details</th>
+                            <th style="width: 70%;">Link URL</th>
+                            <th style="width: 30%; text-align: center;">Unique Clicks</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${events.map(event => {
-                            const date = new Date(event.timestamp * 1000);
-                            const timeStr = date.toLocaleString('ru-RU');
-                            const eventType = event.event || 'unknown';
-                            const eventClass = `event-${eventType.split('#')[0]}`;
-
-                            return `
-                                <tr>
-                                    <td><span class="event-badge ${eventClass}">${eventType}</span></td>
-                                    <td>${event.email || event.email_hash || '-'}</td>
-                                    <td>${timeStr}</td>
-                                    <td>${event.metadata ? JSON.stringify(event.metadata) : '-'}</td>
-                                </tr>
-                            `;
-                        }).join('')}
+                        ${tableRows}
                     </tbody>
                 </table>
+                <div style="margin-top: 15px; padding: 10px; background: #f9f9f9; border-radius: 6px; font-size: 14px; color: #666;">
+                    💡 <strong>Примечание:</strong> Показаны уникальные клики (один пользователь = один клик)
+                </div>
             `;
 
             container.innerHTML = tableHTML;
@@ -457,6 +573,35 @@
                 showAlert('Failed to send campaign: ' + error.message, 'error');
                 sendBtn.disabled = false;
                 sendBtn.textContent = 'Send Campaign';
+            }
+        }
+
+        // Delete campaign
+        async function deleteCampaign() {
+            if (!confirm('⚠️ Are you sure you want to DELETE this campaign?\n\nThis will permanently delete:\n- The campaign\n- All related events (opens, clicks)\n\nThis action CANNOT be undone!')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete campaign');
+                }
+
+                showAlert('Campaign deleted successfully!', 'success');
+
+                // Redirect to home after 1.5 seconds
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1500);
+
+            } catch (error) {
+                console.error('Error deleting campaign:', error);
+                showAlert('Failed to delete campaign: ' + error.message, 'error');
             }
         }
 
