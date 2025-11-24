@@ -281,10 +281,15 @@ def preview_contacts(event):
         # Get sample emails
         sample_emails = [c['email'] for c in filtered_contacts[:5]]
 
+        # Count unsubscribed contacts
+        unsubscribed_count = len([c for c in all_contacts if c.get('status') == 'unsubscribed'])
+
         return cors_response(200, {
             'count': len(filtered_contacts),
             'sample_emails': sample_emails,
-            'all_tags': get_all_tags(all_contacts)
+            'all_tags': get_all_tags(all_contacts),
+            'total_contacts': len(all_contacts),
+            'unsubscribed_contacts': unsubscribed_count
         })
 
     except Exception as e:

@@ -86,25 +86,107 @@
             flex-wrap: wrap;
             gap: 10px;
             margin-top: 10px;
+            min-height: 40px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
         }
 
-        .tag-checkbox {
-            display: flex;
+        .tag-chip {
+            display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 8px 12px;
+            padding: 6px 12px;
+            background: #e535ab;
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .tag-chip .remove-btn {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 4px;
+            opacity: 0.8;
+        }
+
+        .tag-chip .remove-btn:hover {
+            opacity: 1;
+        }
+
+        .add-tag-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .add-tag-btn {
+            padding: 6px 12px;
+            background: white;
+            color: #666;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .add-tag-btn:hover {
             background: #f5f5f5;
+            border-color: #e535ab;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: white;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             border-radius: 6px;
+            z-index: 1000;
+            margin-top: 5px;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 10px 15px;
             cursor: pointer;
             transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
         }
 
-        .tag-checkbox:hover {
-            background: #e0e0e0;
+        .dropdown-item:hover {
+            background: #f5f5f5;
         }
 
-        .tag-checkbox input[type="checkbox"] {
-            cursor: pointer;
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .dropdown-search {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            position: sticky;
+            top: 0;
+            background: white;
+        }
+
+        .dropdown-search input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
         }
 
         .preview-section {
@@ -256,17 +338,25 @@
                     <div style="margin: 15px 0;">
                         <label style="font-weight: normal; font-size: 14px;">Match mode:</label><br>
                         <label style="font-weight: normal; margin-right: 20px;">
-                            <input type="radio" name="match_mode" value="ANY" checked>
+                            <input type="radio" name="match_mode" value="ANY" checked onchange="previewRecipients()">
                             Match ANY (OR) - contacts with at least one selected tag
                         </label>
                         <label style="font-weight: normal;">
-                            <input type="radio" name="match_mode" value="ALL">
+                            <input type="radio" name="match_mode" value="ALL" onchange="previewRecipients()">
                             Match ALL (AND) - contacts must have all selected tags
                         </label>
                     </div>
 
                     <div class="tags-container" id="tags-container">
-                        <p style="color: #999;">Loading tags...</p>
+                        <div class="add-tag-dropdown">
+                            <button type="button" class="add-tag-btn" onclick="toggleTagDropdown('include')">+ Add Tag</button>
+                            <div class="dropdown-content" id="include-dropdown">
+                                <div class="dropdown-search">
+                                    <input type="text" placeholder="Search tags..." onkeyup="filterTags('include')" id="include-search">
+                                </div>
+                                <div id="include-dropdown-items"></div>
+                            </div>
+                        </div>
                     </div>
 
                     <div style="margin-top: 20px;">
@@ -275,7 +365,15 @@
                             Exclude contacts with any of these tags
                         </p>
                         <div class="tags-container" id="exclude-tags-container">
-                            <p style="color: #999;">Loading...</p>
+                            <div class="add-tag-dropdown">
+                                <button type="button" class="add-tag-btn" onclick="toggleTagDropdown('exclude')">+ Add Tag</button>
+                                <div class="dropdown-content" id="exclude-dropdown">
+                                    <div class="dropdown-search">
+                                        <input type="text" placeholder="Search tags..." onkeyup="filterTags('exclude')" id="exclude-search">
+                                    </div>
+                                    <div id="exclude-dropdown-items"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -306,6 +404,9 @@
         const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
 
         let createdCampaignId = null;
+        let allTags = [];
+        let selectedIncludeTags = [];
+        let selectedExcludeTags = [];
 
         // Load available tags
         async function loadTags() {
@@ -314,7 +415,8 @@
                 if (!response.ok) throw new Error('Failed to load tags');
 
                 const data = await response.json();
-                displayTags(data.all_tags || []);
+                allTags = data.all_tags || [];
+                renderTagDropdowns();
                 previewRecipients(); // Initial preview
             } catch (error) {
                 console.error('Error loading tags:', error);
@@ -322,45 +424,132 @@
             }
         }
 
-        // Display tags as checkboxes
-        function displayTags(tags) {
-            const container = document.getElementById('tags-container');
-            const excludeContainer = document.getElementById('exclude-tags-container');
+        // Render tag dropdowns
+        function renderTagDropdowns() {
+            renderDropdown('include');
+            renderDropdown('exclude');
+        }
 
-            if (tags.length === 0) {
-                container.innerHTML = '<p style="color: #999;">No tags available</p>';
-                excludeContainer.innerHTML = '<p style="color: #999;">No tags available</p>';
+        function renderDropdown(type) {
+            const dropdownItems = document.getElementById(`${type}-dropdown-items`);
+            const selectedTags = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
+
+            if (allTags.length === 0) {
+                dropdownItems.innerHTML = '<div style="padding: 10px; color: #999;">No tags available</div>';
                 return;
             }
 
-            // Include tags
-            container.innerHTML = tags.map(tag => `
-                <label class="tag-checkbox">
-                    <input type="checkbox" name="tag" value="${tag}" onchange="previewRecipients()">
-                    ${tag}
-                </label>
+            dropdownItems.innerHTML = allTags.map(tag => {
+                const isSelected = selectedTags.includes(tag);
+                return `
+                    <div class="dropdown-item ${isSelected ? 'disabled' : ''}"
+                         onclick="${isSelected ? '' : `addTag('${escapeHtml(tag)}', '${type}')`}">
+                        ${escapeHtml(tag)} ${isSelected ? '(added)' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleTagDropdown(type) {
+            const dropdown = document.getElementById(`${type}-dropdown`);
+            dropdown.classList.toggle('show');
+
+            // Close other dropdown
+            const otherType = type === 'include' ? 'exclude' : 'include';
+            document.getElementById(`${otherType}-dropdown`).classList.remove('show');
+
+            // Reset search
+            document.getElementById(`${type}-search`).value = '';
+            renderDropdown(type);
+        }
+
+        function filterTags(type) {
+            const searchValue = document.getElementById(`${type}-search`).value.toLowerCase();
+            const dropdownItems = document.getElementById(`${type}-dropdown-items`);
+            const selectedTags = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
+
+            const filteredTags = allTags.filter(tag => tag.toLowerCase().includes(searchValue));
+
+            dropdownItems.innerHTML = filteredTags.map(tag => {
+                const isSelected = selectedTags.includes(tag);
+                return `
+                    <div class="dropdown-item ${isSelected ? 'disabled' : ''}"
+                         onclick="${isSelected ? '' : `addTag('${escapeHtml(tag)}', '${type}')`}">
+                        ${escapeHtml(tag)} ${isSelected ? '(added)' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addTag(tag, type) {
+            const selectedTags = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
+
+            if (!selectedTags.includes(tag)) {
+                selectedTags.push(tag);
+                renderTags(type);
+                renderDropdown(type);
+                previewRecipients();
+            }
+
+            // Close dropdown
+            document.getElementById(`${type}-dropdown`).classList.remove('show');
+        }
+
+        function removeTag(tag, type) {
+            const selectedTags = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
+            const index = selectedTags.indexOf(tag);
+
+            if (index > -1) {
+                selectedTags.splice(index, 1);
+                renderTags(type);
+                renderDropdown(type);
+                previewRecipients();
+            }
+        }
+
+        function renderTags(type) {
+            const container = document.getElementById(`${type === 'include' ? 'tags' : 'exclude-tags'}-container`);
+            const selectedTags = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
+
+            const tagsHtml = selectedTags.map(tag => `
+                <div class="tag-chip">
+                    ${escapeHtml(tag)}
+                    <span class="remove-btn" onclick="removeTag('${escapeHtml(tag)}', '${type}')">&times;</span>
+                </div>
             `).join('');
 
-            // Exclude tags
-            excludeContainer.innerHTML = tags.map(tag => `
-                <label class="tag-checkbox">
-                    <input type="checkbox" name="exclude_tag" value="${tag}" onchange="previewRecipients()">
-                    ${tag}
-                </label>
-            `).join('');
+            container.innerHTML = tagsHtml + `
+                <div class="add-tag-dropdown">
+                    <button type="button" class="add-tag-btn" onclick="toggleTagDropdown('${type}')">+ Add Tag</button>
+                    <div class="dropdown-content" id="${type}-dropdown">
+                        <div class="dropdown-search">
+                            <input type="text" placeholder="Search tags..." onkeyup="filterTags('${type}')" id="${type}-search">
+                        </div>
+                        <div id="${type}-dropdown-items"></div>
+                    </div>
+                </div>
+            `;
         }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.matches('.add-tag-btn')) {
+                const dropdowns = document.getElementsByClassName('dropdown-content');
+                for (let dropdown of dropdowns) {
+                    if (dropdown.classList.contains('show')) {
+                        dropdown.classList.remove('show');
+                    }
+                }
+            }
+        });
 
         // Preview recipients
         async function previewRecipients() {
-            const selectedTags = Array.from(document.querySelectorAll('input[name="tag"]:checked'))
-                .map(cb => cb.value);
-            const excludeTags = Array.from(document.querySelectorAll('input[name="exclude_tag"]:checked'))
-                .map(cb => cb.value);
             const matchMode = document.querySelector('input[name="match_mode"]:checked')?.value || 'ANY';
 
             const params = new URLSearchParams();
-            if (selectedTags.length > 0) params.append('tags', selectedTags.join(','));
-            if (excludeTags.length > 0) params.append('exclude_tags', excludeTags.join(','));
+            if (selectedIncludeTags.length > 0) params.append('tags', selectedIncludeTags.join(','));
+            if (selectedExcludeTags.length > 0) params.append('exclude_tags', selectedExcludeTags.join(','));
             params.append('match_mode', matchMode);
 
             const queryString = params.toString() ? `?${params.toString()}` : '';
@@ -395,18 +584,14 @@
             const subject = document.getElementById('subject').value.trim();
             const preview_text = document.getElementById('preview_text').value.trim();
             const html_body = document.getElementById('html_body').value.trim();
-            const selectedTags = Array.from(document.querySelectorAll('input[name="tag"]:checked'))
-                .map(cb => cb.value);
-            const excludeTags = Array.from(document.querySelectorAll('input[name="exclude_tag"]:checked'))
-                .map(cb => cb.value);
             const matchMode = document.querySelector('input[name="match_mode"]:checked')?.value || 'ANY';
 
             console.log('Form data:', {
                 subject,
                 preview_text,
                 html_body_length: html_body.length,
-                selectedTags,
-                excludeTags,
+                selectedTags: selectedIncludeTags,
+                excludeTags: selectedExcludeTags,
                 matchMode
             });
 
@@ -430,9 +615,9 @@
                         subject,
                         preview_text,
                         html_body,
-                        tags_filter: selectedTags,
+                        tags_filter: selectedIncludeTags,
                         tags_match_mode: matchMode,
-                        exclude_tags: excludeTags
+                        exclude_tags: selectedExcludeTags
                     })
                 });
 
@@ -493,6 +678,13 @@
             const container = document.getElementById('alert-container');
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // Load tags on page load
