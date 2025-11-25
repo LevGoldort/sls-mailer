@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.title }} - YallaBalagan{% endblock %}
+{% block description %}{{ event.description }}{% endblock %}
+
+{% block content %}
+<div class="event-detail">
+    <!-- Hero Image -->
+    {% if event.images and event.images|length > 0 %}
+    <img src="{{ event.images[0] }}" alt="{{ event.title }}" class="event-hero-image">
+    {% else %}
+    <div class="event-hero-image" style="display: flex; align-items: center; justify-content: center; font-size: 5rem; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white;">
+        🎭
+    </div>
+    {% endif %}
+
+    <!-- Event Content -->
+    <div class="event-detail-content">
+        <!-- Header -->
+        <div class="event-detail-header">
+            <h1 class="event-detail-title">{{ event.title }}</h1>
+
+            <!-- Meta Information -->
+            <div class="event-meta">
+                <div class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    <span>{{ event.date_formatted }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">🕐</span>
+                    <span>{{ event.time_formatted }}</span>
+                </div>
+                {% if event.location_name %}
+                <div class="meta-item">
+                    <span class="meta-icon">📍</span>
+                    <span>{{ event.location_name }}</span>
+                </div>
+                {% endif %}
+                {% if event.status == 'sold_out' %}
+                <div class="meta-item" style="color: var(--danger); font-weight: 600;">
+                    <span class="meta-icon">🎫</span>
+                    <span>Билеты проданы</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="event-description-full">
+            {{ event.description }}
+        </div>
+
+        <!-- Tickets Section -->
+        {% if event.status != 'sold_out' and event.status != 'cancelled' %}
+        <div class="tickets-section">
+            <h2 class="tickets-title">Выберите билеты</h2>
+            <div class="ticket-types">
+                {% for ticket in event.ticket_types %}
+                <div class="ticket-type {% if ticket.available == 0 %}sold-out{% endif %}">
+                    <div class="ticket-info">
+                        <h3>{{ ticket.name }}</h3>
+                        {% if ticket.description %}
+                        <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">
+                            {{ ticket.description }}
+                        </p>
+                        {% endif %}
+                        <div class="ticket-available">
+                            {% if ticket.available > 0 %}
+                                Доступно: {{ ticket.available }} из {{ ticket.total }}
+                            {% else %}
+                                Билеты проданы
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="ticket-price-section">
+                        <div class="ticket-price">{{ ticket.price }}<span class="ticket-currency">₪</span></div>
+                        {% if ticket.available > 0 %}
+                        <a href="/checkout?event_id={{ event.event_id }}&ticket_type={{ ticket.id }}"
+                           class="btn btn-primary"
+                           style="margin-top: 0.5rem; padding: 0.5rem 1.5rem; font-size: 0.9375rem;">
+                            Купить
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% elif event.status == 'sold_out' %}
+        <div class="alert alert-info">
+            <p><strong>Все билеты проданы</strong></p>
+            <p>К сожалению, на это событие больше нет доступных билетов.</p>
+        </div>
+        {% elif event.status == 'cancelled' %}
+        <div class="alert" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">
+            <p><strong>Событие отменено</strong></p>
+            <p>Это событие было отменено организаторами.</p>
+        </div>
+        {% endif %}
+
+        <!-- Location Information -->
+        {% if location %}
+        <div class="location-card">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">Место проведения</h2>
+
+            <div class="location-header">
+                {% if location.media and location.media.photos and location.media.photos|length > 0 %}
+                <img src="{{ location.media.photos[0] }}" alt="{{ location.name }}" class="location-image">
+                {% else %}
+                <div class="location-image" style="display: flex; align-items: center; justify-content: center; font-size: 2rem;">
+                    🏛️
+                </div>
+                {% endif %}
+
+                <div class="location-info">
+                    <h3>
+                        {% if location.slug %}
+                        <a href="/locations/{{ location.slug }}.html" style="color: var(--primary); text-decoration: none;">
+                            {{ location.name }}
+                        </a>
+                        {% else %}
+                        {{ location.name }}
+                        {% endif %}
+                    </h3>
+                    {% if location.description %}
+                    <p class="location-description">{{ location.description }}</p>
+                    {% endif %}
+                    {% if location.capacity %}
+                    <p style="color: var(--gray-600); font-size: 0.875rem;">
+                        Вместимость: {{ location.capacity }} человек
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Address -->
+            {% if location.address %}
+            <div class="location-address">
+                <strong>📍 Адрес:</strong>
+                {{ location.address.street }}
+                {% if location.address.city %}, {{ location.address.city }}{% endif %}
+                {% if location.address.coordinates %}
+                <br>
+                <a href="https://www.google.com/maps?q={{ location.address.coordinates.lat }},{{ location.address.coordinates.lng }}"
+                   target="_blank"
+                   style="color: var(--primary); text-decoration: none; font-size: 0.875rem; margin-top: 0.25rem; display: inline-block;">
+                    🗺️ Открыть в Google Maps
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Parking Information -->
+            {% if location.parkings and location.parkings|length > 0 %}
+            <div class="parking-info">
+                <h4>🅿️ Парковка</h4>
+                {% for parking in location.parkings %}
+                <div {% if not loop.first %}style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);"{% endif %}>
+                    <strong>{{ parking.name }}</strong>
+                    {% if parking.description %}
+                    <p class="parking-description">{{ parking.description }}</p>
+                    {% endif %}
+                    {% if parking.price %}
+                    <p style="color: var(--gray-600); font-size: 0.875rem;">
+                        Стоимость: {{ parking.price }}
+                    </p>
+                    {% endif %}
+                    {% if parking.location and parking.location.google_maps_url %}
+                    <a href="{{ parking.location.google_maps_url }}"
+                       target="_blank"
+                       style="color: var(--primary); text-decoration: none; font-size: 0.875rem;">
+                        🗺️ Показать на карте
+                    </a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Refund Policy -->
+        {% if event.refund_policy and event.refund_policy.enabled %}
+        <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-top: 2rem; font-size: 0.875rem; color: var(--gray-600);">
+            <strong>ℹ️ Политика возврата:</strong>
+            Возврат билетов возможен за {{ event.refund_policy.hours_before }} часов до начала события.
+        </div>
+        {% endif %}
+
+        <!-- Back Button -->
+        <div style="margin-top: 2rem;">
+            <a href="/" class="btn" style="background: var(--gray-200); color: var(--gray-800);">
+                ← Назад к событиям
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

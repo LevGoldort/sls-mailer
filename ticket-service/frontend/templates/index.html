@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}YallaBalagan - Афиша событий{% endblock %}
+{% block description %}Культурные события, концерты и вечеринки в Тель-Авиве{% endblock %}
+
+{% block content %}
+<div style="margin-top: 2rem;">
+    <h1 class="page-title">Предстоящие события</h1>
+    <p class="page-subtitle">Выбирайте интересные события и покупайте билеты онлайн</p>
+
+    {% if events %}
+    <div class="events-grid">
+        {% for event in events %}
+        <a href="/events/{{ event.event_id }}.html" class="event-card">
+            {% if event.images and event.images|length > 0 %}
+            <img src="{{ event.images[0] }}" alt="{{ event.title }}" class="event-image">
+            {% else %}
+            <div class="event-image" style="display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+                🎭
+            </div>
+            {% endif %}
+
+            <div class="event-content">
+                <span class="event-date">{{ event.date_formatted }}</span>
+                <h2 class="event-title">{{ event.title }}</h2>
+                <p class="event-description">{{ event.description }}</p>
+
+                <div class="event-footer">
+                    <div>
+                        {% if event.min_price %}
+                        <div class="event-price">от {{ event.min_price }}₪</div>
+                        {% endif %}
+                    </div>
+                    {% if event.location_name %}
+                    <div class="event-location">📍 {{ event.location_name }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <p><strong>Пока нет предстоящих событий</strong></p>
+        <p>Следите за обновлениями!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

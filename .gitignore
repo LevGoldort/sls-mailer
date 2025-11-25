@@ -60,3 +60,14 @@ htmlcov/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# Lambda deployment artifacts
+lambda-package/
+site-output/
+
+# Deployment status files with real endpoints
+AWS_DEPLOYED_INFO.md
+TELEGRAM_BOT_ADMIN_DEPLOYED.md
+*_STATUS.md
+*_INFO.md
+AWS_SETUP.md

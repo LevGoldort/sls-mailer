@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Оформление заказа - YallaBalagan{% endblock %}
+{% block description %}Оформление покупки билетов на {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="checkout-container">
+    <h1 class="page-title" style="font-size: 2rem;">Оформление заказа</h1>
+
+    <!-- Event Info Card -->
+    <div class="checkout-card">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Информация о событии</h2>
+        <div style="display: flex; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);">
+            {% if event.images and event.images|length > 0 %}
+            <img src="{{ event.images[0] }}"
+                 alt="{{ event.title }}"
+                 style="width: 120px; height: 120px; border-radius: 0.5rem; object-fit: cover; background: var(--gray-200);">
+            {% else %}
+            <div style="width: 120px; height: 120px; border-radius: 0.5rem; background: var(--gray-200); display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+                🎭
+            </div>
+            {% endif %}
+            <div>
+                <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">{{ event.title }}</h3>
+                <p style="color: var(--gray-600); font-size: 0.9375rem; margin-bottom: 0.25rem;">
+                    📅 {{ event.date_formatted }} в {{ event.time_formatted }}
+                </p>
+                {% if event.location_name %}
+                <p style="color: var(--gray-600); font-size: 0.9375rem;">
+                    📍 {{ event.location_name }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Ticket Selection -->
+        <div style="margin-top: 1.5rem;">
+            <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Тип билета</h3>
+            <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div>
+                        <strong>{{ ticket_type.name }}</strong>
+                        {% if ticket_type.description %}
+                        <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">
+                            {{ ticket_type.description }}
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">
+                            {{ ticket_type.price }}₪
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quantity Selector -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Количество билетов</label>
+                    <select id="quantity" class="form-select" onchange="updateTotal()">
+                        {% for i in range(1, min(ticket_type.available + 1, 11)) %}
+                        <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                    <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;">
+                        Доступно: {{ ticket_type.available }} билетов
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Information -->
+    <div class="checkout-card">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Контактная информация</h2>
+        <form id="checkout-form" action="/api/orders" method="POST">
+            <input type="hidden" name="event_id" value="{{ event.event_id }}">
+            <input type="hidden" name="ticket_type_id" value="{{ ticket_type.id }}">
+            <input type="hidden" id="quantity-input" name="quantity" value="1">
+
+            <div class="form-group">
+                <label class="form-label" for="customer_name">Полное имя *</label>
+                <input type="text"
+                       id="customer_name"
+                       name="customer_name"
+                       class="form-input"
+                       placeholder="Иван Иванов"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="customer_email">Email *</label>
+                <input type="email"
+                       id="customer_email"
+                       name="customer_email"
+                       class="form-input"
+                       placeholder="ivan@example.com"
+                       required>
+                <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;">
+                    Билеты будут отправлены на этот email
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="customer_phone">Телефон *</label>
+                <input type="tel"
+                       id="customer_phone"
+                       name="customer_phone"
+                       class="form-input"
+                       placeholder="+972-50-123-4567"
+                       required>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="order-summary">
+                <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Итого</h3>
+
+                <div class="summary-row">
+                    <span>{{ ticket_type.name }} × <span id="summary-quantity">1</span></span>
+                    <span id="summary-subtotal">{{ ticket_type.price }}₪</span>
+                </div>
+
+                {% if service_fee %}
+                <div class="summary-row">
+                    <span>Сервисный сбор</span>
+                    <span id="summary-fee">{{ service_fee }}₪</span>
+                </div>
+                {% endif %}
+
+                <div class="summary-row total">
+                    <span>Всего к оплате</span>
+                    <span id="summary-total" style="color: var(--primary);">{{ ticket_type.price }}₪</span>
+                </div>
+            </div>
+
+            <!-- Payment Button -->
+            <button type="submit" class="btn btn-primary btn-large" style="margin-top: 1.5rem;">
+                Перейти к оплате
+            </button>
+
+            <p style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1rem;">
+                После нажатия вы будете перенаправлены на защищенную страницу оплаты
+            </p>
+        </form>
+    </div>
+
+    <!-- Security Notice -->
+    <div style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1.5rem;">
+        🔒 Безопасная оплата через All-Pay
+    </div>
+
+    <!-- Back Link -->
+    <div style="text-align: center; margin-top: 1rem;">
+        <a href="/events/{{ event.event_id }}.html" style="color: var(--gray-600); text-decoration: none; font-size: 0.875rem;">
+            ← Вернуться к событию
+        </a>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Store ticket price for calculations
+const ticketPrice = {{ ticket_type.price }};
+const serviceFee = {{ service_fee if service_fee else 0 }};
+
+function updateTotal() {
+    const quantity = parseInt(document.getElementById('quantity').value);
+
+    // Update hidden input
+    document.getElementById('quantity-input').value = quantity;
+
+    // Update summary
+    document.getElementById('summary-quantity').textContent = quantity;
+
+    const subtotal = ticketPrice * quantity;
+    document.getElementById('summary-subtotal').textContent = subtotal + '₪';
+
+    const total = subtotal + (serviceFee * quantity);
+    document.getElementById('summary-total').textContent = total + '₪';
+
+    {% if service_fee %}
+    const totalFee = serviceFee * quantity;
+    document.getElementById('summary-fee').textContent = totalFee + '₪';
+    {% endif %}
+}
+
+// Form submission handling
+document.getElementById('checkout-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitButton = this.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Обработка...';
+
+    try {
+        const formData = new FormData(this);
+        const data = {
+            event_id: formData.get('event_id'),
+            customer: {
+                name: formData.get('customer_name'),
+                email: formData.get('customer_email'),
+                phone: formData.get('customer_phone')
+            },
+            tickets: [{
+                type_id: formData.get('ticket_type_id'),
+                quantity: parseInt(formData.get('quantity'))
+            }]
+        };
+
+        const response = await fetch('/api/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Redirect to payment or success page
+            if (result.payment_url) {
+                window.location.href = result.payment_url;
+            } else {
+                window.location.href = '/orders/' + result.order_id + '.html';
+            }
+        } else {
+            alert('Ошибка при создании заказа: ' + (result.error || 'Неизвестная ошибка'));
+            submitButton.disabled = false;
+            submitButton.textContent = 'Перейти к оплате';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Произошла ошибка при обработке заказа. Пожалуйста, попробуйте снова.');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Перейти к оплате';
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

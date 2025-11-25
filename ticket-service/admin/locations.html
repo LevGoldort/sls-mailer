@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Локации - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 20px; }
+        .nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .btn-primary { background: #4caf50; }
+        .btn-primary:hover { background: #45a049; }
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .locations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .location-card {
+            padding: 25px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            border-left: 5px solid #ec4899;
+            transition: all 0.3s;
+        }
+        .location-card:hover {
+            background: #f0f0f0;
+            transform: translateY(-5px);
+        }
+        .location-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .location-info {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .location-info div {
+            margin-bottom: 8px;
+        }
+        .location-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-edit {
+            background: #2196f3;
+            color: white;
+        }
+        .btn-edit:hover { background: #0b7dda; }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+        .btn-delete:hover { background: #da190b; }
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+        }
+        .empty {
+            text-align: center;
+            padding: 80px;
+            color: #999;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📍 Управление локациями</h1>
+            <div class="nav">
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+                <a href="events.html" class="nav-btn">🎪 События</a>
+                <a href="locations.html" class="nav-btn">📍 Локации</a>
+                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
+                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
+                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+            </div>
+            <a href="location-edit.html" class="nav-btn btn-primary">+ Создать локацию</a>
+        </div>
+
+        <div class="section">
+            <div id="locations-container" class="locations-grid">
+                <div class="loading">Загрузка локаций...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared.js"></script>
+    <script>
+        async function loadLocations() {
+            try {
+                const data = await API.getLocations();
+                const locations = data.locations || [];
+                displayLocations(locations);
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки локаций');
+                document.getElementById('locations-container').innerHTML =
+                    '<div class="empty">Ошибка загрузки локаций</div>';
+            }
+        }
+
+        function displayLocations(locations) {
+            const container = document.getElementById('locations-container');
+
+            if (locations.length === 0) {
+                container.innerHTML = '<div class="empty">Нет локаций</div>';
+                return;
+            }
+
+            container.innerHTML = locations.map(loc => {
+                const address = loc.address || {};
+                return `
+                    <div class="location-card">
+                        <div class="location-name">${loc.name}</div>
+                        <div class="location-info">
+                            <div>📍 ${address.street || ''}, ${address.city || ''}</div>
+                            <div>👥 Вместимость: ${loc.capacity || '-'}</div>
+                            <div>📝 ${loc.description || 'Нет описания'}</div>
+                        </div>
+                        <div class="location-actions">
+                            <button class="action-btn btn-edit" onclick="window.location.href='location-edit.html?id=${loc.location_id}'">
+                                ✏️ Редактировать
+                            </button>
+                            <button class="action-btn btn-delete" onclick="deleteLocation('${loc.location_id}', '${loc.name}')">
+                                🗑️ Удалить
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function deleteLocation(locationId, name) {
+            if (!confirm(`Удалить локацию "${name}"?`)) return;
+
+            try {
+                await API.deleteLocation(locationId);
+                showToast('Локация удалена', 'success');
+                await loadLocations();
+            } catch (error) {
+                handleError(error, 'Ошибка удаления локации');
+            }
+        }
+
+        loadLocations();
+    </script>
+</body>
+</html>

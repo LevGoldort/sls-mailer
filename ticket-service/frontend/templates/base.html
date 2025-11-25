@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}YallaBalagan - События{% endblock %}</title>
+    <meta name="description" content="{% block description %}Афиша культурных событий{% endblock %}">
+
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">🎭 YallaBalagan</a>
+                <nav>
+                    <a href="/">События</a>
+                    <a href="/locations">Места</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 YallaBalagan. Все права защищены.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                <a href="mailto:info@yallabalagan.org" style="color: inherit;">info@yallabalagan.org</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заказы - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 20px; }
+        .nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .btn-export { background: #4caf50; }
+        .btn-export:hover { background: #45a049; }
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-input, .filter-select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .orders-table th {
+            background: #f5f5f5;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+        }
+        .orders-table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .orders-table tr:hover {
+            background: #f9f9f9;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-completed { background: #e8f5e9; color: #2e7d32; }
+        .status-pending { background: #fff3e0; color: #e65100; }
+        .loading { text-align: center; padding: 60px; color: #666; }
+        .empty { text-align: center; padding: 80px; color: #999; }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 Управление заказами</h1>
+            <div class="nav">
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+                <a href="events.html" class="nav-btn">🎪 События</a>
+                <a href="locations.html" class="nav-btn">📍 Локации</a>
+                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
+                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
+                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+            </div>
+            <div class="filters">
+                <input type="text" id="search" class="filter-input" placeholder="🔍 Поиск по email или ID...">
+                <button class="nav-btn btn-export" onclick="exportOrders()">📥 Экспорт CSV</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div id="orders-container">
+                <div class="loading">Загрузка заказов...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared.js"></script>
+    <script>
+        let allOrders = [];
+
+        async function loadOrders() {
+            try {
+                const data = await API.getOrders();
+                allOrders = data.orders || [];
+                displayOrders(allOrders);
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки заказов');
+                document.getElementById('orders-container').innerHTML =
+                    '<div class="empty">Ошибка загрузки заказов</div>';
+            }
+        }
+
+        function displayOrders(orders) {
+            const container = document.getElementById('orders-container');
+
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="empty">Нет заказов</div>';
+                return;
+            }
+
+            const html = `
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID Заказа</th>
+                            <th>Клиент</th>
+                            <th>Email</th>
+                            <th>Билеты</th>
+                            <th>Сумма</th>
+                            <th>Статус</th>
+                            <th>Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(order => {
+                            const customer = order.customer || {};
+                            const payment = order.payment || {};
+                            const ticketCount = (order.tickets || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
+                            const statusClass = payment.status === 'completed' ? 'status-completed' : 'status-pending';
+
+                            return `
+                                <tr>
+                                    <td><strong>${order.order_id}</strong></td>
+                                    <td>${customer.name || '-'}</td>
+                                    <td>${customer.email || '-'}</td>
+                                    <td>${ticketCount} шт</td>
+                                    <td><strong>${formatCurrency(order.total_amount)}</strong></td>
+                                    <td><span class="status-badge ${statusClass}">${payment.status || 'pending'}</span></td>
+                                    <td>${formatDateShort(order.created_at)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        document.getElementById('search').addEventListener('input', (e) => {
+            const search = e.target.value.toLowerCase();
+            const filtered = allOrders.filter(o => {
+                const customer = o.customer || {};
+                return (
+                    o.order_id.toLowerCase().includes(search) ||
+                    (customer.email || '').toLowerCase().includes(search) ||
+                    (customer.name || '').toLowerCase().includes(search)
+                );
+            });
+            displayOrders(filtered);
+        });
+
+        function exportOrders() {
+            if (allOrders.length === 0) {
+                showToast('Нет заказов для экспорта', 'error');
+                return;
+            }
+
+            const csvData = allOrders.map(o => ({
+                order_id: o.order_id,
+                customer_name: o.customer?.name || '',
+                customer_email: o.customer?.email || '',
+                total_amount: o.total_amount,
+                status: o.payment?.status || '',
+                created_at: o.created_at
+            }));
+
+            exportToCSV(csvData, 'orders.csv');
+        }
+
+        loadOrders();
+    </script>
+</body>
+</html>

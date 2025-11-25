@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование локации - Ticket Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .form-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .form-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast-show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            background: #4caf50;
+        }
+
+        .toast-error {
+            background: #f44336;
+        }
+
+        .btn-secondary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5568d3;
+        }
+
+        .parking-item {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .parking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="locations.html" class="back-link">← Назад к локациям</a>
+            <h1 id="page-title">Создание локации</h1>
+        </div>
+
+        <form id="location-form">
+            <div class="form-section">
+                <h2>Основная информация</h2>
+
+                <div class="form-group">
+                    <label for="name">Название локации *</label>
+                    <input type="text" id="name" name="name" required placeholder="Dizengoff Bar">
+                </div>
+
+                <div class="form-group">
+                    <label for="slug">Slug (URL) *</label>
+                    <input type="text" id="slug" name="slug" required placeholder="dizengoff-bar">
+                    <div class="help-text">Используется в URL. Только латиница, цифры и дефисы</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="capacity">Вместимость *</label>
+                    <input type="number" id="capacity" name="capacity" required min="1" placeholder="150">
+                </div>
+
+                <div class="form-group">
+                    <label for="short_description">Краткое описание *</label>
+                    <textarea id="short_description" name="short_description" required placeholder="Уютный бар в центре Тель-Авива"></textarea>
+                    <div class="help-text">Отображается на странице события</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Полное описание *</label>
+                    <textarea id="description" name="description" required placeholder="Подробное описание локации..."></textarea>
+                    <div class="help-text">Отображается на странице локации</div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Адрес</h2>
+
+                <div class="form-group">
+                    <label for="street">Улица *</label>
+                    <input type="text" id="street" name="street" required placeholder="Dizengoff 50">
+                </div>
+
+                <div class="form-group">
+                    <label for="city">Город *</label>
+                    <input type="text" id="city" name="city" required placeholder="Tel Aviv">
+                </div>
+
+                <div class="form-group">
+                    <label for="maps-url">Google Maps ссылка</label>
+                    <input type="url" id="maps-url" placeholder="https://maps.google.com/...">
+                    <div class="help-text">Вставьте ссылку из Google Maps - координаты заполнятся автоматически</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="lat">Широта</label>
+                        <input type="number" id="lat" name="lat" step="0.000001" placeholder="32.0853">
+                        <div class="help-text">Автозаполнится из Google Maps</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="lng">Долгота</label>
+                        <input type="number" id="lng" name="lng" step="0.000001" placeholder="34.7818">
+                        <div class="help-text">Автозаполнится из Google Maps</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Медиа</h2>
+
+                <div class="form-group">
+                    <label>Фотографии локации</label>
+                    <div id="location-images-upload"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="video">Видео (YouTube ссылка)</label>
+                    <input type="url" id="video" name="video" placeholder="https://www.youtube.com/watch?v=...">
+                    <div class="help-text">Необязательно</div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Парковки</h2>
+                <div id="parkings-container"></div>
+                <button type="button" class="btn btn-secondary" onclick="addParking()">+ Добавить парковку</button>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="window.location.href='locations.html'">Отмена</button>
+                <button type="submit" class="btn btn-primary" id="submit-btn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="shared.js"></script>
+    <script src="shared-image-upload.js"></script>
+    <script>
+        let locationId = null;
+        let parkingCounter = 0;
+        let imageUrls = [];
+        let isEditMode = false;
+
+        // Check if editing existing location
+        async function checkEditMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+
+            if (id) {
+                isEditMode = true;
+                locationId = id;
+                document.getElementById('page-title').textContent = 'Редактирование локации';
+                document.getElementById('submit-btn').textContent = 'Сохранить изменения';
+                await loadLocation(id);
+            }
+        }
+
+        // Display existing images in the upload component
+        function displayExistingImages(urls) {
+            const uploadedContainer = document.getElementById('location-images-upload-uploaded');
+            if (!uploadedContainer) {
+                console.error('Upload container not found');
+                return;
+            }
+
+            urls.forEach((url, index) => {
+                const cardId = `existing-img-${index}`;
+                const card = document.createElement('div');
+                card.className = 'image-upload-card';
+                card.id = cardId;
+
+                const preview = document.createElement('img');
+                preview.className = 'image-preview';
+                preview.src = url;
+
+                const status = document.createElement('div');
+                status.className = 'upload-status success';
+                status.textContent = '✓ Существующее фото';
+
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'image-url-display';
+                urlDiv.innerHTML = `
+                    <input type="text" class="url-input-display" value="${url}" readonly>
+                    <button class="copy-url-btn" onclick="copyImageUrl('${url}', this)">Copy</button>
+                    <button class="remove-img-btn" onclick="removeExistingImage('${cardId}', '${url}')">×</button>
+                `;
+
+                card.appendChild(preview);
+                card.appendChild(status);
+                card.appendChild(urlDiv);
+                uploadedContainer.appendChild(card);
+            });
+        }
+
+        // Remove existing image from the array
+        function removeExistingImage(cardId, url) {
+            const card = document.getElementById(cardId);
+            if (card) card.remove();
+
+            // Remove from imageUrls array
+            const index = imageUrls.indexOf(url);
+            if (index > -1) {
+                imageUrls.splice(index, 1);
+            }
+        }
+
+        // Load existing location data
+        async function loadLocation(id) {
+            try {
+                const data = await API.getLocation(id);
+                const location = data.location;
+                console.log('Loaded location:', location);
+
+                // Fill form fields - with null checks
+                const nameEl = document.getElementById('name');
+                const slugEl = document.getElementById('slug');
+                const capacityEl = document.getElementById('capacity');
+                const descEl = document.getElementById('description');
+                const shortDescEl = document.getElementById('short_description');
+
+                if (nameEl) nameEl.value = location.name || '';
+                if (slugEl) slugEl.value = location.slug || '';
+                if (capacityEl) capacityEl.value = location.capacity || '';
+                if (descEl) descEl.value = location.description || '';
+                if (shortDescEl) shortDescEl.value = location.short_description || '';
+
+                // Address
+                if (location.address) {
+                    const streetEl = document.getElementById('street');
+                    const cityEl = document.getElementById('city');
+                    const latEl = document.getElementById('lat');
+                    const lngEl = document.getElementById('lng');
+
+                    if (streetEl) streetEl.value = location.address.street || '';
+                    if (cityEl) cityEl.value = location.address.city || '';
+                    if (location.address.coordinates) {
+                        if (latEl) latEl.value = location.address.coordinates.lat || '';
+                        if (lngEl) lngEl.value = location.address.coordinates.lng || '';
+                    }
+                }
+
+                // Load existing images
+                if (location.media && location.media.photos) {
+                    imageUrls = [...location.media.photos];
+                    console.log('Loaded images:', imageUrls);
+                    displayExistingImages(imageUrls);
+                }
+
+                // Videos
+                if (location.media && location.media.videos && location.media.videos.length > 0) {
+                    const videoEl = document.getElementById('video');
+                    if (videoEl) videoEl.value = location.media.videos[0] || '';
+                }
+
+                // Load existing parkings
+                if (location.parkings && location.parkings.length > 0) {
+                    console.log('Loading parkings:', location.parkings.length);
+                    location.parkings.forEach(parking => {
+                        const parkingData = {
+                            description: parking.description,
+                            lat: parking.coordinates?.lat || '',
+                            lng: parking.coordinates?.lng || ''
+                        };
+                        addParking(parkingData);
+                    });
+                }
+
+                showToast('Локация загружена', 'success');
+            } catch (error) {
+                console.error('Load location error:', error);
+                handleError(error, 'Ошибка загрузки локации');
+                setTimeout(() => window.location.href = 'locations.html', 2000);
+            }
+        }
+
+        // Initialize image upload component
+        function initImageUploadComponent() {
+            initImageUpload(
+                'location-images-upload',
+                'locations',
+                (url) => {
+                    imageUrls.push(url);
+                    console.log('Image uploaded:', url);
+                },
+                (error) => {
+                    console.error('Image upload error:', error);
+                    showToast('Ошибка загрузки фото', 'error');
+                }
+            );
+        }
+
+        // Google Maps URL parsing
+        function parseGoogleMapsUrl(url) {
+            const patterns = [
+                /@(-?\d+\.\d+),(-?\d+\.\d+)/,  // @lat,lng
+                /q=(-?\d+\.\d+),(-?\d+\.\d+)/,  // q=lat,lng
+                /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // !3dlat!4dlng
+            ];
+
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) {
+                    return {
+                        lat: parseFloat(parseFloat(match[1]).toFixed(6)),
+                        lng: parseFloat(parseFloat(match[2]).toFixed(6))
+                    };
+                }
+            }
+            return null;
+        }
+
+        // Setup Google Maps URL parsing for main coordinates
+        document.addEventListener('DOMContentLoaded', () => {
+            const mapsUrl = document.getElementById('maps-url');
+            if (mapsUrl) {
+                mapsUrl.addEventListener('blur', () => {
+                    const url = mapsUrl.value.trim();
+                    if (!url) return;
+
+                    const coords = parseGoogleMapsUrl(url);
+                    if (coords) {
+                        document.getElementById('lat').value = coords.lat;
+                        document.getElementById('lng').value = coords.lng;
+                        showToast('Координаты извлечены из ссылки!', 'success');
+                    } else {
+                        showToast('Не удалось извлечь координаты. Проверьте ссылку.', 'error');
+                    }
+                });
+            }
+        });
+
+        // Auto-generate slug from name
+        document.getElementById('name').addEventListener('input', (e) => {
+            if (!locationId) { // Only auto-generate for new locations
+                const slug = e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .replace(/\s+/g, '-')
+                    .replace(/-+/g, '-');
+                document.getElementById('slug').value = slug;
+            }
+        });
+
+        function addParking(data = null) {
+            const id = `parking-${Date.now()}-${parkingCounter++}`;
+            const container = document.getElementById('parkings-container');
+
+            const div = document.createElement('div');
+            div.className = 'parking-item';
+            div.dataset.id = id;
+
+            div.innerHTML = `
+                <div class="parking-header">
+                    <h3>Парковка</h3>
+                    <button type="button" class="btn btn-danger" onclick="removeParking('${id}')">Удалить</button>
+                </div>
+                <div class="form-group">
+                    <label>Описание</label>
+                    <input type="text" class="parking-description" value="${data?.description || ''}" placeholder="Бесплатная парковка на улице">
+                </div>
+                <div class="form-group">
+                    <label>Google Maps ссылка</label>
+                    <input type="url" class="parking-maps-url" placeholder="https://maps.google.com/...">
+                    <div class="help-text">Вставьте ссылку - координаты заполнятся автоматически</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Широта</label>
+                        <input type="number" class="parking-lat" value="${data?.lat || ''}" step="0.000001" placeholder="32.0853">
+                    </div>
+                    <div class="form-group">
+                        <label>Долгота</label>
+                        <input type="number" class="parking-lng" value="${data?.lng || ''}" step="0.000001" placeholder="34.7818">
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(div);
+
+            // Add Google Maps URL parsing for this parking
+            const mapsUrlInput = div.querySelector('.parking-maps-url');
+            const latInput = div.querySelector('.parking-lat');
+            const lngInput = div.querySelector('.parking-lng');
+
+            mapsUrlInput.addEventListener('blur', () => {
+                const url = mapsUrlInput.value.trim();
+                if (!url) return;
+
+                const coords = parseGoogleMapsUrl(url);
+                if (coords) {
+                    latInput.value = coords.lat;
+                    lngInput.value = coords.lng;
+                    showToast('Координаты парковки извлечены!', 'success');
+                } else {
+                    showToast('Не удалось извлечь координаты парковки', 'error');
+                }
+            });
+        }
+
+        function removeParking(id) {
+            const item = document.querySelector(`[data-id="${id}"]`);
+            if (item) {
+                item.remove();
+            }
+        }
+
+        async function init() {
+            // Initialize image upload component
+            initImageUploadComponent();
+
+            // Check if editing existing location
+            await checkEditMode();
+        }
+
+        document.getElementById('location-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Сохранение...';
+
+            try {
+                const lat = parseFloat(document.getElementById('lat').value) || 0;
+                const lng = parseFloat(document.getElementById('lng').value) || 0;
+
+                // Collect parkings
+                const parkings = [];
+                document.querySelectorAll('.parking-item').forEach(item => {
+                    const description = item.querySelector('.parking-description').value;
+                    const parkingLat = parseFloat(item.querySelector('.parking-lat').value) || 0;
+                    const parkingLng = parseFloat(item.querySelector('.parking-lng').value) || 0;
+
+                    if (description) {
+                        parkings.push({
+                            description,
+                            coordinates: { lat: parkingLat, lng: parkingLng }
+                        });
+                    }
+                });
+
+                // Collect media
+                const video = document.getElementById('video').value || null;
+
+                const locationData = {
+                    name: document.getElementById('name').value,
+                    slug: document.getElementById('slug').value,
+                    capacity: parseInt(document.getElementById('capacity').value),
+                    description: document.getElementById('description').value,
+                    short_description: document.getElementById('short_description').value,
+                    address: {
+                        street: document.getElementById('street').value,
+                        city: document.getElementById('city').value,
+                        coordinates: { lat, lng }
+                    },
+                    parkings: parkings,
+                    media: {
+                        photos: imageUrls,
+                        videos: video ? [video] : []
+                    }
+                };
+
+                if (locationId) {
+                    await API.updateLocation(locationId, locationData);
+                    showToast('Локация успешно обновлена', 'success');
+                } else {
+                    await API.createLocation(locationData);
+                    showToast('Локация успешно создана', 'success');
+                }
+
+                setTimeout(() => {
+                    window.location.href = 'locations.html';
+                }, 1500);
+
+            } catch (error) {
+                handleError(error, 'Ошибка сохранения локации');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Сохранить';
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>

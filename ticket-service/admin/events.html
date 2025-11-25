@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>События - Ticket Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .nav-btn:hover {
+            background: #5568d3;
+        }
+
+        .btn-primary {
+            background: #4caf50;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-input {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        .events-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .event-card {
+            padding: 25px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .event-card:hover {
+            background: #f0f0f0;
+            transform: translateX(5px);
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .event-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .event-date {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .event-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-edit {
+            background: #2196f3;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #0b7dda;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #da190b;
+        }
+
+        .event-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-sold-out {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .status-cancelled {
+            background: #f5f5f5;
+            color: #757575;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 80px;
+            color: #999;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast-show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            background: #4caf50;
+        }
+
+        .toast-error {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎪 Управление событиями</h1>
+
+            <div class="nav">
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+                <a href="events.html" class="nav-btn">🎪 События</a>
+                <a href="locations.html" class="nav-btn">📍 Локации</a>
+                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
+                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
+                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="search" class="filter-input" placeholder="🔍 Поиск по названию...">
+                <select id="status-filter" class="filter-select">
+                    <option value="">Все статусы</option>
+                    <option value="active">Активные</option>
+                    <option value="sold_out">Распроданные</option>
+                    <option value="cancelled">Отменённые</option>
+                </select>
+                <a href="event-edit.html" class="nav-btn btn-primary">+ Создать событие</a>
+            </div>
+        </div>
+
+        <div class="section">
+            <div id="events-container" class="events-grid">
+                <div class="loading">Загрузка событий...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared.js"></script>
+    <script>
+        let allEvents = [];
+
+        async function loadEvents() {
+            try {
+                const data = await API.getEvents();
+                allEvents = data.events || [];
+                displayEvents(allEvents);
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки событий');
+                document.getElementById('events-container').innerHTML =
+                    '<div class="empty">Ошибка загрузки событий</div>';
+            }
+        }
+
+        function displayEvents(events) {
+            const container = document.getElementById('events-container');
+
+            if (events.length === 0) {
+                container.innerHTML = '<div class="empty">Нет событий</div>';
+                return;
+            }
+
+            container.innerHTML = events.map(event => {
+                const stats = calculateEventStats(event);
+                const statusClass = `status-${event.status}`;
+
+                return `
+                    <div class="event-card">
+                        <div class="event-header">
+                            <div>
+                                <div class="event-title">${event.title}</div>
+                                <div class="event-date">📅 ${formatDate(event.date)}</div>
+                                <span class="status-badge ${statusClass}">${event.status}</span>
+                            </div>
+                            <div class="event-actions">
+                                <button class="action-btn btn-edit" onclick="editEvent('${event.event_id}')">
+                                    ✏️ Редактировать
+                                </button>
+                                <button class="action-btn btn-delete" onclick="deleteEvent('${event.event_id}', '${event.title}')">
+                                    🗑️ Удалить
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="event-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">${stats.soldTickets}/${stats.totalTickets}</div>
+                                <div class="stat-label">Продано билетов</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${stats.capacity}%</div>
+                                <div class="stat-label">Заполненность</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${formatCurrency(stats.revenue)}</div>
+                                <div class="stat-label">Выручка</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function editEvent(eventId) {
+            window.location.href = `event-edit.html?id=${eventId}`;
+        }
+
+        async function deleteEvent(eventId, title) {
+            if (!confirm(`Вы уверены, что хотите удалить событие "${title}"?`)) {
+                return;
+            }
+
+            try {
+                await API.deleteEvent(eventId);
+                showToast('Событие успешно удалено', 'success');
+                await loadEvents();
+            } catch (error) {
+                handleError(error, 'Ошибка удаления события');
+            }
+        }
+
+        // Filters
+        document.getElementById('search').addEventListener('input', (e) => {
+            filterEvents();
+        });
+
+        document.getElementById('status-filter').addEventListener('change', (e) => {
+            filterEvents();
+        });
+
+        function filterEvents() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const status = document.getElementById('status-filter').value;
+
+            let filtered = allEvents;
+
+            if (search) {
+                filtered = filtered.filter(e =>
+                    e.title.toLowerCase().includes(search) ||
+                    e.description.toLowerCase().includes(search)
+                );
+            }
+
+            if (status) {
+                filtered = filtered.filter(e => e.status === status);
+            }
+
+            displayEvents(filtered);
+        }
+
+        // Load events on page load
+        loadEvents();
+    </script>
+</body>
+</html>

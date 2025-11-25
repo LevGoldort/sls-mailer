@@ -1,0 +1,204 @@
+{
+  "tables": [
+    {
+      "TableName": "yallabalagan-events",
+      "KeySchema": [
+        {
+          "AttributeName": "PK",
+          "KeyType": "HASH"
+        },
+        {
+          "AttributeName": "SK",
+          "KeyType": "RANGE"
+        }
+      ],
+      "AttributeDefinitions": [
+        {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "SK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "GSI1PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "GSI1SK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "date",
+          "AttributeType": "S"
+        }
+      ],
+      "BillingMode": "PAY_PER_REQUEST",
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "GSI1",
+          "KeySchema": [
+            {
+              "AttributeName": "GSI1PK",
+              "KeyType": "HASH"
+            },
+            {
+              "AttributeName": "GSI1SK",
+              "KeyType": "RANGE"
+            }
+          ],
+          "Projection": {
+            "ProjectionType": "ALL"
+          }
+        },
+        {
+          "IndexName": "DateIndex",
+          "KeySchema": [
+            {
+              "AttributeName": "PK",
+              "KeyType": "HASH"
+            },
+            {
+              "AttributeName": "date",
+              "KeyType": "RANGE"
+            }
+          ],
+          "Projection": {
+            "ProjectionType": "ALL"
+          }
+        }
+      ],
+      "Tags": [
+        {
+          "Key": "Project",
+          "Value": "YallaBalagan-TicketService"
+        }
+      ]
+    },
+    {
+      "TableName": "yallabalagan-locations",
+      "KeySchema": [
+        {
+          "AttributeName": "PK",
+          "KeyType": "HASH"
+        },
+        {
+          "AttributeName": "SK",
+          "KeyType": "RANGE"
+        }
+      ],
+      "AttributeDefinitions": [
+        {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "SK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "slug",
+          "AttributeType": "S"
+        }
+      ],
+      "BillingMode": "PAY_PER_REQUEST",
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "SlugIndex",
+          "KeySchema": [
+            {
+              "AttributeName": "slug",
+              "KeyType": "HASH"
+            }
+          ],
+          "Projection": {
+            "ProjectionType": "ALL"
+          }
+        }
+      ],
+      "Tags": [
+        {
+          "Key": "Project",
+          "Value": "YallaBalagan-TicketService"
+        }
+      ]
+    },
+    {
+      "TableName": "yallabalagan-orders",
+      "KeySchema": [
+        {
+          "AttributeName": "PK",
+          "KeyType": "HASH"
+        },
+        {
+          "AttributeName": "SK",
+          "KeyType": "RANGE"
+        }
+      ],
+      "AttributeDefinitions": [
+        {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "SK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "event_id",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "customer_email",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "created_at",
+          "AttributeType": "S"
+        }
+      ],
+      "BillingMode": "PAY_PER_REQUEST",
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "EventIndex",
+          "KeySchema": [
+            {
+              "AttributeName": "event_id",
+              "KeyType": "HASH"
+            },
+            {
+              "AttributeName": "created_at",
+              "KeyType": "RANGE"
+            }
+          ],
+          "Projection": {
+            "ProjectionType": "ALL"
+          }
+        },
+        {
+          "IndexName": "EmailIndex",
+          "KeySchema": [
+            {
+              "AttributeName": "customer_email",
+              "KeyType": "HASH"
+            },
+            {
+              "AttributeName": "created_at",
+              "KeyType": "RANGE"
+            }
+          ],
+          "Projection": {
+            "ProjectionType": "ALL"
+          }
+        }
+      ],
+      "Tags": [
+        {
+          "Key": "Project",
+          "Value": "YallaBalagan-TicketService"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование события - Ticket Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .form-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .ticket-types {
+            margin-top: 20px;
+        }
+
+        .ticket-type-item {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .ticket-type-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .btn-secondary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast-show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            background: #4caf50;
+        }
+
+        .toast-error {
+            background: #f44336;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="events.html" class="back-link">← Назад к списку событий</a>
+            <h1 id="page-title">Создание события</h1>
+        </div>
+
+        <form id="event-form">
+            <div class="form-section">
+                <h2>Основная информация</h2>
+
+                <div class="form-group">
+                    <label for="title">Название события *</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Описание *</label>
+                    <textarea id="description" name="description" required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date">Дата *</label>
+                        <input type="date" id="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="time">Время *</label>
+                        <input type="time" id="time" name="time" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="location_id">Локация *</label>
+                        <select id="location_id" name="location_id" required>
+                            <option value="">Выберите локацию...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Статус</label>
+                        <select id="status" name="status">
+                            <option value="active">Активно</option>
+                            <option value="sold_out">Распродано</option>
+                            <option value="cancelled">Отменено</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Медиа</h2>
+
+                <div class="form-group">
+                    <label>Фотографии события</label>
+                    <div id="event-images-upload"></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Типы билетов</h2>
+                <div id="ticket-types-container" class="ticket-types"></div>
+                <button type="button" class="btn btn-secondary" onclick="addTicketType()">+ Добавить тип билета</button>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="window.location.href='events.html'">Отмена</button>
+                <button type="submit" class="btn btn-primary" id="submit-btn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="shared.js"></script>
+    <script src="shared-image-upload.js"></script>
+    <script>
+        let eventId = null;
+        let ticketTypeCounter = 0;
+        let imageUrls = [];
+
+        // Initialize image upload component
+        function initImageUploadComponent() {
+            initImageUpload(
+                'event-images-upload',
+                'events',
+                (url) => {
+                    imageUrls.push(url);
+                    console.log('Image uploaded:', url);
+                },
+                (error) => {
+                    console.error('Image upload error:', error);
+                    showToast('Ошибка загрузки фото', 'error');
+                }
+            );
+        }
+
+        async function init() {
+            // Initialize image upload component
+            initImageUploadComponent();
+
+            // Load locations
+            await loadLocations();
+
+            // Check if editing existing event
+            const urlParams = new URLSearchParams(window.location.search);
+            eventId = urlParams.get('id');
+
+            if (eventId) {
+                document.getElementById('page-title').textContent = 'Редактирование события';
+                await loadEvent(eventId);
+            } else {
+                // Add one default ticket type for new events
+                addTicketType();
+            }
+        }
+
+        async function loadLocations() {
+            try {
+                const data = await API.getLocations();
+                const select = document.getElementById('location_id');
+
+                data.locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.location_id;
+                    option.textContent = loc.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки локаций');
+            }
+        }
+
+        async function loadEvent(id) {
+            try {
+                const data = await API.getEvent(id);
+                const event = data.event;
+
+                // Fill form
+                document.getElementById('title').value = event.title;
+                document.getElementById('description').value = event.description;
+
+                // Parse date and time
+                const dateTime = new Date(event.date);
+                document.getElementById('date').value = dateTime.toISOString().split('T')[0];
+                document.getElementById('time').value = dateTime.toTimeString().slice(0, 5);
+
+                document.getElementById('location_id').value = event.location_id;
+                document.getElementById('status').value = event.status;
+
+                // Load images if present
+                if (event.images && event.images.length > 0) {
+                    imageUrls = event.images;
+                    console.log('Loaded existing images:', imageUrls);
+                }
+
+                // Add ticket types
+                event.ticket_types.forEach(tt => {
+                    addTicketType(tt);
+                });
+
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки события');
+            }
+        }
+
+        function addTicketType(data = null) {
+            const id = data?.id || `tt-${Date.now()}-${ticketTypeCounter++}`;
+            const container = document.getElementById('ticket-types-container');
+
+            const div = document.createElement('div');
+            div.className = 'ticket-type-item';
+            div.dataset.id = id;
+
+            div.innerHTML = `
+                <div class="ticket-type-header">
+                    <h3>Тип билета</h3>
+                    <button type="button" class="btn btn-danger" onclick="removeTicketType('${id}')">Удалить</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Название *</label>
+                        <input type="text" class="tt-name" value="${data?.name || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Цена (₪) *</label>
+                        <input type="number" class="tt-price" value="${data?.price || ''}" required min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Всего билетов *</label>
+                        <input type="number" class="tt-total" value="${data?.total || ''}" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Доступно</label>
+                        <input type="number" class="tt-available" value="${data?.available || data?.total || ''}" min="0">
+                        <div class="help-text">Оставьте пустым для новых событий</div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(div);
+        }
+
+        function removeTicketType(id) {
+            const item = document.querySelector(`[data-id="${id}"]`);
+            if (item) {
+                item.remove();
+            }
+        }
+
+        document.getElementById('event-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Сохранение...';
+
+            try {
+                // Collect ticket types
+                const ticketTypes = [];
+                document.querySelectorAll('.ticket-type-item').forEach(item => {
+                    const id = item.dataset.id;
+                    const name = item.querySelector('.tt-name').value;
+                    const price = parseFloat(item.querySelector('.tt-price').value);
+                    const total = parseInt(item.querySelector('.tt-total').value);
+                    const availableInput = item.querySelector('.tt-available').value;
+                    const available = availableInput ? parseInt(availableInput) : total;
+
+                    ticketTypes.push({ id, name, price, total, available });
+                });
+
+                if (ticketTypes.length === 0) {
+                    throw new Error('Добавьте хотя бы один тип билета');
+                }
+
+                // Build event data
+                const date = document.getElementById('date').value;
+                const time = document.getElementById('time').value;
+                const dateTime = `${date}T${time}:00Z`;
+
+                const eventData = {
+                    title: document.getElementById('title').value,
+                    description: document.getElementById('description').value,
+                    date: dateTime,
+                    location_id: document.getElementById('location_id').value,
+                    status: document.getElementById('status').value,
+                    ticket_types: ticketTypes,
+                    images: imageUrls,
+                    currency: 'ILS'
+                };
+
+                // Create or update
+                if (eventId) {
+                    await API.updateEvent(eventId, eventData);
+                    showToast('Событие успешно обновлено', 'success');
+                } else {
+                    await API.createEvent(eventData);
+                    showToast('Событие успешно создано', 'success');
+                }
+
+                setTimeout(() => {
+                    window.location.href = 'events.html';
+                }, 1500);
+
+            } catch (error) {
+                handleError(error, 'Ошибка сохранения события');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Сохранить';
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>

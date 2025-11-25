@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Заказ оформлен - YallaBalagan{% endblock %}
+{% block description %}Ваш заказ успешно оформлен{% endblock %}
+
+{% block content %}
+<div class="checkout-container" style="margin-top: 2rem;">
+    <!-- Success Message -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
+        <h1 class="page-title" style="font-size: 2rem; color: var(--success);">Заказ успешно оформлен!</h1>
+        <p class="page-subtitle" style="margin-bottom: 0;">
+            Билеты отправлены на ваш email
+        </p>
+    </div>
+
+    <!-- Order Details Card -->
+    <div class="checkout-card">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Детали заказа</h2>
+
+        <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-family: monospace;">
+            <strong>Номер заказа:</strong> {{ order.order_id }}
+        </div>
+
+        <!-- Event Info -->
+        <div style="padding-bottom: 1.5rem; border-bottom: 1px solid var(--gray-200); margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.75rem;">Событие</h3>
+            <p style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem;">{{ event.title }}</p>
+            <p style="color: var(--gray-600); font-size: 0.9375rem;">
+                📅 {{ event.date_formatted }} в {{ event.time_formatted }}
+            </p>
+            {% if event.location_name %}
+            <p style="color: var(--gray-600); font-size: 0.9375rem;">
+                📍 {{ event.location_name }}
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- Customer Info -->
+        <div style="padding-bottom: 1.5rem; border-bottom: 1px solid var(--gray-200); margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.75rem;">Контактная информация</h3>
+            <div style="color: var(--gray-700);">
+                <p style="margin-bottom: 0.25rem;"><strong>Имя:</strong> {{ order.customer.name }}</p>
+                <p style="margin-bottom: 0.25rem;"><strong>Email:</strong> {{ order.customer.email }}</p>
+                <p><strong>Телефон:</strong> {{ order.customer.phone }}</p>
+            </div>
+        </div>
+
+        <!-- Tickets -->
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.75rem;">Билеты</h3>
+            {% for ticket in order.tickets %}
+            <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>{{ ticket.type_name }}</strong>
+                        <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">
+                            Количество: {{ ticket.quantity }}
+                        </p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.875rem; color: var(--gray-600);">
+                            {{ ticket.price_per_ticket }}₪ × {{ ticket.quantity }}
+                        </div>
+                        <div style="font-weight: 600; color: var(--primary);">
+                            {{ ticket.price_per_ticket * ticket.quantity }}₪
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Total -->
+        <div style="background: var(--primary); color: white; padding: 1.25rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 1.125rem; font-weight: 600;">Итого оплачено</span>
+                <span style="font-size: 1.5rem; font-weight: bold;">{{ order.total_amount }}₪</span>
+            </div>
+        </div>
+
+        <!-- QR Codes -->
+        {% if order.qr_codes and order.qr_codes|length > 0 %}
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.75rem;">Ваши билеты</h3>
+            <p style="color: var(--gray-600); font-size: 0.9375rem; margin-bottom: 1rem;">
+                Покажите эти QR-коды на входе
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                {% for qr in order.qr_codes %}
+                <div style="background: white; border: 2px solid var(--gray-200); padding: 1rem; border-radius: 0.5rem; text-align: center;">
+                    <!-- Placeholder for QR code image -->
+                    <div style="width: 150px; height: 150px; margin: 0 auto; background: var(--gray-100); display: flex; align-items: center; justify-content: center; border-radius: 0.5rem;">
+                        <div style="font-size: 3rem;">📱</div>
+                    </div>
+                    <p style="margin-top: 0.75rem; font-size: 0.75rem; font-family: monospace; color: var(--gray-600);">
+                        {{ qr.code }}
+                    </p>
+                    <p style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--gray-700);">
+                        {{ qr.ticket_type }}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Payment Status -->
+        {% if order.payment %}
+        <div style="background: {% if order.payment.status == 'completed' %}#d1fae5{% else %}#fee2e2{% endif %}; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+            <strong>Статус оплаты:</strong>
+            {% if order.payment.status == 'completed' %}
+            <span style="color: var(--success);">✓ Оплачено</span>
+            {% elif order.payment.status == 'pending' %}
+            <span style="color: #d97706;">⏳ Ожидается оплата</span>
+            {% else %}
+            <span style="color: var(--danger);">✗ Ошибка оплаты</span>
+            {% endif %}
+
+            {% if order.payment.allpay_transaction_id %}
+            <p style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.5rem;">
+                ID транзакции: {{ order.payment.allpay_transaction_id }}
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Important Info -->
+        <div style="background: #dbeafe; border: 1px solid #93c5fd; color: #1e40af; padding: 1rem; border-radius: 0.5rem; font-size: 0.875rem;">
+            <strong>ℹ️ Важная информация:</strong>
+            <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
+                <li>Билеты отправлены на email: <strong>{{ order.customer.email }}</strong></li>
+                <li>Проверьте папку "Спам", если не получили письмо</li>
+                <li>Сохраните это письмо или сделайте скриншот QR-кодов</li>
+                <li>При входе на событие покажите QR-код</li>
+                {% if event.refund_policy and event.refund_policy.enabled %}
+                <li>Возврат возможен за {{ event.refund_policy.hours_before }} часов до начала</li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- Actions -->
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+            <a href="/" class="btn btn-primary" style="flex: 1; min-width: 200px;">
+                Посмотреть другие события
+            </a>
+            <button onclick="window.print()" class="btn" style="flex: 1; min-width: 200px; background: var(--gray-200); color: var(--gray-800);">
+                🖨️ Распечатать билеты
+            </button>
+        </div>
+    </div>
+
+    <!-- Support Info -->
+    <div style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 2rem;">
+        <p>Возникли вопросы? Свяжитесь с нами:</p>
+        <p style="margin-top: 0.5rem;">
+            <a href="mailto:info@yallabalagan.org" style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                info@yallabalagan.org
+            </a>
+        </p>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Add to calendar button (if needed)
+function addToCalendar() {
+    const event = {
+        title: '{{ event.title }}',
+        description: '{{ event.description }}',
+        date: '{{ event.date }}',
+        location_name: '{{ event.location_name if event.location_name else "" }}'
+    };
+    window.YallaBalagan.addToCalendar(event);
+}
+
+// Print styles
+const printStyles = document.createElement('style');
+printStyles.textContent = `
+    @media print {
+        header, footer, nav, .btn {
+            display: none !important;
+        }
+        .checkout-card {
+            box-shadow: none !important;
+            page-break-inside: avoid;
+        }
+    }
+`;
+document.head.appendChild(printStyles);
+</script>
+{% endblock %}
+{% endblock %}
