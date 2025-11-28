@@ -11,7 +11,8 @@
     {% if events %}
     <div class="events-grid">
         {% for event in events %}
-        <a href="/events/{{ event.event_id }}.html" class="event-card">
+        {% set event_slug = event.slug if event.slug else event.event_id %}
+        <a href="/events/{{ event_slug }}.html" class="event-card">
             {% if event.images and event.images|length > 0 %}
             <img src="{{ event.images[0] }}" alt="{{ event.title }}" class="event-image">
             {% else %}

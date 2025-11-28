@@ -1,7 +1,7 @@
 """Order model for ticket service"""
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import random
 import string
@@ -97,6 +97,8 @@ class Order:
     qr_codes: List[QRCode] = field(default_factory=list)
     notifications: Notifications = field(default_factory=Notifications)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    coupon_code: Optional[str] = None
+    discount_amount: float = 0
 
     @staticmethod
     def generate_id() -> str:
@@ -120,24 +122,41 @@ class Order:
         """Вычисляет общую сумму заказа"""
         return sum(ticket.get_total() for ticket in self.tickets)
 
-    def generate_qr_codes(self):
-        """Генерирует QR коды для всех билетов в заказе"""
+    def generate_qr_codes(self, generate_images: bool = True):
+        """
+        Генерирует QR коды для всех билетов в заказе
+        
+        Args:
+            generate_images: Если True, генерирует QR изображения и загружает в S3
+        """
         self.qr_codes = []
         index = 1
 
         for ticket in self.tickets:
-            for _ in range(ticket.quantity):
+            for _ in range(int(ticket.quantity)):
                 code = self.generate_ticket_code(self.event_id, index)
+                
+                # Generate QR image if requested
+                s3_url = None
+                if generate_images:
+                    try:
+                        from utils.qr_generator import generate_qr_image
+                        s3_url = generate_qr_image(code, self.order_id)
+                    except Exception as e:
+                        print(f"Warning: Failed to generate QR image for {code}: {str(e)}")
+                        # Continue without image - code is still valid
+                
                 qr = QRCode(
                     code=code,
-                    ticket_type=ticket.type_id
+                    ticket_type=ticket.type_id,
+                    s3_url=s3_url
                 )
                 self.qr_codes.append(qr)
                 index += 1
 
     def to_dynamodb_item(self) -> Dict:
         """Конвертирует в формат DynamoDB"""
-        return {
+        item = {
             "PK": f"ORDER#{self.order_id}",
             "SK": "METADATA",
             "order_id": self.order_id,
@@ -153,6 +172,13 @@ class Order:
             # GSI для поиска
             "customer_email": self.customer.email
         }
+
+        # Add coupon fields if present
+        if self.coupon_code:
+            item["coupon_code"] = self.coupon_code
+            item["discount_amount"] = self.discount_amount
+
+        return item
 
     @classmethod
     def from_dynamodb_item(cls, item: Dict) -> 'Order':
@@ -187,7 +213,9 @@ class Order:
             payment=payment,
             qr_codes=qr_codes,
             notifications=notifications,
-            created_at=item.get("created_at")
+            created_at=item.get("created_at"),
+            coupon_code=item.get("coupon_code"),
+            discount_amount=item.get("discount_amount", 0)
         )
 
     def can_refund(self, event_date: str, hours_before: int = 48) -> tuple[bool, str]:
@@ -206,7 +234,7 @@ class Order:
 
         # Проверка времени до события
         event_dt = datetime.fromisoformat(event_date.replace('Z', '+00:00'))
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         hours_until = (event_dt - now).total_seconds() / 3600
 
         if hours_until < hours_before:

@@ -189,6 +189,63 @@
             color: #666;
             margin-top: 5px;
         }
+
+        /* Orders table styles */
+        .orders-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .orders-table th {
+            background: #f5f5f5;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .orders-table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .orders-table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-pending {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .empty-orders {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
@@ -205,6 +262,13 @@
                 <div class="form-group">
                     <label for="title">Название события *</label>
                     <input type="text" id="title" name="title" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="slug">Короткий адрес (опционально)</label>
+                    <input type="text" id="slug" name="slug" placeholder="yallaom">
+                    <div class="help-text">Используется в публичном URL. Только латиница, цифры и дефисы.</div>
+                    <div class="help-text" id="slug-preview">Страница будет доступна по /events/&lt;event_id&gt;.html</div>
                 </div>
 
                 <div class="form-group">
@@ -261,14 +325,72 @@
                 <button type="submit" class="btn btn-primary" id="submit-btn">Сохранить</button>
             </div>
         </form>
+
+        <!-- Orders section - only visible when editing existing event -->
+        <div id="orders-section" class="orders-section" style="display: none;">
+            <h2>Заказы на это событие</h2>
+            <div id="orders-container">
+                <div class="loading">Загрузка заказов...</div>
+            </div>
+        </div>
     </div>
 
-    <script src="shared.js"></script>
+    <script src="shared.js?v=1764370571"></script>
     <script src="shared-image-upload.js"></script>
     <script>
         let eventId = null;
         let ticketTypeCounter = 0;
         let imageUrls = [];
+        let locations = []; // Store locations for capacity validation
+        let slugManuallyEdited = false;
+
+        function slugify(value) {
+            if (!value) return '';
+            return value
+                .toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
+        function updateSlugPreview() {
+            const previewEl = document.getElementById('slug-preview');
+            const slugInput = document.getElementById('slug');
+            if (!previewEl || !slugInput) return;
+
+            const slug = slugInput.value.trim();
+            if (slug) {
+                previewEl.innerHTML = `Публичный URL: <code>/events/${slug}.html</code>`;
+            } else if (eventId) {
+                previewEl.innerHTML = `Публичный URL по умолчанию: <code>/events/${eventId}.html</code>`;
+            } else {
+                previewEl.textContent = 'Без короткого адреса страница будет доступна по /events/<event_id>.html';
+            }
+        }
+
+        function initSlugHandlers() {
+            const titleInput = document.getElementById('title');
+            const slugInput = document.getElementById('slug');
+            if (!titleInput || !slugInput) return;
+
+            titleInput.addEventListener('input', (e) => {
+                if (eventId || slugManuallyEdited) {
+                    return;
+                }
+                const autoSlug = slugify(e.target.value);
+                slugInput.value = autoSlug;
+                updateSlugPreview();
+            });
+
+            slugInput.addEventListener('input', (e) => {
+                slugManuallyEdited = true;
+                slugInput.value = slugify(e.target.value);
+                updateSlugPreview();
+            });
+
+            updateSlugPreview();
+        }
 
         // Initialize image upload component
         function initImageUploadComponent() {
@@ -289,6 +411,8 @@
         async function init() {
             // Initialize image upload component
             initImageUploadComponent();
+
+            initSlugHandlers();
 
             // Load locations
             await loadLocations();
@@ -311,10 +435,13 @@
                 const data = await API.getLocations();
                 const select = document.getElementById('location_id');
 
-                data.locations.forEach(loc => {
+                // Store locations for validation
+                locations = data.locations || [];
+
+                locations.forEach(loc => {
                     const option = document.createElement('option');
                     option.value = loc.location_id;
-                    option.textContent = loc.name;
+                    option.textContent = `${loc.name} (вместимость: ${loc.capacity})`;
                     select.appendChild(option);
                 });
             } catch (error) {
@@ -329,6 +456,13 @@
 
                 // Fill form
                 document.getElementById('title').value = event.title;
+                if (event.slug) {
+                    document.getElementById('slug').value = event.slug;
+                    slugManuallyEdited = true;
+                } else {
+                    slugManuallyEdited = false;
+                }
+                updateSlugPreview();
                 document.getElementById('description').value = event.description;
 
                 // Parse date and time
@@ -349,6 +483,9 @@
                 event.ticket_types.forEach(tt => {
                     addTicketType(tt);
                 });
+
+                // Load orders for this event
+                loadOrders(id);
 
             } catch (error) {
                 handleError(error, 'Ошибка загрузки события');
@@ -426,6 +563,20 @@
                     throw new Error('Добавьте хотя бы один тип билета');
                 }
 
+                // Validate total tickets against location capacity
+                const locationId = document.getElementById('location_id').value;
+                const selectedLocation = locations.find(loc => loc.location_id === locationId);
+
+                if (selectedLocation) {
+                    const totalTickets = ticketTypes.reduce((sum, tt) => sum + tt.total, 0);
+
+                    if (totalTickets > selectedLocation.capacity) {
+                        throw new Error(
+                            `Общее количество билетов (${totalTickets}) превышает вместимость локации "${selectedLocation.name}" (${selectedLocation.capacity})`
+                        );
+                    }
+                }
+
                 // Build event data
                 const date = document.getElementById('date').value;
                 const time = document.getElementById('time').value;
@@ -441,6 +592,14 @@
                     images: imageUrls,
                     currency: 'ILS'
                 };
+
+                const slugValue = document.getElementById('slug').value.trim();
+                if (slugValue) {
+                    eventData.slug = slugValue;
+                } else if (eventId) {
+                    // Отправляем пустой slug, чтобы очистить существующий
+                    eventData.slug = '';
+                }
 
                 // Create or update
                 if (eventId) {
@@ -461,6 +620,73 @@
                 submitBtn.textContent = 'Сохранить';
             }
         });
+
+        // Orders management
+        async function loadOrders(eventId) {
+            try {
+                const data = await API.getOrdersByEvent(eventId);
+                const orders = data.orders || [];
+
+                // Sort orders by created_at (newest first)
+                orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                displayOrders(orders);
+
+                // Show orders section
+                document.getElementById('orders-section').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('orders-container').innerHTML =
+                    '<div class="empty-orders">Ошибка загрузки заказов</div>';
+            }
+        }
+
+        function displayOrders(orders) {
+            const container = document.getElementById('orders-container');
+
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="empty-orders">Пока нет заказов на это событие</div>';
+                return;
+            }
+
+            const html = `
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID Заказа</th>
+                            <th>Клиент</th>
+                            <th>Email</th>
+                            <th>Билеты</th>
+                            <th>Сумма</th>
+                            <th>Статус</th>
+                            <th>Дата и время</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(order => {
+                            const customer = order.customer || {};
+                            const payment = order.payment || {};
+                            const ticketCount = (order.tickets || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
+                            const statusClass = payment.status === 'completed' ? 'status-completed' : 'status-pending';
+
+                            return `
+                                <tr>
+                                    <td><strong>${order.order_id}</strong></td>
+                                    <td>${customer.name || '-'}</td>
+                                    <td>${customer.email || '-'}</td>
+                                    <td>${ticketCount} шт</td>
+                                    <td><strong>${formatCurrency(order.total_amount)}</strong></td>
+                                    <td><span class="status-badge ${statusClass}">${payment.status || 'pending'}</span></td>
+                                    <td>${formatDate(order.created_at)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = html;
+        }
 
         init();
     </script>

@@ -87,7 +87,8 @@ class Coupon:
             Tuple[bool, str]: (is_valid, error_message)
         """
         if current_time is None:
-            current_time = datetime.utcnow()
+            from datetime import timezone
+            current_time = datetime.now(timezone.utc)
 
         # Проверка статуса
         if self.status != "active":

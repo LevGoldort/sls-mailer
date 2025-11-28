@@ -133,20 +133,36 @@
         </div>
     </div>
 
-    <script src="shared.js"></script>
+    <script src="shared.js?v=1764370571"></script>
     <script>
         let allOrders = [];
+        let events = [];
 
         async function loadOrders() {
             try {
-                const data = await API.getOrders();
-                allOrders = data.orders || [];
+                // Load both orders and events in parallel
+                const [ordersData, eventsData] = await Promise.all([
+                    API.getOrders(),
+                    API.getEvents()
+                ]);
+
+                allOrders = ordersData.orders || [];
+                events = eventsData.events || [];
+
+                // Sort orders by created_at (newest first)
+                allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
                 displayOrders(allOrders);
             } catch (error) {
                 handleError(error, 'Ошибка загрузки заказов');
                 document.getElementById('orders-container').innerHTML =
                     '<div class="empty">Ошибка загрузки заказов</div>';
             }
+        }
+
+        function getEventName(eventId) {
+            const event = events.find(e => e.event_id === eventId);
+            return event ? event.title : 'Неизвестное событие';
         }
 
         function displayOrders(orders) {
@@ -162,12 +178,13 @@
                     <thead>
                         <tr>
                             <th>ID Заказа</th>
+                            <th>Событие</th>
                             <th>Клиент</th>
                             <th>Email</th>
                             <th>Билеты</th>
                             <th>Сумма</th>
                             <th>Статус</th>
-                            <th>Дата</th>
+                            <th>Дата и время</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -176,16 +193,18 @@
                             const payment = order.payment || {};
                             const ticketCount = (order.tickets || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
                             const statusClass = payment.status === 'completed' ? 'status-completed' : 'status-pending';
+                            const eventName = getEventName(order.event_id);
 
                             return `
                                 <tr>
                                     <td><strong>${order.order_id}</strong></td>
+                                    <td>${eventName}</td>
                                     <td>${customer.name || '-'}</td>
                                     <td>${customer.email || '-'}</td>
                                     <td>${ticketCount} шт</td>
                                     <td><strong>${formatCurrency(order.total_amount)}</strong></td>
                                     <td><span class="status-badge ${statusClass}">${payment.status || 'pending'}</span></td>
-                                    <td>${formatDateShort(order.created_at)}</td>
+                                    <td>${formatDate(order.created_at)}</td>
                                 </tr>
                             `;
                         }).join('')}
@@ -217,6 +236,7 @@
 
             const csvData = allOrders.map(o => ({
                 order_id: o.order_id,
+                event_name: getEventName(o.event_id),
                 customer_name: o.customer?.name || '',
                 customer_email: o.customer?.email || '',
                 total_amount: o.total_amount,

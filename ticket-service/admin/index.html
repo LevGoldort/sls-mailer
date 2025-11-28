@@ -228,6 +228,72 @@
                 gap: 8px;
             }
         }
+
+        /* Regenerate Site Button */
+        .btn-regenerate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+        }
+
+        .btn-regenerate:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Spinner Animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+            bottom: -2px;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -244,6 +310,26 @@
                 <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
                 <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
             </div>
+        </div>
+
+        <!-- Site Regeneration Section -->
+        <div class="regenerate-site-section" style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                <div style="flex: 1; min-width: 250px;">
+                    <h3 style="color: white; margin: 0 0 8px 0; font-size: 20px; font-weight: 600;">
+                        🌐 Публичный сайт
+                    </h3>
+                    <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 14px;">
+                        Обновите публичный сайт, чтобы изменения стали видны посетителям
+                    </p>
+                </div>
+                <div>
+                    <button id="regenerate-site-btn" class="btn-regenerate" onclick="regenerateSite()" style="background: white; color: #667eea; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.3s;">
+                        🔄 Обновить сайт
+                    </button>
+                </div>
+            </div>
+            <div id="regenerate-status" style="margin-top: 15px;"></div>
         </div>
 
         <div class="stats">
@@ -285,15 +371,29 @@
         </div>
 
         <div class="section">
-            <h2>Предстоящие события</h2>
-            <div id="upcoming-events" class="event-list">
-                <div class="loading">Загрузка...</div>
+            <h2>События</h2>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('upcoming')">Предстоящие</button>
+                <button class="tab" onclick="switchTab('past')">Прошедшие</button>
+            </div>
+            <div id="upcoming-tab" class="tab-content active">
+                <div id="upcoming-events" class="event-list">
+                    <div class="loading">Загрузка...</div>
+                </div>
+            </div>
+            <div id="past-tab" class="tab-content">
+                <div id="past-events" class="event-list">
+                    <div class="loading">Загрузка...</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="shared.js"></script>
+    <script src="shared.js?v=1764370571"></script>
     <script>
+        // Store all events globally for tab switching
+        let allEvents = [];
+
         async function loadDashboard() {
             try {
                 // Load all data in parallel
@@ -310,6 +410,9 @@
                 const locations = locationsData.locations || [];
                 const coupons = couponsData.coupons || [];
 
+                // Store events globally
+                allEvents = events;
+
                 const orderStats = calculateOrdersStats(orders);
 
                 // Update stats
@@ -320,44 +423,84 @@
                 document.getElementById('stat-locations').textContent = locations.length;
                 document.getElementById('stat-coupons').textContent = coupons.length;
 
-                // Display upcoming events (sorted by date)
-                const sortedEvents = events
-                    .filter(e => e.status === 'active')
-                    .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                displayUpcomingEvents(sortedEvents.slice(0, 5));
+                // Display events based on current tab
+                displayEventsByStatus();
 
             } catch (error) {
                 handleError(error, 'Ошибка загрузки данных');
                 document.getElementById('upcoming-events').innerHTML =
                     '<div class="empty">Ошибка загрузки данных</div>';
+                document.getElementById('past-events').innerHTML =
+                    '<div class="empty">Ошибка загрузки данных</div>';
             }
         }
 
-        function displayUpcomingEvents(events) {
-            const container = document.getElementById('upcoming-events');
+        function isEventPast(event) {
+            // Event is considered past if its date + 1 hour is in the past
+            const eventDate = new Date(event.date);
+            const eventEndTime = new Date(eventDate.getTime() + 60 * 60 * 1000); // +1 hour
+            return eventEndTime <= new Date();
+        }
+
+        function displayEventsByStatus() {
+            const now = new Date();
+
+            // Filter events by time
+            const upcomingEvents = allEvents
+                .filter(e => !isEventPast(e))
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const pastEvents = allEvents
+                .filter(e => isEventPast(e))
+                .sort((a, b) => new Date(b.date) - new Date(a.date)); // Most recent first
+
+            displayEvents('upcoming-events', upcomingEvents, 'Нет предстоящих событий');
+            displayEvents('past-events', pastEvents, 'Нет прошедших событий');
+        }
+
+        function displayEvents(containerId, events, emptyMessage) {
+            const container = document.getElementById(containerId);
 
             if (events.length === 0) {
-                container.innerHTML = '<div class="empty">Нет предстоящих событий</div>';
+                container.innerHTML = `<div class="empty">${emptyMessage}</div>`;
                 return;
             }
 
             container.innerHTML = events.map(event => {
                 const stats = calculateEventStats(event);
                 const statusClass = event.status === 'active' ? 'status-active' : 'status-sold-out';
+                const isPast = isEventPast(event);
 
                 return `
-                    <div class="event-item" onclick="navigateTo('events.html')">
+                    <div class="event-item" onclick="navigateTo('event-edit.html?id=${event.event_id}')">
                         <div class="event-title">${event.title}</div>
                         <div class="event-meta">
                             <span>📅 ${formatDate(event.date)}</span>
                             <span>🎫 Продано: ${stats.soldTickets}/${stats.totalTickets}</span>
                             <span>💰 ${formatCurrency(stats.revenue)}</span>
                             <span class="status-badge ${statusClass}">${event.status}</span>
+                            ${isPast ? '<span style="color: #999;">✓ Завершено</span>' : ''}
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function switchTab(tab) {
+            // Update tab buttons
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tc => tc.classList.remove('active'));
+
+            if (tab === 'upcoming') {
+                document.getElementById('upcoming-tab').classList.add('active');
+            } else if (tab === 'past') {
+                document.getElementById('past-tab').classList.add('active');
+            }
         }
 
         // Load dashboard on page load

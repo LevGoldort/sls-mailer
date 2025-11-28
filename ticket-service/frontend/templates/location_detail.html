@@ -85,15 +85,6 @@
                 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                     {% for parking in location.parkings %}
                     <div {% if not loop.first %}style="padding-top: 1.5rem; border-top: 1px solid var(--gray-200);"{% endif %}>
-                        <h3 style="font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.5rem;">
-                            {{ parking.name }}
-                            {% if parking.type %}
-                            <span style="font-size: 0.875rem; font-weight: normal; color: var(--gray-600); margin-right: 0.5rem;">
-                                ({{ parking.type }})
-                            </span>
-                            {% endif %}
-                        </h3>
-
                         {% if parking.description %}
                         <p style="color: var(--gray-600); margin-bottom: 0.75rem;">
                             {{ parking.description }}
@@ -101,14 +92,14 @@
                         {% endif %}
 
                         <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9375rem;">
-                            {% if parking.price %}
-                            <div style="color: var(--gray-700);">
-                                <strong>Стоимость:</strong> {{ parking.price }}
-                            </div>
-                            {% endif %}
-
-                            {% if parking.location and parking.location.google_maps_url %}
-                            <a href="{{ parking.location.google_maps_url }}"
+                            {% if parking.coordinates %}
+                            <a href="https://www.google.com/maps?q={{ parking.coordinates.lat }},{{ parking.coordinates.lng }}"
+                               target="_blank"
+                               style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                                🗺️ Показать на карте →
+                            </a>
+                            {% elif parking.google_maps_url %}
+                            <a href="{{ parking.google_maps_url }}"
                                target="_blank"
                                style="color: var(--primary); text-decoration: none; font-weight: 500;">
                                 🗺️ Показать на карте →
@@ -161,7 +152,8 @@
                 <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Предстоящие события</h2>
                 <div class="events-grid">
                     {% for event in upcoming_events %}
-                    <a href="/events/{{ event.event_id }}.html" class="event-card">
+                    {% set event_slug = event.slug if event.slug else event.event_id %}
+                    <a href="/events/{{ event_slug }}.html" class="event-card">
                         {% if event.images and event.images|length > 0 %}
                         <img src="{{ event.images[0] }}" alt="{{ event.title }}" class="event-image">
                         {% else %}

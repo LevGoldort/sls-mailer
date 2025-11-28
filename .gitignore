@@ -71,3 +71,8 @@ TELEGRAM_BOT_ADMIN_DEPLOYED.md
 *_STATUS.md
 *_INFO.md
 AWS_SETUP.md
+
+# Security audit reports (may contain sensitive info)
+security_audit.md
+**/security_audit.md
+/ticket-service/docs/CHECKOUT_HTML_README.md

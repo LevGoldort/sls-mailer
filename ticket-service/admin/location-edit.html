@@ -287,7 +287,7 @@
         </form>
     </div>
 
-    <script src="shared.js"></script>
+    <script src="shared.js?v=1764370571"></script>
     <script src="shared-image-upload.js"></script>
     <script>
         let locationId = null;
@@ -445,10 +445,11 @@
 
         // Google Maps URL parsing
         function parseGoogleMapsUrl(url) {
+            // Проверяем паттерны в порядке приоритета (самые точные сначала)
             const patterns = [
-                /@(-?\d+\.\d+),(-?\d+\.\d+)/,  // @lat,lng
+                /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // !3dlat!4dlng - самые точные координаты места
                 /q=(-?\d+\.\d+),(-?\d+\.\d+)/,  // q=lat,lng
-                /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // !3dlat!4dlng
+                /@(-?\d+\.\d+),(-?\d+\.\d+)/,  // @lat,lng - менее точные, центр карты
             ];
 
             for (const pattern of patterns) {

@@ -55,6 +55,7 @@ class Event:
     status: str = "active"  # "active" | "sold_out" | "cancelled"
     recurrence: Optional[Recurrence] = None
     refund_policy: RefundPolicy = field(default_factory=lambda: RefundPolicy())
+    slug: Optional[str] = None  # Короткий URL /events/<slug>.html
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -65,7 +66,7 @@ class Event:
 
     def to_dynamodb_item(self) -> Dict:
         """Конвертирует в формат DynamoDB"""
-        return {
+        item = {
             "PK": f"EVENT#{self.event_id}",
             "SK": "METADATA",
             "event_id": self.event_id,
@@ -86,6 +87,11 @@ class Event:
             "GSI1SK": self.date
         }
 
+        if self.slug:
+            item["slug"] = self.slug
+
+        return item
+
     @classmethod
     def from_dynamodb_item(cls, item: Dict) -> 'Event':
         """Создает объект из DynamoDB item"""
@@ -97,7 +103,11 @@ class Event:
         if item.get("recurrence"):
             recurrence = Recurrence(**item["recurrence"])
 
-        refund_policy = RefundPolicy(**item.get("refund_policy", {}))
+        refund_policy_data = item.get("refund_policy", {})
+        if refund_policy_data:
+            refund_policy = RefundPolicy(**refund_policy_data)
+        else:
+            refund_policy = RefundPolicy()  # Use defaults
 
         return cls(
             event_id=item["event_id"],
@@ -111,6 +121,7 @@ class Event:
             status=item.get("status", "active"),
             recurrence=recurrence,
             refund_policy=refund_policy,
+            slug=item.get("slug"),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )

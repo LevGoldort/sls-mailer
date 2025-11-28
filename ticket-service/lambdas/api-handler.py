@@ -9,13 +9,16 @@ from typing import Dict, Any
 from decimal import Decimal
 import boto3
 import base64
+import re
 
 # Add parent directory to path для импорта models и utils
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from models import Event, Location, Order, Customer, OrderTicket, TicketType, Coupon, Address, Coordinates, Parking, Media, Contact
 from utils.dynamodb import DynamoDBClient
-from datetime import datetime
+from utils.payment import get_payment_provider, parse_webhook_payload
+from utils.auth import get_admin_authenticator
+from datetime import datetime, timezone
 
 
 # Helper для конвертации Decimal в int/float
@@ -28,6 +31,55 @@ class DecimalEncoder(json.JSONEncoder):
 
 # Инициализация DynamoDB клиента
 db = DynamoDBClient()
+SLUG_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$')  # 2-50 chars, lowercase, digits, hyphen
+
+
+def normalize_slug(slug: str) -> str:
+    """Приводит slug к безопасному формату"""
+    if not slug:
+        return ''
+    cleaned = slug.strip().lower()
+    cleaned = cleaned.replace(' ', '-')
+    cleaned = re.sub(r'[^a-z0-9-]', '-', cleaned)
+    cleaned = re.sub(r'-{2,}', '-', cleaned)
+    return cleaned.strip('-')
+
+
+def validate_event_slug(slug: str, current_event_id: str = None) -> str:
+    """Проверяет slug на валидность и уникальность"""
+    normalized = normalize_slug(slug)
+
+    if not normalized:
+        raise ValueError("Slug не может быть пустым")
+
+    if not SLUG_PATTERN.match(normalized):
+        raise ValueError("Slug может содержать только латинские буквы, цифры и дефисы (2-50 символов)")
+
+    if db.is_event_slug_taken(normalized, exclude_event_id=current_event_id):
+        raise ValueError("Такой slug уже используется другим событием")
+
+    return normalized
+
+
+def log_security_event(event_type: str, details: dict):
+    """Log security events for monitoring"""
+    log_entry = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'event_type': event_type,
+        'details': details
+    }
+    print(f"SECURITY_EVENT: {json.dumps(log_entry)}")
+
+
+def get_client_identifier(event: Dict) -> str:
+    """Extract client IP for logging"""
+    headers = event.get('headers', {})
+    forwarded_for = headers.get('x-forwarded-for', '')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+
+    http_context = event.get('requestContext', {}).get('http', {})
+    return http_context.get('sourceIp', 'unknown')
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -46,7 +98,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
                 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
             },
             'body': ''
@@ -64,6 +116,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_coupons(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
+        elif path == '/api/admin/regenerate-site' and http_method == 'POST':
+            return handle_regenerate_site(event)
+        elif path == '/api/webhooks/allpay' and http_method == 'POST':
+            return handle_allpay_webhook(event)
         else:
             return error_response(404, "Endpoint not found")
 
@@ -82,14 +138,19 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
     if method == 'GET' and path == '/api/events':
         return list_events()
 
-    # GET /api/events/{id} - детали события
-    if method == 'GET' and path.startswith('/api/events/'):
-        event_id = path.split('/')[-1]
-        return get_event(event_id)
+    # GET /api/events/slug/{slug} - детали события по slug
+    if method == 'GET' and path.startswith('/api/events/slug/'):
+        slug = path.split('/')[-1]
+        return get_event_by_slug(slug)
 
     # POST /api/events - создать событие (admin)
     if method == 'POST' and path == '/api/events':
         return create_event(event)
+
+    # GET /api/events/{id} - детали события
+    if method == 'GET' and path.startswith('/api/events/'):
+        event_id = path.split('/')[-1]
+        return get_event(event_id)
 
     # PUT /api/events/{id} - обновить событие (admin)
     if method == 'PUT' and path.startswith('/api/events/'):
@@ -99,7 +160,7 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
     # DELETE /api/events/{id} - удалить событие (admin)
     if method == 'DELETE' and path.startswith('/api/events/'):
         event_id = path.split('/')[-1]
-        return delete_event(event_id)
+        return delete_event(event_id, event)
 
     return error_response(404, "Events endpoint not found")
 
@@ -120,7 +181,9 @@ def list_events() -> Dict:
                 'location_id': evt.location_id,
                 'ticket_types': [tt.to_dict() for tt in evt.ticket_types],
                 'status': evt.status,
-                'images': evt.images
+                'images': evt.images,
+                'slug': evt.slug,
+                'currency': evt.currency
             })
         except Exception as e:
             print(f"Error parsing event: {e}")
@@ -146,8 +209,35 @@ def get_event(event_id: str) -> Dict:
     })
 
 
+def get_event_by_slug(slug: str) -> Dict:
+    """GET /api/events/slug/{slug}"""
+    if not slug:
+        return error_response(400, "Slug is required")
+
+    item = db.get_event_by_slug(slug)
+    if not item:
+        return error_response(404, "Event not found")
+
+    evt = Event.from_dynamodb_item(item)
+
+    return success_response({
+        'event': evt.to_dynamodb_item()
+    })
+
+
 def create_event(request_event: Dict) -> Dict:
-    """POST /api/events"""
+    """ADMIN ONLY - POST /api/events"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_event_create', {
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         body = json.loads(request_event.get('body', '{}'))
 
@@ -168,6 +258,14 @@ def create_event(request_event: Dict) -> Dict:
                 available=tt['total']  # Initially all available
             ))
 
+        # Обрабатываем slug (опционально)
+        slug_value = None
+        if body.get('slug'):
+            try:
+                slug_value = validate_event_slug(body['slug'])
+            except ValueError as exc:
+                return error_response(400, str(exc))
+
         # Создаем событие
         event_id = Event.generate_id()
         evt = Event(
@@ -178,7 +276,8 @@ def create_event(request_event: Dict) -> Dict:
             location_id=body['location_id'],
             ticket_types=ticket_types,
             currency=body.get('currency', 'ILS'),
-            images=body.get('images', [])
+            images=body.get('images', []),
+            slug=slug_value
         )
 
         # Сохраняем в DynamoDB
@@ -197,7 +296,19 @@ def create_event(request_event: Dict) -> Dict:
 
 
 def update_event(event_id: str, request_event: Dict) -> Dict:
-    """PUT /api/events/{id}"""
+    """ADMIN ONLY - PUT /api/events/{id}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_event_update', {
+            'event_id': event_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Проверяем что событие существует
         item = db.get_event(event_id)
@@ -208,6 +319,17 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
 
         # Получаем текущее событие
         evt = Event.from_dynamodb_item(item)
+
+        # Обновляем slug (можно очистить)
+        if 'slug' in body:
+            slug_value = body['slug']
+            if slug_value:
+                try:
+                    evt.slug = validate_event_slug(slug_value, evt.event_id)
+                except ValueError as exc:
+                    return error_response(400, str(exc))
+            else:
+                evt.slug = None
 
         # Обновляем поля
         if 'title' in body:
@@ -254,8 +376,20 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
         return error_response(500, f"Failed to update event: {str(e)}")
 
 
-def delete_event(event_id: str) -> Dict:
-    """DELETE /api/events/{id}"""
+def delete_event(event_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - DELETE /api/events/{id}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_event_delete', {
+            'event_id': event_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     item = db.get_event(event_id)
     if not item:
         return error_response(404, "Event not found")
@@ -293,7 +427,7 @@ def handle_locations(event: Dict, method: str, path: str) -> Dict:
     # DELETE /api/locations/{id} - удалить локацию (admin)
     if method == 'DELETE' and path.startswith('/api/locations/'):
         location_id = path.split('/')[-1]
-        return delete_location(location_id)
+        return delete_location(location_id, event)
 
     return error_response(404, "Locations endpoint not found")
 
@@ -337,7 +471,18 @@ def get_location(location_id: str) -> Dict:
 
 
 def create_location(request_event: Dict) -> Dict:
-    """POST /api/locations"""
+    """ADMIN ONLY - POST /api/locations"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_location_create', {
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         body = json.loads(request_event.get('body', '{}'))
 
@@ -401,7 +546,19 @@ def create_location(request_event: Dict) -> Dict:
 
 
 def update_location(location_id: str, request_event: Dict) -> Dict:
-    """PUT /api/locations/{id}"""
+    """ADMIN ONLY - PUT /api/locations/{id}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_location_update', {
+            'location_id': location_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Проверяем что локация существует
         item = db.get_location(location_id)
@@ -464,8 +621,20 @@ def update_location(location_id: str, request_event: Dict) -> Dict:
         return error_response(500, f"Failed to update location: {str(e)}")
 
 
-def delete_location(location_id: str) -> Dict:
-    """DELETE /api/locations/{id}"""
+def delete_location(location_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - DELETE /api/locations/{id}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_location_delete', {
+            'location_id': location_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     item = db.get_location(location_id)
     if not item:
         return error_response(404, "Location not found")
@@ -487,13 +656,28 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
         query_params = event.get('queryStringParameters', {}) or {}
         event_id = query_params.get('event_id')
         if event_id:
-            return list_orders_by_event(event_id)
+            return list_orders_by_event(event_id, event)
         else:
-            return list_all_orders()
+            return list_all_orders(event)
 
     # POST /api/orders - создать заказ
     if method == 'POST' and path == '/api/orders':
         return create_order(event)
+
+    # GET /api/orders/verify/{ticket_code} - проверить билет
+    if method == 'GET' and path.startswith('/api/orders/verify/'):
+        ticket_code = path.split('/')[-1]
+        return verify_ticket(ticket_code)
+
+    # GET /api/orders/{id}/can-refund - проверить возможность возврата
+    if method == 'GET' and path.endswith('/can-refund'):
+        order_id = path.split('/')[-2]  # /api/orders/{id}/can-refund
+        return check_can_refund(order_id)
+
+    # POST /api/orders/{id}/refund - обработать возврат
+    if method == 'POST' and path.endswith('/refund'):
+        order_id = path.split('/')[-2]  # /api/orders/{id}/refund
+        return process_refund(order_id, event)
 
     # GET /api/orders/{id} - детали заказа
     if method == 'GET' and path.startswith('/api/orders/'):
@@ -503,8 +687,20 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     return error_response(404, "Orders endpoint not found")
 
 
-def list_orders_by_event(event_id: str) -> Dict:
-    """GET /api/orders?event_id=xxx - список заказов для события"""
+def list_orders_by_event(event_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - GET /api/orders?event_id=xxx - список заказов для события"""
+
+    # SECURITY: Require admin authentication (PII protection)
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_orders_access', {
+            'event_id': event_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         items = db.get_orders_by_event(event_id)
 
@@ -528,8 +724,19 @@ def list_orders_by_event(event_id: str) -> Dict:
         return error_response(500, f"Failed to list orders: {str(e)}")
 
 
-def list_all_orders() -> Dict:
-    """GET /api/orders - список всех заказов"""
+def list_all_orders(request_event: Dict) -> Dict:
+    """ADMIN ONLY - GET /api/orders - список всех заказов"""
+
+    # SECURITY: Require admin authentication (PII protection)
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_all_orders_access', {
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         items = db.list_orders()
 
@@ -572,6 +779,15 @@ def create_order(request_event: Dict) -> Dict:
 
         evt = Event.from_dynamodb_item(event_item)
 
+        # Проверяем что событие не прошло (event_date + 1 hour >= now)
+        from datetime import datetime, timedelta, timezone
+        event_dt = datetime.fromisoformat(evt.date.replace('Z', '+00:00'))
+        event_end_time = event_dt + timedelta(hours=1)
+        now = datetime.now(timezone.utc)
+
+        if event_end_time <= now:
+            return error_response(400, "This event has already ended. Ticket sales are closed.")
+
         # Проверяем доступность билетов
         order_tickets = []
         for ticket_req in body['tickets']:
@@ -592,6 +808,36 @@ def create_order(request_event: Dict) -> Dict:
                 price_per_ticket=ticket_type.price
             ))
 
+        # Calculate subtotal
+        subtotal = sum(t.get_total() for t in order_tickets)
+
+        # Process coupon if provided
+        coupon_code = body.get('coupon_code')
+        discount_amount = 0
+
+        if coupon_code:
+            # Get and validate coupon
+            coupon_item = db.get_coupon(coupon_code)
+            if not coupon_item:
+                return error_response(400, "Coupon not found")
+
+            coupon = Coupon.from_dynamodb_item(coupon_item)
+
+            # Validate coupon
+            is_valid, error_msg = coupon.is_valid(event_id)
+            if not is_valid:
+                return error_response(400, f"Invalid coupon: {error_msg}")
+
+            # Calculate discount
+            discount_amount = coupon.calculate_discount(subtotal)
+
+            # Increment coupon usage
+            coupon.increment_uses()
+            db.put_coupon(coupon.to_dynamodb_item())
+
+        # Calculate total with discount
+        total_amount = subtotal - discount_amount
+
         # Создаем заказ
         customer = Customer(**body['customer'])
         order = Order(
@@ -599,25 +845,36 @@ def create_order(request_event: Dict) -> Dict:
             event_id=event_id,
             customer=customer,
             tickets=order_tickets,
-            total_amount=sum(t.get_total() for t in order_tickets)
+            total_amount=total_amount,
+            coupon_code=coupon_code,
+            discount_amount=discount_amount
         )
 
-        # Генерируем QR коды
-        order.generate_qr_codes()
+        # НЕ генерируем QR коды и НЕ уменьшаем билеты до успешной оплаты!
+        # Это будет сделано в webhook handler при получении статуса 'completed'
 
-        # Уменьшаем количество доступных билетов
-        for ticket in order_tickets:
-            evt.decrease_available(ticket.type_id, ticket.quantity)
-
-        # Сохраняем
+        # Сохраняем заказ со статусом pending
         db.put_order(order.to_dynamodb_item())
-        db.put_event(evt.to_dynamodb_item())
+
+        # Generate payment URL via payment provider
+        payment_provider = get_payment_provider()
+        try:
+            payment_url = payment_provider.create_payment_url(
+                order_id=order.order_id,
+                amount=order.total_amount,
+                currency=order.currency,
+                email=order.customer.email,
+                event_id=event_id
+            )
+        except Exception as e:
+            print(f"Failed to create payment URL: {str(e)}")
+            payment_url = f"/processing.html?order_id={order.order_id}"  # Fallback
 
         return success_response({
             'message': 'Order created successfully',
             'order_id': order.order_id,
             'order': order.to_dynamodb_item(),
-            'payment_url': f"https://allpay.example.com/pay/{order.order_id}"  # TODO: Real All-Pay URL
+            'payment_url': payment_url
         }, status_code=201)
 
     except json.JSONDecodeError:
@@ -642,6 +899,200 @@ def get_order(order_id: str) -> Dict:
     })
 
 
+def check_can_refund(order_id: str) -> Dict:
+    """GET /api/orders/{id}/can-refund - проверяет возможность возврата"""
+    try:
+        # Load order
+        order_data = db.get_order(order_id)
+        if not order_data:
+            return error_response(404, "Order not found")
+        
+        order = Order.from_dynamodb_item(order_data)
+        
+        # Load event
+        event_data = db.get_event(order.event_id)
+        if not event_data:
+            return error_response(404, "Event not found")
+        
+        event = Event.from_dynamodb_item(event_data)
+        
+        # Check refund eligibility
+        hours_before = event.refund_policy.hours_before if event.refund_policy else 48
+        can_refund, reason = order.can_refund(event.date, hours_before)
+        
+        # Calculate hours until event
+        event_dt = datetime.fromisoformat(event.date.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        hours_until = (event_dt - now).total_seconds() / 3600
+        
+        return success_response({
+            'can_refund': can_refund,
+            'reason': reason,
+            'hours_until_event': round(hours_until, 2),
+            'hours_before_required': hours_before
+        })
+        
+    except Exception as e:
+        print(f"Error checking refund eligibility: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to check refund eligibility: {str(e)}")
+
+
+def process_refund(order_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - POST /api/orders/{id}/refund - обрабатывает возврат (placeholder)"""
+
+    # SECURITY: Require admin authentication (financial protection)
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_refund_attempt', {
+            'order_id': order_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        # Load order
+        order_data = db.get_order(order_id)
+        if not order_data:
+            return error_response(404, "Order not found")
+        
+        order = Order.from_dynamodb_item(order_data)
+        
+        # Load event
+        event_data = db.get_event(order.event_id)
+        if not event_data:
+            return error_response(404, "Event not found")
+        
+        event_obj = Event.from_dynamodb_item(event_data)
+        
+        # Check refund eligibility
+        hours_before = event_obj.refund_policy.hours_before if event_obj.refund_policy else 48
+        can_refund, reason = order.can_refund(event_obj.date, hours_before)
+        
+        if not can_refund:
+            return error_response(400, f"Cannot refund: {reason}")
+        
+        # TODO: Call All-Pay refund API here
+        # For now, this is a placeholder that always succeeds
+        print(f"PLACEHOLDER: Processing refund for order {order_id}")
+        print(f"TODO: Integrate with All-Pay refund API")
+        
+        # Update order status to refunded
+        from models import Refund
+        refund = Refund(
+            requested_at=datetime.utcnow().isoformat(),
+            processed_at=datetime.utcnow().isoformat(),
+            amount=order.total_amount,
+            reason="customer_request"
+        )
+        
+        order.payment.status = "refunded"
+        order.payment.refund = refund
+        
+        # Restore tickets to event
+        for ticket in order.tickets:
+            event_obj.increase_available(ticket.type_id, ticket.quantity)
+            print(f"Restored {ticket.quantity} tickets of type {ticket.type_id} for event {order.event_id}")
+        
+        # Save updated order and event
+        db.put_order(order.to_dynamodb_item())
+        db.put_event(event_obj.to_dynamodb_item())
+        
+        print(f"Refund processed successfully for order {order_id}")
+        
+        return success_response({
+            'status': 'success',
+            'message': 'Refund processed successfully',
+            'refund_amount': order.total_amount,
+            'currency': order.currency,
+            'order_id': order_id,
+            'note': 'This is a placeholder implementation. All-Pay integration pending.'
+        })
+        
+    except Exception as e:
+        print(f"Error processing refund: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to process refund: {str(e)}")
+
+
+def verify_ticket(ticket_code: str) -> Dict:
+    """GET /api/orders/verify/{ticket_code} - проверяет билет"""
+    try:
+        # Find order by ticket code
+        order_data = db.get_order_by_ticket_code(ticket_code)
+        if not order_data:
+            return error_response(404, "Ticket not found")
+        
+        order = Order.from_dynamodb_item(order_data)
+        
+        # Find the specific QR code
+        qr_code = None
+        for qr in order.qr_codes:
+            if qr.code == ticket_code:
+                qr_code = qr
+                break
+        
+        if not qr_code:
+            return error_response(404, "Ticket code not found in order")
+        
+        # Validate ticket
+        if order.payment.status != "completed":
+            return error_response(400, "Ticket payment not completed")
+        
+        if order.payment.status == "refunded":
+            return error_response(400, "Ticket has been refunded")
+        
+        if qr_code.scanned:
+            return error_response(400, "Ticket already scanned", extra_data={
+                'scanned_at': qr_code.scanned_at,
+                'order_id': order.order_id
+            })
+        
+        # Load event for details
+        event_data = db.get_event(order.event_id)
+        event = None
+        if event_data:
+            event = Event.from_dynamodb_item(event_data)
+        
+        # Mark ticket as scanned
+        db.update_ticket_scanned_status(order.order_id, ticket_code, scanned=True)
+        
+        # Reload order to get updated scan status
+        order_data = db.get_order(order.order_id)
+        order = Order.from_dynamodb_item(order_data)
+        
+        # Find updated QR code
+        for qr in order.qr_codes:
+            if qr.code == ticket_code:
+                qr_code = qr
+                break
+        
+        return success_response({
+            'valid': True,
+            'ticket': {
+                'code': ticket_code,
+                'ticket_type': qr_code.ticket_type,
+                'order_id': order.order_id,
+                'scanned_at': qr_code.scanned_at,
+                'event': {
+                    'event_id': order.event_id,
+                    'title': event.title if event else None,
+                    'date': event.date if event else None
+                } if event else None
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error verifying ticket: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to verify ticket: {str(e)}")
+
+
 # ===== Coupons Handlers =====
 def handle_coupons(event: Dict, method: str, path: str) -> Dict:
     """Обрабатывает запросы к /api/coupons"""
@@ -650,12 +1101,12 @@ def handle_coupons(event: Dict, method: str, path: str) -> Dict:
     if method == 'GET' and path == '/api/coupons':
         query_params = event.get('queryStringParameters', {}) or {}
         status = query_params.get('status')
-        return list_coupons(status)
+        return list_coupons(status, event)
 
     # GET /api/coupons/{code} - детали купона
     if method == 'GET' and path.startswith('/api/coupons/'):
         coupon_code = path.split('/')[-1]
-        return get_coupon_details(coupon_code)
+        return get_coupon_details(coupon_code, event)
 
     # POST /api/coupons - создать купон (admin)
     if method == 'POST' and path == '/api/coupons':
@@ -673,13 +1124,24 @@ def handle_coupons(event: Dict, method: str, path: str) -> Dict:
     # DELETE /api/coupons/{code} - удалить купон (admin)
     if method == 'DELETE' and path.startswith('/api/coupons/'):
         coupon_code = path.split('/')[-1]
-        return delete_coupon_handler(coupon_code)
+        return delete_coupon_handler(coupon_code, event)
 
     return error_response(404, "Coupons endpoint not found")
 
 
-def list_coupons(status: str = None) -> Dict:
-    """GET /api/coupons"""
+def list_coupons(status: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - GET /api/coupons"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_coupons_list', {
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     items = db.list_coupons(status=status)
 
     coupons = []
@@ -697,8 +1159,20 @@ def list_coupons(status: str = None) -> Dict:
     })
 
 
-def get_coupon_details(coupon_code: str) -> Dict:
-    """GET /api/coupons/{code}"""
+def get_coupon_details(coupon_code: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - GET /api/coupons/{code}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_coupon_details', {
+            'coupon_code': coupon_code,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     item = db.get_coupon(coupon_code)
 
     if not item:
@@ -712,7 +1186,18 @@ def get_coupon_details(coupon_code: str) -> Dict:
 
 
 def create_coupon(request_event: Dict) -> Dict:
-    """POST /api/coupons"""
+    """ADMIN ONLY - POST /api/coupons"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_coupon_create', {
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         body = json.loads(request_event.get('body', '{}'))
 
@@ -804,7 +1289,19 @@ def validate_coupon(request_event: Dict) -> Dict:
 
 
 def update_coupon(coupon_code: str, request_event: Dict) -> Dict:
-    """PUT /api/coupons/{code}"""
+    """ADMIN ONLY - PUT /api/coupons/{code}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_coupon_update', {
+            'coupon_code': coupon_code,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Проверяем что купон существует
         item = db.get_coupon(coupon_code)
@@ -851,8 +1348,20 @@ def update_coupon(coupon_code: str, request_event: Dict) -> Dict:
         return error_response(500, f"Failed to update coupon: {str(e)}")
 
 
-def delete_coupon_handler(coupon_code: str) -> Dict:
-    """DELETE /api/coupons/{code}"""
+def delete_coupon_handler(coupon_code: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - DELETE /api/coupons/{code}"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_coupon_delete', {
+            'coupon_code': coupon_code,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     item = db.get_coupon(coupon_code)
     if not item:
         return error_response(404, "Coupon not found")
@@ -867,7 +1376,18 @@ def delete_coupon_handler(coupon_code: str) -> Dict:
 
 # ===== Image Upload Handler =====
 def handle_image_upload(event: Dict) -> Dict:
-    """Handles image upload to S3 bucket"""
+    """ADMIN ONLY - Handles image upload to S3 bucket"""
+
+    # SECURITY: Require admin authentication (S3 abuse prevention)
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_image_upload', {
+            'ip': get_client_identifier(event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Parse request body
         body = json.loads(event.get('body', '{}'))
@@ -913,6 +1433,56 @@ def handle_image_upload(event: Dict) -> Dict:
         return error_response(500, f"Failed to upload image: {str(e)}")
 
 
+def handle_regenerate_site(event: Dict) -> Dict:
+    """ADMIN ONLY - Регенерация публичного сайта через Lambda site-regenerator"""
+
+    # SECURITY: Require admin authentication (Lambda abuse prevention)
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_site_regenerate', {
+            'ip': get_client_identifier(event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        print("Invoking site-regenerator Lambda...")
+
+        lambda_client = boto3.client('lambda')
+
+        # Invoke site regenerator Lambda synchronously
+        response = lambda_client.invoke(
+            FunctionName='yallabalagan-site-regenerator',
+            InvocationType='RequestResponse',  # Synchronous for immediate response
+            Payload=json.dumps({})
+        )
+
+        # Parse response
+        result_payload = json.loads(response['Payload'].read())
+
+        print(f"Site regenerator response: {result_payload}")
+
+        # Return the response from site-regenerator
+        return {
+            'statusCode': result_payload.get('statusCode', 200),
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+            },
+            'body': result_payload.get('body', '{}')
+        }
+
+    except Exception as e:
+        print(f"Error invoking site regenerator: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+        return error_response(500, f"Failed to regenerate site: {str(e)}")
+
+
 # ===== Helper Functions =====
 def success_response(data: Dict, status_code: int = 200) -> Dict:
     """Формирует успешный ответ"""
@@ -928,8 +1498,12 @@ def success_response(data: Dict, status_code: int = 200) -> Dict:
     }
 
 
-def error_response(status_code: int, message: str) -> Dict:
+def error_response(status_code: int, message: str, extra_data: Dict = None) -> Dict:
     """Формирует ответ об ошибке"""
+    body_data = {'error': message}
+    if extra_data:
+        body_data.update(extra_data)
+    
     return {
         'statusCode': status_code,
         'headers': {
@@ -938,10 +1512,111 @@ def error_response(status_code: int, message: str) -> Dict:
             'Access-Control-Allow-Headers': 'Content-Type',
             'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
         },
-        'body': json.dumps({
-            'error': message
-        }, ensure_ascii=False, cls=DecimalEncoder)
+        'body': json.dumps(body_data, ensure_ascii=False, cls=DecimalEncoder)
     }
+
+
+def handle_allpay_webhook(event: Dict) -> Dict:
+    """
+    POST /api/webhooks/allpay - handle webhook from All-Pay (or mock)
+
+    Processes payment status updates from payment provider
+    """
+    try:
+        # Extract body and signature
+        body = event.get('body', '')
+        if event.get('isBase64Encoded'):
+            body = base64.b64decode(body).decode('utf-8')
+
+        # Get signature from headers (all lowercase in Lambda events)
+        headers = event.get('headers', {})
+        signature = headers.get('x-allpay-signature') or headers.get('x-webhook-signature', '')
+
+        # Verify signature
+        payment_provider = get_payment_provider()
+        if not payment_provider.verify_webhook_signature(body.encode(), signature):
+            print(f"Invalid webhook signature")
+            return error_response(401, "Invalid signature")
+
+        # Parse webhook payload
+        try:
+            webhook_data = parse_webhook_payload(body)
+        except ValueError as e:
+            print(f"Invalid webhook payload: {str(e)}")
+            return error_response(400, str(e))
+
+        order_id = webhook_data['order_id']
+        payment_status = webhook_data['status']  # 'completed', 'failed', 'cancelled'
+        transaction_id = webhook_data.get('transaction_id')
+
+        print(f"Webhook received: order_id={order_id}, status={payment_status}, transaction_id={transaction_id}")
+
+        # Update order payment status
+        db.update_order_payment_status(
+            order_id=order_id,
+            status=payment_status,
+            transaction_id=transaction_id
+        )
+
+        # If payment completed, finalize the order
+        if payment_status == 'completed':
+            try:
+                # Получаем заказ из БД
+                order_data = db.get_order(order_id)
+                if not order_data:
+                    raise Exception(f"Order {order_id} not found")
+
+                # Создаем Order объект
+                order = Order.from_dynamodb_item(order_data)
+
+                # Генерируем QR коды для билетов
+                print(f"Generating QR codes for order {order_id}")
+                order.generate_qr_codes()
+
+                # Получаем событие и уменьшаем доступные билеты
+                event_data = db.get_event(order.event_id)
+                if event_data:
+                    evt = Event.from_dynamodb_item(event_data)
+
+                    # Уменьшаем количество доступных билетов
+                    for ticket in order.tickets:
+                        evt.decrease_available(ticket.type_id, ticket.quantity)
+                        print(f"Decreased {ticket.quantity} tickets of type {ticket.type_id} for event {order.event_id}")
+
+                    # Сохраняем обновленное событие
+                    db.put_event(evt.to_dynamodb_item())
+
+                # Сохраняем обновленный заказ с QR кодами
+                db.put_order(order.to_dynamodb_item())
+                print(f"Order {order_id} finalized with QR codes and tickets decremented")
+
+                # Trigger email Lambda asynchronously
+                lambda_client = boto3.client('lambda')
+                lambda_client.invoke(
+                    FunctionName=os.environ.get('EMAIL_SENDER_LAMBDA', 'yallabalagan-email-sender'),
+                    InvocationType='Event',  # Async invocation
+                    Payload=json.dumps({
+                        'order_id': order_id
+                    })
+                )
+                print(f"Email Lambda triggered for order {order_id}")
+            except Exception as e:
+                # Don't fail webhook if processing fails - log it
+                print(f"Failed to finalize order {order_id}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+        # Return success to payment provider
+        return success_response({
+            'status': 'success',
+            'message': 'Webhook processed'
+        })
+
+    except Exception as e:
+        print(f"Webhook processing error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Webhook processing failed: {str(e)}")
 
 
 # For local testing

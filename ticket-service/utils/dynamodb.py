@@ -50,6 +50,31 @@ class DynamoDBClient:
         )
         return response.get('Items', [])
 
+    def get_event_by_slug(self, slug: str) -> Optional[Dict]:
+        """Получает событие по slug (требует GSI `SlugIndex` по атрибуту slug)"""
+        if not slug:
+            return None
+
+        response = self.events_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={
+                ':slug': slug
+            },
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def is_event_slug_taken(self, slug: str, exclude_event_id: str = None) -> bool:
+        """Проверяет, занят ли slug другим событием"""
+        item = self.get_event_by_slug(slug)
+        if not item:
+            return False
+        if exclude_event_id and item.get('event_id') == exclude_event_id:
+            return False
+        return True
+
     def delete_event(self, event_id: str):
         """Удаляет событие"""
         return self.events_table.delete_item(
@@ -164,6 +189,96 @@ class DynamoDBClient:
             UpdateExpression=update_expr,
             ExpressionAttributeNames=expr_attr_names,
             ExpressionAttributeValues=expr_attr_values
+        )
+
+    def update_order_notification_status(self, order_id: str, email_sent: bool = None, sms_sent: bool = None):
+        """Обновляет статус уведомлений заказа"""
+        from datetime import datetime
+        
+        update_expr_parts = []
+        expr_attr_values = {}
+        
+        if email_sent is not None:
+            update_expr_parts.append('notifications.email_sent = :email_sent')
+            expr_attr_values[':email_sent'] = email_sent
+        
+        if sms_sent is not None:
+            update_expr_parts.append('notifications.sms_sent = :sms_sent')
+            expr_attr_values[':sms_sent'] = sms_sent
+        
+        if not update_expr_parts:
+            return  # Nothing to update
+        
+        update_expr = 'SET ' + ', '.join(update_expr_parts)
+        
+        return self.orders_table.update_item(
+            Key={
+                'PK': f'ORDER#{order_id}',
+                'SK': 'METADATA'
+            },
+            UpdateExpression=update_expr,
+            ExpressionAttributeValues=expr_attr_values
+        )
+
+    def get_order_by_ticket_code(self, ticket_code: str) -> Optional[Dict]:
+        """Находит заказ по коду билета (сканирует все заказы)"""
+        # Scan orders table and filter by ticket code
+        # Note: This is not efficient for large datasets, but works for MVP
+        # TODO: Consider adding GSI for ticket codes if needed
+        
+        response = self.orders_table.scan()
+        
+        for item in response.get('Items', []):
+            qr_codes = item.get('qr_codes', [])
+            for qr in qr_codes:
+                if qr.get('code') == ticket_code:
+                    return item
+        
+        # Handle pagination if needed
+        while 'LastEvaluatedKey' in response:
+            response = self.orders_table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+            for item in response.get('Items', []):
+                qr_codes = item.get('qr_codes', [])
+                for qr in qr_codes:
+                    if qr.get('code') == ticket_code:
+                        return item
+        
+        return None
+
+    def update_ticket_scanned_status(self, order_id: str, ticket_code: str, scanned: bool = True):
+        """Обновляет статус сканирования билета"""
+        from datetime import datetime
+        
+        # Get order first
+        order_data = self.get_order(order_id)
+        if not order_data:
+            return None
+        
+        # Update the specific QR code in the list
+        qr_codes = order_data.get('qr_codes', [])
+        updated = False
+        
+        for i, qr in enumerate(qr_codes):
+            if qr.get('code') == ticket_code:
+                qr_codes[i]['scanned'] = scanned
+                if scanned:
+                    qr_codes[i]['scanned_at'] = datetime.utcnow().isoformat()
+                updated = True
+                break
+        
+        if not updated:
+            return None
+        
+        # Update the order
+        return self.orders_table.update_item(
+            Key={
+                'PK': f'ORDER#{order_id}',
+                'SK': 'METADATA'
+            },
+            UpdateExpression='SET qr_codes = :qr_codes',
+            ExpressionAttributeValues={
+                ':qr_codes': qr_codes
+            }
         )
 
     def list_orders(self, limit: int = 100) -> List[Dict]:

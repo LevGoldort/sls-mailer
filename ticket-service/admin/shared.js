@@ -4,10 +4,22 @@ const API_BASE_URL = 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 
 // ===== API Helper =====
 async function apiCall(endpoint, method = 'GET', body = null) {
+    // Get admin API key from localStorage or prompt
+    let adminKey = localStorage.getItem('admin_api_key');
+
+    if (!adminKey) {
+        adminKey = prompt('🔑 Enter admin API key:');
+        if (!adminKey) {
+            throw new Error('Admin key required');
+        }
+        localStorage.setItem('admin_api_key', adminKey);
+    }
+
     const options = {
         method,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-API-Key': adminKey  // Send API key in header
         }
     };
 
@@ -17,6 +29,14 @@ async function apiCall(endpoint, method = 'GET', body = null) {
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+
+        // Handle 401 - invalid API key
+        if (response.status === 401) {
+            localStorage.removeItem('admin_api_key');  // Clear invalid key
+            alert('❌ Invalid admin key. Please refresh and try again.');
+            throw new Error('Unauthorized: Invalid admin key');
+        }
+
         const data = await response.json();
 
         if (!response.ok) {
@@ -289,6 +309,97 @@ function handleError(error, defaultMessage = 'Произошла ошибка') 
     const message = error.message || defaultMessage;
     showToast(message, 'error');
 }
+
+// ===== Site Regeneration =====
+/**
+ * Regenerate public site
+ */
+async function regenerateSite() {
+    const btn = document.getElementById('regenerate-site-btn');
+    const statusDiv = document.getElementById('regenerate-status');
+
+    // Disable button
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Генерация...';
+
+    statusDiv.innerHTML = `
+        <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; color: white;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="spinner"></div>
+                <span>Запуск генерации сайта...</span>
+            </div>
+        </div>
+    `;
+
+    try {
+        // Get admin API key from localStorage or prompt
+        let adminKey = localStorage.getItem('admin_api_key');
+
+        if (!adminKey) {
+            adminKey = prompt('🔑 Enter admin API key:');
+            if (!adminKey) {
+                throw new Error('Admin key required');
+            }
+            localStorage.setItem('admin_api_key', adminKey);
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/admin/regenerate-site`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': adminKey  // Send API key in header
+            }
+        });
+
+        // Handle 401 - invalid API key
+        if (response.status === 401) {
+            localStorage.removeItem('admin_api_key');
+            throw new Error('Unauthorized: Invalid admin key. Please refresh and try again.');
+        }
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            statusDiv.innerHTML = `
+                <div style="background: rgba(16, 185, 129, 0.2); padding: 15px; border-radius: 8px; color: white; border: 2px solid rgba(16, 185, 129, 0.5);">
+                    <div style="font-weight: 600; margin-bottom: 8px;">
+                        ✅ Сайт успешно обновлен за ${parseFloat(data.message.match(/[\d.]+/)?.[0] || 0).toFixed(1)}с!
+                    </div>
+                    <div style="margin: 8px 0; font-size: 13px; opacity: 0.9;">
+                        📊 События: ${data.events_count} | Локации: ${data.locations_count} | Файлов: ${data.files_uploaded}
+                    </div>
+                    <a href="${data.url}" target="_blank" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: white; color: #667eea; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
+                        Открыть публичный сайт →
+                    </a>
+                </div>
+            `;
+        } else {
+            throw new Error(data.message || 'Ошибка генерации');
+        }
+
+    } catch (error) {
+        console.error('Regeneration error:', error);
+        statusDiv.innerHTML = `
+            <div style="background: rgba(239, 68, 68, 0.2); padding: 15px; border-radius: 8px; color: white; border: 2px solid rgba(239, 68, 68, 0.5);">
+                <div style="font-weight: 600; margin-bottom: 5px;">
+                    ❌ Ошибка генерации
+                </div>
+                <div style="font-size: 13px; opacity: 0.9;">
+                    ${error.message}
+                </div>
+            </div>
+        `;
+    } finally {
+        // Re-enable button after 2 seconds
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 Обновить сайт';
+        }, 2000);
+    }
+}
+
+// Export for global use
+window.regenerateSite = regenerateSite;
 
 // ===== Init function to be called on page load =====
 function initAdmin() {

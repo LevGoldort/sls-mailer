@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" dir="rtl">
+<html lang="ru" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,38 @@
 
     <link rel="stylesheet" href="/static/css/style.css">
 
+    {% if fb_pixel_id %}
+    <!-- Facebook Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '{{ fb_pixel_id }}');
+    fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id={{ fb_pixel_id }}&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- End Facebook Pixel Code -->
+    {% endif %}
+
+    {% if ga4_id %}
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga4_id }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '{{ ga4_id }}');
+    </script>
+    <!-- End Google Analytics 4 -->
+    {% endif %}
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -15,10 +47,6 @@
         <div class="container">
             <div class="header-content">
                 <a href="/" class="logo">🎭 YallaBalagan</a>
-                <nav>
-                    <a href="/">События</a>
-                    <a href="/locations">Места</a>
-                </nav>
             </div>
         </div>
     </header>
@@ -31,7 +59,14 @@
         <div class="container">
             <p>&copy; 2025 YallaBalagan. Все права защищены.</p>
             <p style="margin-top: 0.5rem; font-size: 0.875rem;">
-                <a href="mailto:info@yallabalagan.org" style="color: inherit;">info@yallabalagan.org</a>
+                <a href="mailto:yalla@yallabalagan.org" style="color: inherit;">yalla@yallabalagan.org</a>
+            </p>
+            <p style="margin-top: 0.75rem; font-size: 0.875rem;">
+                <a href="https://yallabalagan.org/privacy/" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+                <span style="margin: 0 0.5rem;">•</span>
+                <a href="https://yallabalagan.org/terms/" style="color: inherit; text-decoration: underline;">Terms and Conditions</a>
+                <span style="margin: 0 0.5rem;">•</span>
+                <a href="https://yallabalagan.org/accessibility/" style="color: inherit; text-decoration: underline;">Accessibility Statement</a>
             </p>
         </div>
     </footer>
