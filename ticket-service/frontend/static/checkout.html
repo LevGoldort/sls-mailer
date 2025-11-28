@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оформление заказа - YallaBalagan</title>
+    <meta name="description" content="Оформление покупки билетов">
+
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    
+
+    
+
+    
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">🎭 YallaBalagan</a>
+                <nav>
+                    <a href="/">События</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        
+<div class="checkout-container">
+    <!-- Loading State -->
+    <div id="loading-state" style="text-align: center; padding: 3rem;">
+        <div style="width: 60px; height: 60px; border: 4px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 2rem;"></div>
+        <p>Загрузка...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" style="display: none; text-align: center; padding: 3rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">❌</div>
+        <h1>Ошибка</h1>
+        <p id="error-message" style="color: var(--danger); margin-bottom: 2rem;">Не удалось загрузить данные</p>
+        <a href="/" class="btn btn-primary">Вернуться на главную</a>
+    </div>
+
+    <!-- Checkout Content (will be populated by JS) -->
+    <div id="checkout-content" style="display: none;">
+        <h1 class="page-title" style="font-size: 2rem;">Оформление заказа</h1>
+
+        <!-- Event Info Card -->
+        <div class="checkout-card" id="event-info">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Customer Information -->
+        <div class="checkout-card">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Контактная информация</h2>
+            <form id="checkout-form">
+                <div class="form-group">
+                    <label class="form-label" for="customer_name">Полное имя *</label>
+                    <input type="text"
+                           id="customer_name"
+                           name="customer_name"
+                           class="form-input"
+                           placeholder="Иван Иванов"
+                           required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="customer_email">Email *</label>
+                    <input type="email"
+                           id="customer_email"
+                           name="customer_email"
+                           class="form-input"
+                           placeholder="ivan@example.com"
+                           required>
+                    <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;">
+                        Билеты будут отправлены на этот email
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="customer_phone">Телефон *</label>
+                    <input type="tel"
+                           id="customer_phone"
+                           name="customer_phone"
+                           class="form-input"
+                           placeholder="+972-50-123-4567"
+                           required>
+                </div>
+
+                <!-- Order Summary -->
+                <div class="order-summary">
+                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Итого</h3>
+
+                    <div class="summary-row">
+                        <span><span id="summary-ticket-name"></span> × <span id="summary-quantity">1</span></span>
+                        <span id="summary-subtotal"></span>
+                    </div>
+
+                    <div class="summary-row" id="coupon-row" style="display: none; color: var(--success, #059669);">
+                        <span>Купон (<span id="summary-coupon-code"></span>)</span>
+                        <span id="summary-discount"></span>
+                    </div>
+
+                    <div class="summary-row" id="service-fee-row" style="display: none;">
+                        <span>Сервисный сбор</span>
+                        <span id="summary-fee"></span>
+                    </div>
+
+                    <div class="summary-row total">
+                        <span>Всего к оплате</span>
+                        <span id="summary-total" style="color: var(--primary);"></span>
+                    </div>
+                </div>
+
+                <!-- Payment Button -->
+                <button type="submit" class="btn btn-primary btn-large" style="margin-top: 1.5rem;">
+                    Перейти к оплате
+                </button>
+
+                <p style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1rem;">
+                    После нажатия вы будете перенаправлены на защищенную страницу оплаты
+                </p>
+            </form>
+        </div>
+
+        <!-- Security Notice -->
+        <div style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1.5rem;">
+            🔒 Безопасная оплата через All-Pay
+        </div>
+
+        <!-- Back Link -->
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="#" id="back-link" style="color: var(--gray-600); text-decoration: none; font-size: 0.875rem;">
+                ← Вернуться к событию
+            </a>
+        </div>
+    </div>
+</div>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 YallaBalagan. Все права защищены.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                <a href="mailto:info@yallabalagan.org" style="color: inherit;">info@yallabalagan.org</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+    
+<style>
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<script>
+// Parse URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const eventId = urlParams.get('event_id');
+const ticketTypeId = urlParams.get('ticket_type');
+const couponCode = urlParams.get('coupon');
+
+// API Configuration
+const API_URL = 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+
+// Global state
+let eventData = null;
+let ticketTypeData = null;
+let ticketPrice = 0;
+let serviceFee = 0;
+let appliedCoupon = null;
+
+// Date/time formatting functions
+function formatDate(dateStr) {
+    const dt = new Date(dateStr);
+    const months = {
+        0: 'января', 1: 'февраля', 2: 'марта', 3: 'апреля',
+        4: 'мая', 5: 'июня', 6: 'июля', 7: 'августа',
+        8: 'сентября', 9: 'октября', 10: 'ноября', 11: 'декабря'
+    };
+    return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+
+function formatTime(dateStr) {
+    const dt = new Date(dateStr);
+    return dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
+}
+
+// Load event and ticket data
+async function loadCheckoutData() {
+    if (!eventId || !ticketTypeId) {
+        showError('Неверные параметры. Пожалуйста, выберите событие и тип билета.');
+        return;
+    }
+
+    try {
+        // Fetch event data
+        const response = await fetch(`${API_URL}/api/events/${eventId}`);
+        if (!response.ok) {
+            throw new Error('Событие не найдено');
+        }
+
+        const data = await response.json();
+        eventData = data.event;
+
+        // Add formatted date and time
+        eventData.date_formatted = formatDate(eventData.date);
+        eventData.time_formatted = formatTime(eventData.date);
+
+        // Fetch location data if location_id exists
+        if (eventData.location_id) {
+            try {
+                const locResponse = await fetch(`${API_URL}/api/locations/${eventData.location_id}`);
+                if (locResponse.ok) {
+                    const locData = await locResponse.json();
+                    eventData.location_name = locData.location?.name || '';
+                }
+            } catch (error) {
+                console.warn('Could not load location data:', error);
+            }
+        }
+
+        // Find ticket type
+        ticketTypeData = eventData.ticket_types.find(t => t.id === ticketTypeId);
+        if (!ticketTypeData) {
+            throw new Error('Тип билета не найден');
+        }
+
+        if (ticketTypeData.available === 0) {
+            throw new Error('К сожалению, билеты этого типа проданы');
+        }
+
+        // Set ticket price
+        ticketPrice = ticketTypeData.price;
+
+        // Validate and apply coupon if provided
+        if (couponCode) {
+            await validateCoupon(couponCode);
+        }
+
+        // Render checkout page
+        renderCheckout();
+
+    } catch (error) {
+        console.error('Error loading checkout data:', error);
+        showError(error.message || 'Не удалось загрузить данные события');
+    }
+}
+
+// Render checkout page
+function renderCheckout() {
+    // Hide loading, show content
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('checkout-content').style.display = 'block';
+
+    // Render event info
+    const eventInfoHtml = `
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Информация о событии</h2>
+        <div style="display: flex; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);">
+            ${eventData.images && eventData.images.length > 0
+                ? `<img src="${eventData.images[0]}" alt="${eventData.title}" style="width: 120px; height: 120px; border-radius: 0.5rem; object-fit: cover; background: var(--gray-200);">`
+                : `<div style="width: 120px; height: 120px; border-radius: 0.5rem; background: var(--gray-200); display: flex; align-items: center; justify-content: center; font-size: 3rem;">🎭</div>`
+            }
+            <div>
+                <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">${eventData.title}</h3>
+                <p style="color: var(--gray-600); font-size: 0.9375rem; margin-bottom: 0.25rem;">
+                    📅 ${eventData.date_formatted} в ${eventData.time_formatted}
+                </p>
+                ${eventData.location_name
+                    ? `<p style="color: var(--gray-600); font-size: 0.9375rem;">📍 ${eventData.location_name}</p>`
+                    : ''
+                }
+            </div>
+        </div>
+
+        <!-- Ticket Selection -->
+        <div style="margin-top: 1.5rem;">
+            <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Тип билета</h3>
+            <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div>
+                        <strong>${ticketTypeData.name}</strong>
+                        ${ticketTypeData.description
+                            ? `<p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">${ticketTypeData.description}</p>`
+                            : ''
+                        }
+                    </div>
+                    <div style="text-align: right;">
+                        <div id="ticket-price-display">
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">
+                                ${ticketTypeData.price}₪
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quantity Selector -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Количество билетов</label>
+                    <select id="quantity" class="form-select" onchange="updateTotal()">
+                        ${Array.from({length: Math.min(ticketTypeData.available, 10)}, (_, i) => i + 1)
+                            .map(i => `<option value="${i}">${i}</option>`)
+                            .join('')}
+                    </select>
+                    ${ticketTypeData.available < (ticketTypeData.total / 2)
+                        ? `<p style="color: var(--warning, #f59e0b); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500;">
+                            ⚡ Больше половины зала продано, доступно ${ticketTypeData.available} билетов
+                        </p>`
+                        : ''
+                    }
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('event-info').innerHTML = eventInfoHtml;
+
+    // Set back link
+    const backSlug = eventData.slug || eventData.event_id;
+    document.getElementById('back-link').href = `/events/${backSlug}.html`;
+
+    // Update summary
+    document.getElementById('summary-ticket-name').textContent = ticketTypeData.name;
+    updateTotal();
+
+    // Fire analytics on page load (begin checkout)
+    fireInitiateCheckout();
+}
+
+// Validate coupon
+async function validateCoupon(code) {
+    try {
+        const response = await fetch(`${API_URL}/api/coupons/validate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                coupon_code: code,
+                event_id: eventId,
+                amount: ticketPrice
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.valid) {
+            appliedCoupon = data;
+            console.log('Coupon applied:', appliedCoupon);
+        } else {
+            console.warn('Coupon validation failed:', data);
+        }
+    } catch (error) {
+        console.error('Error validating coupon:', error);
+    }
+}
+
+// Update total
+function updateTotal() {
+    const quantity = parseInt(document.getElementById('quantity').value);
+
+    // Update summary
+    document.getElementById('summary-quantity').textContent = quantity;
+
+    let subtotal = ticketPrice * quantity;
+    document.getElementById('summary-subtotal').textContent = subtotal + '₪';
+
+    // Apply coupon discount
+    let discount = 0;
+    let discountedPrice = ticketPrice;
+
+    if (appliedCoupon) {
+        // Calculate discount per ticket
+        let discountPerTicket;
+        if (appliedCoupon.coupon.discount_type === 'percentage') {
+            discountPerTicket = ticketPrice * (appliedCoupon.coupon.discount_value / 100);
+        } else {
+            discountPerTicket = Math.min(appliedCoupon.coupon.discount_value, ticketPrice);
+        }
+        discount = discountPerTicket * quantity;
+        discount = Math.round(discount * 100) / 100;
+        discountedPrice = ticketPrice - discountPerTicket;
+        discountedPrice = Math.round(discountedPrice * 100) / 100;
+
+        // Update ticket price display with strikethrough
+        document.getElementById('ticket-price-display').innerHTML = `
+            <div style="text-decoration: line-through; color: var(--gray-500); font-size: 0.875rem;">
+                ${ticketPrice}₪
+            </div>
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">
+                ${discountedPrice}₪
+            </div>
+        `;
+
+        document.getElementById('summary-coupon-code').textContent = appliedCoupon.coupon.coupon_code;
+        document.getElementById('summary-discount').textContent = '-' + discount + '₪';
+        document.getElementById('coupon-row').style.display = 'flex';
+    } else {
+        // Reset ticket price display
+        document.getElementById('ticket-price-display').innerHTML = `
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">
+                ${ticketPrice}₪
+            </div>
+        `;
+        document.getElementById('coupon-row').style.display = 'none';
+    }
+
+    const total = subtotal - discount + (serviceFee * quantity);
+    document.getElementById('summary-total').textContent = total + '₪';
+
+    if (serviceFee > 0) {
+        const totalFee = serviceFee * quantity;
+        document.getElementById('summary-fee').textContent = totalFee + '₪';
+        document.getElementById('service-fee-row').style.display = 'flex';
+    }
+}
+
+// Show error state
+function showError(message) {
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('error-state').style.display = 'block';
+    document.getElementById('error-message').textContent = message;
+}
+
+// Fire InitiateCheckout analytics
+function fireInitiateCheckout() {
+    if (typeof fbq !== 'undefined') {
+        fbq('track', 'InitiateCheckout', {
+            content_ids: [eventId],
+            content_name: eventData.title,
+            content_type: 'product',
+            value: ticketPrice,
+            currency: 'ILS'
+        });
+        console.log('Facebook Pixel: InitiateCheckout tracked');
+    }
+
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'begin_checkout', {
+            currency: 'ILS',
+            value: ticketPrice,
+            items: [{
+                item_id: ticketTypeId,
+                item_name: ticketTypeData.name,
+                price: ticketPrice,
+                quantity: 1
+            }]
+        });
+        console.log('GA4: begin_checkout tracked');
+    }
+}
+
+// Form submission handling
+document.getElementById('checkout-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitButton = this.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Обработка...';
+
+    try {
+        const formData = new FormData(this);
+        const quantity = parseInt(document.getElementById('quantity').value);
+
+        const data = {
+            event_id: eventId,
+            customer: {
+                name: formData.get('customer_name'),
+                email: formData.get('customer_email'),
+                phone: formData.get('customer_phone')
+            },
+            tickets: [{
+                type_id: ticketTypeId,
+                quantity: quantity
+            }]
+        };
+
+        // Add coupon if applied
+        if (appliedCoupon) {
+            data.coupon_code = appliedCoupon.coupon.coupon_code;
+        }
+
+        const response = await fetch(`${API_URL}/api/orders`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Fire AddPaymentInfo analytics event
+            const totalValue = (ticketPrice + serviceFee) * quantity;
+
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'AddPaymentInfo', {
+                    content_ids: [eventId],
+                    value: totalValue,
+                    currency: 'ILS'
+                });
+            }
+
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'add_payment_info', {
+                    currency: 'ILS',
+                    value: totalValue
+                });
+            }
+
+            // Save order info to sessionStorage for later use
+            sessionStorage.setItem('pending_order', JSON.stringify({
+                order_id: result.order_id,
+                event_id: eventId,
+                total_amount: totalValue
+            }));
+
+            // Redirect to payment or success page
+            if (result.payment_url) {
+                window.location.href = result.payment_url;
+            } else {
+                window.location.href = '/orders/' + result.order_id + '.html';
+            }
+        } else {
+            alert('Ошибка при создании заказа: ' + (result.error || 'Неизвестная ошибка'));
+            submitButton.disabled = false;
+            submitButton.textContent = 'Перейти к оплате';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Произошла ошибка при обработке заказа. Пожалуйста, попробуйте снова.');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Перейти к оплате';
+    }
+});
+
+// Load data on page load
+loadCheckoutData();
+</script>
+
+</body>
+</html>
