@@ -67,7 +67,11 @@
                         {% endif %}
                         <div class="ticket-available">
                             {% if ticket.available > 0 %}
-                                Доступно: {{ ticket.available }} из {{ ticket.total }}
+                                {% if ticket.available < ticket.total / 2 %}
+                                    <span style="color: var(--warning, #f59e0b); font-weight: 600;">
+                                        ⚡ Осталось меньше половины билетов! Доступно {{ ticket.available }} билетов
+                                    </span>
+                                {% endif %}
                             {% else %}
                                 Билеты проданы
                             {% endif %}
