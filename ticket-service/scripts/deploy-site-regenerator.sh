@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+SKIP_DEPS=${1:-false}
+
 echo "🚀 Deploying site-regenerator Lambda function..."
 
 cd "$(dirname "$0")/.."
@@ -10,14 +12,26 @@ echo "📦 Creating deployment package..."
 mkdir -p lambda-site-regenerator
 cp lambdas/site-regenerator.py lambda-site-regenerator/lambda_function.py
 
-# Install dependencies
+# Install dependencies (if not skipping)
 cd lambda-site-regenerator
-pip install requests jinja2 -t . --platform manylinux2014_x86_64 --only-binary=:all:
+if [ "$SKIP_DEPS" = "true" ]; then
+    echo "⚡ Skipping dependency installation (quick mode)"
+    if [ -d "/tmp/site-regenerator-deps-cache" ]; then
+        echo "📋 Using cached dependencies..."
+        cp -r /tmp/site-regenerator-deps-cache/* . 2>/dev/null || true
+    fi
+else
+    echo "📥 Installing dependencies..."
+    pip install requests jinja2 -t . --platform manylinux2014_x86_64 --only-binary=:all:
+    # Cache dependencies
+    mkdir -p /tmp/site-regenerator-deps-cache
+    rsync -a --exclude='lambda_function.py' . /tmp/site-regenerator-deps-cache/ 2>/dev/null || true
+fi
 zip -r ../site-regenerator.zip .
 cd ..
 
 # Check if function exists
-FUNCTION_EXISTS=$(aws lambda get-function --function-name yallabalagan-site-regenerator --region eu-north-1 2>&1 || echo "not found")
+FUNCTION_EXISTS=$(aws lambda get-function --function-name yallabalagan-site-regenerator --region eu-north-1 --no-cli-pager 2>&1 || echo "not found")
 
 if [[ "$FUNCTION_EXISTS" == *"not found"* ]]; then
     echo "📤 Creating new Lambda function..."
@@ -32,16 +46,18 @@ if [[ "$FUNCTION_EXISTS" == *"not found"* ]]; then
       --timeout 60 \
       --memory-size 512 \
       --environment Variables="{API_URL=https://ovajavet67.execute-api.eu-north-1.amazonaws.com,S3_BUCKET=yallabalagan-tickets-frontend}" \
-      --region eu-north-1
+      --region eu-north-1 \
+      --no-cli-pager > /dev/null
 
     # Get layer ARN
-    LAYER_ARN=$(aws lambda list-layer-versions --layer-name yallabalagan-site-templates --region eu-north-1 --query 'LayerVersions[0].LayerVersionArn' --output text)
+    LAYER_ARN=$(aws lambda list-layer-versions --layer-name yallabalagan-site-templates --region eu-north-1 --query 'LayerVersions[0].LayerVersionArn' --output text --no-cli-pager)
 
     # Attach layer
     aws lambda update-function-configuration \
       --function-name yallabalagan-site-regenerator \
       --layers "$LAYER_ARN" \
-      --region eu-north-1
+      --region eu-north-1 \
+      --no-cli-pager > /dev/null
 else
     echo "🔄 Updating existing Lambda function..."
 
@@ -49,22 +65,16 @@ else
     aws lambda update-function-code \
       --function-name yallabalagan-site-regenerator \
       --zip-file fileb://site-regenerator.zip \
-      --region eu-north-1
+      --region eu-north-1 \
+      --no-cli-pager > /dev/null
 fi
 
 # Cleanup
 rm -rf lambda-site-regenerator site-regenerator.zip
 
 echo "✅ Lambda function deployed successfully!"
-echo "🧪 Testing function..."
 
-# Test invoke
-aws lambda invoke \
-  --function-name yallabalagan-site-regenerator \
-  --region eu-north-1 \
-  response.json
-
-cat response.json | jq
-rm response.json
+# Cleanup
+rm -f response.json
 
 echo "✅ Deployment complete!"

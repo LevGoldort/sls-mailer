@@ -30,7 +30,8 @@ aws lambda publish-layer-version \
   --description "Jinja2 templates and static files for site generation" \
   --zip-file fileb://site-templates-layer.zip \
   --compatible-runtimes python3.11 \
-  --region eu-north-1
+  --region eu-north-1 \
+  --no-cli-pager > /dev/null
 
 # Cleanup
 rm -rf lambda-layer site-templates-layer.zip

@@ -19,12 +19,19 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Usage
 usage() {
-    echo -e "${BLUE}Usage:${NC} $0 [admin|frontend|all]"
+    echo -e "${BLUE}Usage:${NC} $0 [admin|frontend|all] [--skip-layers]"
     echo ""
     echo "Options:"
     echo "  admin     - Deploy admin panel only (sync S3 + deploy admin lambdas)"
     echo "  frontend  - Deploy frontend only (regenerate site + deploy all lambdas + layers)"
     echo "  all       - Deploy everything (admin + frontend)"
+    echo ""
+    echo "Flags:"
+    echo "  --skip-layers  - Skip Lambda Layer update and dependency reinstall (faster)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 frontend              # Full deploy with layers (slow)"
+    echo "  $0 frontend --skip-layers  # Quick deploy, code only (fast)"
     echo ""
     exit 1
 }
@@ -46,23 +53,28 @@ deploy_admin() {
 
 # Deploy lambdas
 deploy_lambdas() {
+    local skip_deps=$1
     echo -e "${GREEN}🚀 Deploying Lambda Functions...${NC}"
+
+    if [ "$skip_deps" = "true" ]; then
+        echo -e "${YELLOW}⚡ Quick mode: skipping dependency reinstall${NC}"
+    fi
 
     # Deploy main API handler
     echo -e "${BLUE}📦 Deploying ticket API handler...${NC}"
-    "$SCRIPT_DIR/deploy-lambda.sh"
+    "$SCRIPT_DIR/deploy-lambda.sh" "$skip_deps"
 
     # Deploy site regenerator
     echo -e "${BLUE}📦 Deploying site regenerator...${NC}"
-    "$SCRIPT_DIR/deploy-site-regenerator.sh"
+    "$SCRIPT_DIR/deploy-site-regenerator.sh" "$skip_deps"
 
     # Deploy email sender
     echo -e "${BLUE}📦 Deploying email sender...${NC}"
-    "$SCRIPT_DIR/deploy-email-sender.sh"
+    "$SCRIPT_DIR/deploy-email-sender.sh" "$skip_deps"
 
     # Deploy event status updater
     echo -e "${BLUE}📦 Deploying event status updater...${NC}"
-    "$SCRIPT_DIR/deploy-event-status-updater.sh"
+    "$SCRIPT_DIR/deploy-event-status-updater.sh" "$skip_deps"
 
     echo -e "${GREEN}✅ All Lambda functions deployed successfully!${NC}"
 }
@@ -80,13 +92,15 @@ update_layer() {
         --layer-name yallabalagan-site-templates \
         --region "$REGION" \
         --query 'LayerVersions[0].LayerVersionArn' \
-        --output text)
+        --output text \
+        --no-cli-pager)
 
     echo -e "${BLUE}🔄 Updating site-regenerator to use latest layer...${NC}"
     aws lambda update-function-configuration \
         --function-name yallabalagan-site-regenerator \
         --layers "$LAYER_ARN" \
-        --region "$REGION" > /dev/null
+        --region "$REGION" \
+        --no-cli-pager > /dev/null
 
     echo -e "${GREEN}✅ Lambda Layer updated successfully!${NC}"
 }
@@ -105,6 +119,7 @@ regenerate_site() {
         --function-name yallabalagan-site-regenerator \
         --region "$REGION" \
         --payload '{}' \
+        --no-cli-pager \
         /tmp/regenerate-response.json > /dev/null
 
     # Parse response
@@ -124,13 +139,18 @@ regenerate_site() {
 
 # Deploy frontend
 deploy_frontend() {
+    local skip_layers=$1
     echo -e "${GREEN}🚀 Deploying Frontend...${NC}"
 
-    # Update Lambda Layer first
-    update_layer
+    # Update Lambda Layer first (unless skipping)
+    if [ "$skip_layers" != "true" ]; then
+        update_layer
+    else
+        echo -e "${YELLOW}⚡ Skipping Lambda Layer update${NC}"
+    fi
 
     # Deploy all Lambda functions
-    deploy_lambdas
+    deploy_lambdas "$skip_layers"
 
     # Regenerate site
     regenerate_site
@@ -144,6 +164,12 @@ main() {
 
     cd "$PROJECT_DIR"
 
+    # Parse flags
+    SKIP_LAYERS="false"
+    if [[ "$2" == "--skip-layers" ]] || [[ "$3" == "--skip-layers" ]]; then
+        SKIP_LAYERS="true"
+    fi
+
     case "$1" in
         admin)
             echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -154,16 +180,22 @@ main() {
         frontend)
             echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             echo -e "${YELLOW}  Deploying FRONTEND${NC}"
+            if [ "$SKIP_LAYERS" = "true" ]; then
+                echo -e "${YELLOW}  (Quick mode - skipping layers)${NC}"
+            fi
             echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            deploy_frontend
+            deploy_frontend "$SKIP_LAYERS"
             ;;
         all)
             echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             echo -e "${YELLOW}  Deploying EVERYTHING${NC}"
+            if [ "$SKIP_LAYERS" = "true" ]; then
+                echo -e "${YELLOW}  (Quick mode - skipping layers)${NC}"
+            fi
             echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             deploy_admin
             echo ""
-            deploy_frontend
+            deploy_frontend "$SKIP_LAYERS"
             ;;
         *)
             echo -e "${RED}❌ Invalid argument: $1${NC}"

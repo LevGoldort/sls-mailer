@@ -152,7 +152,10 @@ function showSuccess(order) {
             <div class="qr-grid">
                 ${order.qr_codes.map((qr, index) => `
                     <div class="qr-item">
-                        <div class="qr-placeholder">📱</div>
+                        ${qr.s3_url
+                            ? `<img src="${qr.s3_url}" alt="QR Code ${qr.code}" class="qr-image">`
+                            : `<div class="qr-placeholder">📱</div>`
+                        }
                         <p>Билет #${index + 1}</p>
                         <p class="qr-code">${qr.code}</p>
                     </div>
@@ -314,6 +317,14 @@ function fireAnalytics(order) {
 .qr-placeholder {
     font-size: 3rem;
     margin-bottom: 0.5rem;
+}
+
+.qr-image {
+    width: 150px;
+    height: 150px;
+    display: block;
+    margin: 0 auto 0.5rem;
+    border-radius: 0.5rem;
 }
 
 .qr-code {

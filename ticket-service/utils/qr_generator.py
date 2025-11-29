@@ -22,14 +22,18 @@ def generate_qr_image(code: str, order_id: str, bucket_name: str = None) -> Opti
         # Get bucket name from env or parameter
         bucket = bucket_name or os.environ.get('QR_BUCKET', 'yallabalagan-ticket-media')
         region = os.environ.get('AWS_REGION', 'eu-north-1')
-        
+
+        print(f"Generating QR code for {code}, bucket: {bucket}, region: {region}")
+
         # Generate QR code image
         # Try PIL first, fallback to pure Python
         try:
             from PIL import Image
             import qrcode.image.pil
             image_factory = qrcode.image.pil.PilImage
-        except ImportError:
+            print("Using PIL image factory")
+        except ImportError as e:
+            print(f"PIL not available ({e}), falling back to PyPNG")
             # Fallback to pure python if PIL not available
             import qrcode.image.pure
             image_factory = qrcode.image.pure.PyPNGImage
@@ -60,20 +64,27 @@ def generate_qr_image(code: str, order_id: str, bucket_name: str = None) -> Opti
         
         # S3 key: qr-codes/{order_id}/{code}.png
         s3_key = f"qr-codes/{order_id}/{code}.png"
-        
+
+        print(f"Uploading QR code to S3: s3://{bucket}/{s3_key}")
+
         # Upload to S3
-        s3_client = boto3.client('s3', region_name=region)
-        s3_client.put_object(
-            Bucket=bucket,
-            Key=s3_key,
-            Body=img_buffer.getvalue(),
-            ContentType='image/png',
-            CacheControl='max-age=31536000',  # 1 year cache
-        )
-        
+        try:
+            s3_client = boto3.client('s3', region_name=region)
+            s3_client.put_object(
+                Bucket=bucket,
+                Key=s3_key,
+                Body=img_buffer.getvalue(),
+                ContentType='image/png',
+                CacheControl='max-age=31536000',  # 1 year cache
+            )
+            print(f"Successfully uploaded to S3")
+        except Exception as s3_error:
+            print(f"ERROR uploading to S3: {s3_error}")
+            raise
+
         # Generate public URL
         url = f"https://{bucket}.s3.{region}.amazonaws.com/{s3_key}"
-        
+
         print(f"QR code generated and uploaded: {url}")
         return url
         

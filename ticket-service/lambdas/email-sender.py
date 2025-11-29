@@ -48,49 +48,72 @@ def load_email_template() -> str:
     
     <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
         <h2 style="color: #667eea; margin-top: 0;">{{ event.title }}</h2>
-        
+
+        {% if event.images and event.images|length > 0 %}
+        <div style="margin-bottom: 20px; text-align: center;">
+            <img src="{{ event.images[0] }}" alt="{{ event.title }}" style="max-width: 100%; height: auto; border-radius: 8px;">
+        </div>
+        {% endif %}
+
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <p><strong>📅 Дата и время:</strong> {{ event_date_formatted }}</p>
-            <p><strong>📍 Локация:</strong> {{ location_name }}</p>
+            <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
             <p><strong>🎫 Количество билетов:</strong> {{ total_tickets }}</p>
             <p><strong>💰 Сумма:</strong> {{ order.total_amount }} {{ order.currency }}</p>
             <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
         </div>
         
-        {% if order.qr_codes %}
+        {% if enriched_qr_codes %}
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h3 style="color: #667eea; margin-top: 0;">Ваши QR-коды:</h3>
+            <h3 style="color: #667eea; margin-top: 0;">Ваши билеты:</h3>
             <p style="color: #666; font-size: 14px;">Покажите эти QR-коды на входе</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
-                {% for qr in order.qr_codes %}
-                <div style="text-align: center; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px;">
-                    {% if qr.s3_url %}
-                    <img src="{{ qr.s3_url }}" alt="QR Code {{ qr.code }}" style="width: 150px; height: 150px; display: block; margin: 0 auto;">
-                    {% else %}
-                    <div style="width: 150px; height: 150px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; margin: 0 auto; border-radius: 8px;">
-                        <span style="font-size: 48px;">📱</span>
+
+            {% for qr in enriched_qr_codes %}
+            <div style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                <!-- Top section: Info left, QR right -->
+                <div style="display: table; width: 100%;">
+                    <div style="display: table-cell; vertical-align: top; width: 60%;">
+                        <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #667eea;">{{ event.title }}</p>
+                        <p style="margin: 0 0 6px 0; font-size: 14px; color: #333;">🎫 {{ qr['ticket_type_name'] }}</p>
+                        <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">📍 <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a></p>
+                        {% if location_address %}
+                        <p style="margin: 0; font-size: 12px; color: #999;">{{ location_address }}</p>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                    <p style="margin: 10px 0 5px 0; font-size: 12px; font-family: monospace; color: #666;">{{ qr.code }}</p>
-                    <p style="margin: 0; font-size: 11px; color: #999;">{{ qr.ticket_type }}</p>
+                    <div style="display: table-cell; vertical-align: top; width: 40%; text-align: right;">
+                        {% if qr['s3_url'] %}
+                        <img src="{{ qr['s3_url'] }}" alt="QR Code" style="width: 120px; height: 120px; border-radius: 8px;">
+                        {% else %}
+                        <div style="width: 120px; height: 120px; background: #f0f0f0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px;">
+                            <span style="font-size: 48px;">📱</span>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-                {% endfor %}
+
+                <!-- Bottom section: Ticket ID -->
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0;">
+                    <p style="margin: 0; font-size: 11px; color: #999;">ID билета: <span style="font-family: monospace; color: #666;">{{ qr['code'] }}</span></p>
+                </div>
             </div>
+            {% endfor %}
         </div>
         {% endif %}
         
         <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
             <p style="margin: 0; font-size: 14px;"><strong>⚠️ Важно:</strong></p>
             <ul style="margin: 10px 0 0 0; padding-left: 20px; font-size: 14px;">
-                <li>Приходите за 15-30 минут до начала события</li>
                 <li>Покажите QR-код на входе (можно с телефона)</li>
                 <li>Сохраните это письмо до посещения события</li>
             </ul>
         </div>
         
         <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <p style="color: #666; font-size: 12px; margin: 0 0 10px 0;">
+                Для отмены билетов напишите на <a href="mailto:yalla@yallabalagan.org" style="color: #667eea;">yalla@yallabalagan.org</a> и укажите айди билетов (можно переслать это сообщение просто).
+            </p>
             <p style="color: #666; font-size: 12px; margin: 0;">
-                Если у вас есть вопросы, свяжитесь с нами по email или телефону.
+                По закону мы вернем 100% стоимости при отмене за 7 дней до даты. В других случаях - пишите, решим.
             </p>
         </div>
     </div>
@@ -176,56 +199,104 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Load location (optional - for display)
         location_name = "Локация"
+        location_address = ""
+        location_id = event_obj.location_id
         try:
             location_data = db.get_location(event_obj.location_id)
             if location_data:
                 from models import Location
                 location = Location.from_dynamodb_item(location_data)
                 location_name = location.name
-        except:
-            pass  # Location not critical for email
+                # Format address as "City, Street"
+                if location.address and location.address.city and location.address.street:
+                    location_address = f"{location.address.city}, {location.address.street}"
+        except Exception as e:
+            print(f"Warning: Failed to load location: {e}")  # Log the error instead of silently ignoring
         
         # Load email template
         template_str = load_email_template()
         template = Template(template_str)
-        
+
         # Calculate total tickets
         total_tickets = sum(t.quantity for t in order.tickets)
-        
+
+        # Enrich QR codes with ticket type names
+        try:
+            ticket_type_map = {t.type_id: t.type_name for t in order.tickets}
+            enriched_qr_codes = []
+            for qr in order.qr_codes:
+                qr_dict = qr.to_dict()
+                qr_dict['ticket_type_name'] = ticket_type_map.get(qr.ticket_type, qr.ticket_type)
+                enriched_qr_codes.append(qr_dict)
+            print(f"Enriched {len(enriched_qr_codes)} QR codes")
+        except Exception as e:
+            print(f"Error enriching QR codes: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to empty list
+            enriched_qr_codes = []
+
+        # Get frontend URL from environment
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
+
         # Render email HTML
-        email_html = template.render(
-            order=order,
-            event=event_obj,
-            event_date_formatted=format_event_date(event_obj.date),
-            location_name=location_name,
-            total_tickets=total_tickets
-        )
+        try:
+            email_html = template.render(
+                order=order,
+                event=event_obj,
+                event_date_formatted=format_event_date(event_obj.date),
+                location_name=location_name,
+                location_address=location_address,
+                location_id=location_id,
+                total_tickets=total_tickets,
+                enriched_qr_codes=enriched_qr_codes,
+                frontend_url=frontend_url
+            )
+            print(f"Email template rendered successfully")
+        except Exception as e:
+            print(f"Error rendering email template: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': f'Failed to render email template: {str(e)}'})
+            }
         
         # Get sender email from env
-        sender_email = os.environ.get('SENDER_EMAIL', 'noreply@yallabalagan.com')
+        sender_email = os.environ.get('SENDER_EMAIL', 'yalla@yallabalagan.org')
         recipient_email = order.customer.email
-        
+
+        print(f"Sending email from {sender_email} to {recipient_email}")
+
         # Send email via SES
-        response = ses_client.send_email(
-            Source=sender_email,
-            Destination={
-                'ToAddresses': [recipient_email]
-            },
-            Message={
-                'Subject': {
-                    'Data': f'Ваши билеты: {event_obj.title}',
-                    'Charset': 'UTF-8'
+        try:
+            response = ses_client.send_email(
+                Source=sender_email,
+                Destination={
+                    'ToAddresses': [recipient_email]
                 },
-                'Body': {
-                    'Html': {
-                        'Data': email_html,
+                Message={
+                    'Subject': {
+                        'Data': f'Ваши билеты: {event_obj.title}',
                         'Charset': 'UTF-8'
+                    },
+                    'Body': {
+                        'Html': {
+                            'Data': email_html,
+                            'Charset': 'UTF-8'
+                        }
                     }
                 }
-            }
-        )
-        
-        print(f"Email sent successfully. MessageId: {response['MessageId']}")
+            )
+
+            print(f"Email sent successfully. MessageId: {response['MessageId']}")
+        except Exception as e:
+            print(f"ERROR sending email via SES: {e}")
+            print(f"Sender: {sender_email}, Recipient: {recipient_email}")
+            import traceback
+            traceback.print_exc()
+            # Re-raise to trigger the outer exception handler
+            raise
         
         # Update order to mark email as sent
         from datetime import datetime

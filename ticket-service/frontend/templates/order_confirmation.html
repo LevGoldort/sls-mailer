@@ -89,10 +89,13 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
                 {% for qr in order.qr_codes %}
                 <div style="background: white; border: 2px solid var(--gray-200); padding: 1rem; border-radius: 0.5rem; text-align: center;">
-                    <!-- Placeholder for QR code image -->
+                    {% if qr.s3_url %}
+                    <img src="{{ qr.s3_url }}" alt="QR Code {{ qr.code }}" style="width: 150px; height: 150px; display: block; margin: 0 auto; border-radius: 0.5rem;">
+                    {% else %}
                     <div style="width: 150px; height: 150px; margin: 0 auto; background: var(--gray-100); display: flex; align-items: center; justify-content: center; border-radius: 0.5rem;">
                         <div style="font-size: 3rem;">📱</div>
                     </div>
+                    {% endif %}
                     <p style="margin-top: 0.75rem; font-size: 0.75rem; font-family: monospace; color: var(--gray-600);">
                         {{ qr.code }}
                     </p>

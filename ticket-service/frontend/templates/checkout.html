@@ -299,6 +299,11 @@ function renderCheckout() {
 // Validate coupon
 async function validateCoupon(code) {
     try {
+        // Get current quantity (defaults to 1 if not set yet)
+        const quantityElement = document.getElementById('quantity');
+        const quantity = quantityElement ? parseInt(quantityElement.value) : 1;
+        const totalAmount = ticketPrice * quantity;
+
         const response = await fetch(`${API_URL}/api/coupons/validate`, {
             method: 'POST',
             headers: {
@@ -307,7 +312,8 @@ async function validateCoupon(code) {
             body: JSON.stringify({
                 coupon_code: code,
                 event_id: eventId,
-                amount: ticketPrice
+                amount: totalAmount,
+                ticket_quantity: quantity
             })
         });
 

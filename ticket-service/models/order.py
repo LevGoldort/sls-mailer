@@ -27,10 +27,17 @@ class OrderTicket:
     price_per_ticket: float
 
     def get_total(self) -> float:
-        return self.quantity * self.price_per_ticket
+        # Convert to float to handle Decimal types from DynamoDB
+        return float(self.quantity) * float(self.price_per_ticket)
 
     def to_dict(self):
-        return asdict(self)
+        from decimal import Decimal
+        return {
+            'type_id': self.type_id,
+            'type_name': self.type_name,
+            'quantity': self.quantity,
+            'price_per_ticket': Decimal(str(self.price_per_ticket))
+        }
 
 
 @dataclass
@@ -156,6 +163,8 @@ class Order:
 
     def to_dynamodb_item(self) -> Dict:
         """Конвертирует в формат DynamoDB"""
+        from decimal import Decimal
+
         item = {
             "PK": f"ORDER#{self.order_id}",
             "SK": "METADATA",
@@ -163,7 +172,7 @@ class Order:
             "event_id": self.event_id,
             "customer": self.customer.to_dict(),
             "tickets": [t.to_dict() for t in self.tickets],
-            "total_amount": self.total_amount,
+            "total_amount": Decimal(str(self.total_amount)),
             "currency": self.currency,
             "payment": self.payment.to_dict(),
             "qr_codes": [qr.to_dict() for qr in self.qr_codes],
@@ -176,7 +185,7 @@ class Order:
         # Add coupon fields if present
         if self.coupon_code:
             item["coupon_code"] = self.coupon_code
-            item["discount_amount"] = self.discount_amount
+            item["discount_amount"] = Decimal(str(self.discount_amount))
 
         return item
 

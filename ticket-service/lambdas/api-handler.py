@@ -828,12 +828,12 @@ def create_order(request_event: Dict) -> Dict:
             if not is_valid:
                 return error_response(400, f"Invalid coupon: {error_msg}")
 
-            # Calculate discount
-            discount_amount = coupon.calculate_discount(subtotal)
+            # Calculate discount (total tickets for per-ticket discount)
+            total_tickets = sum(t.quantity for t in order_tickets)
+            discount_amount = coupon.calculate_discount(subtotal, total_tickets)
 
-            # Increment coupon usage
-            coupon.increment_uses()
-            db.put_coupon(coupon.to_dynamodb_item())
+            # NOTE: Coupon usage will be incremented ONLY after successful payment
+            # (in webhook handler when payment_status == 'completed')
 
         # Calculate total with discount
         total_amount = subtotal - discount_amount
@@ -1257,6 +1257,7 @@ def validate_coupon(request_event: Dict) -> Dict:
         coupon_code = body['coupon_code']
         event_id = body['event_id']
         amount = float(body['amount'])
+        ticket_quantity = int(body.get('ticket_quantity', 1))  # Optional, defaults to 1
 
         # Получаем купон
         item = db.get_coupon(coupon_code)
@@ -1270,9 +1271,9 @@ def validate_coupon(request_event: Dict) -> Dict:
         if not is_valid:
             return error_response(400, error_msg)
 
-        # Рассчитываем скидку
-        discount_amount = coupon.calculate_discount(amount)
-        final_amount = coupon.apply_discount(amount)
+        # Рассчитываем скидку (с учетом количества билетов)
+        discount_amount = coupon.calculate_discount(amount, ticket_quantity)
+        final_amount = coupon.apply_discount(amount, ticket_quantity)
 
         return success_response({
             'valid': True,
@@ -1585,6 +1586,15 @@ def handle_allpay_webhook(event: Dict) -> Dict:
 
                     # Сохраняем обновленное событие
                     db.put_event(evt.to_dynamodb_item())
+
+                # Increment coupon usage if coupon was used
+                if order.coupon_code:
+                    coupon_data = db.get_coupon(order.coupon_code)
+                    if coupon_data:
+                        coupon = Coupon.from_dynamodb_item(coupon_data)
+                        coupon.increment_uses()
+                        db.put_coupon(coupon.to_dynamodb_item())
+                        print(f"Incremented coupon usage for {order.coupon_code}, now at {coupon.current_uses} uses")
 
                 # Сохраняем обновленный заказ с QR кодами
                 db.put_order(order.to_dynamodb_item())

@@ -115,34 +115,43 @@ class Coupon:
 
         return True, ""
 
-    def calculate_discount(self, amount: float) -> float:
+    def calculate_discount(self, amount: float, ticket_quantity: int = 1) -> float:
         """
         Рассчитывает сумму скидки
 
         Args:
             amount: Исходная сумма
+            ticket_quantity: Количество билетов (для fixed_amount применяется на каждый билет)
 
         Returns:
             float: Сумма скидки
         """
+        # Convert Decimal to float if needed
+        amount = float(amount)
+
         if self.discount_type == "percentage":
             discount = amount * (self.discount_value / 100)
-        else:  # fixed_amount
-            discount = min(self.discount_value, amount)
+        else:  # fixed_amount - применяем скидку на каждый билет
+            discount_per_ticket = self.discount_value
+            total_discount = discount_per_ticket * ticket_quantity
+            discount = min(total_discount, amount)
 
         return round(discount, 2)
 
-    def apply_discount(self, amount: float) -> float:
+    def apply_discount(self, amount: float, ticket_quantity: int = 1) -> float:
         """
         Применяет скидку к сумме
 
         Args:
             amount: Исходная сумма
+            ticket_quantity: Количество билетов (для fixed_amount применяется на каждый билет)
 
         Returns:
             float: Сумма со скидкой
         """
-        discount = self.calculate_discount(amount)
+        # Convert Decimal to float if needed
+        amount = float(amount)
+        discount = self.calculate_discount(amount, ticket_quantity)
         return round(max(0, amount - discount), 2)
 
     def increment_uses(self) -> None:

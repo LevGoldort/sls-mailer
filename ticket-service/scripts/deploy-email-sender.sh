@@ -1,13 +1,14 @@
 #!/bin/bash
 #
 # Deploy Email Sender Lambda function для Ticket Service
-# Usage: ./scripts/deploy-email-sender.sh
+# Usage: ./scripts/deploy-email-sender.sh [skip_deps]
 #
 
 set -e
 
 FUNCTION_NAME="yallabalagan-email-sender"
 REGION="eu-north-1"
+SKIP_DEPS=${1:-false}
 
 echo "🚀 Deploying Lambda function: $FUNCTION_NAME"
 echo ""
@@ -21,9 +22,20 @@ cp -r models "$TEMP_DIR/"
 cp -r utils "$TEMP_DIR/"
 cp lambdas/email-sender.py "$TEMP_DIR/lambda_function.py"
 
-# Устанавливаем зависимости
-echo "📥 Installing dependencies..."
-pip install -q -r requirements.txt -t "$TEMP_DIR/"
+# Устанавливаем зависимости (если не пропускаем)
+if [ "$SKIP_DEPS" = "true" ]; then
+    echo "⚡ Skipping dependency installation (quick mode)"
+    if [ -d "/tmp/email-sender-deps-cache" ]; then
+        echo "📋 Using cached dependencies..."
+        cp -r /tmp/email-sender-deps-cache/* "$TEMP_DIR/" 2>/dev/null || true
+    fi
+else
+    echo "📥 Installing dependencies..."
+    pip install -q -r requirements.txt -t "$TEMP_DIR/"
+    # Cache dependencies
+    mkdir -p /tmp/email-sender-deps-cache
+    rsync -a --exclude='models' --exclude='utils' --exclude='lambda_function.py' "$TEMP_DIR/" /tmp/email-sender-deps-cache/ 2>/dev/null || true
+fi
 
 # Создаем zip
 cd "$TEMP_DIR"
