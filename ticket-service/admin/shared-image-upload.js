@@ -263,6 +263,12 @@ async function uploadToS3(file, filename) {
 
         reader.onload = async function(e) {
             try {
+                // Get admin API key from localStorage
+                const adminKey = localStorage.getItem('admin_api_key');
+                if (!adminKey) {
+                    throw new Error('Admin API key not found. Please refresh the page.');
+                }
+
                 // For now, we'll use a Lambda endpoint to handle S3 upload
                 // You could also use pre-signed URLs like in newsletter admin
                 const arrayBuffer = e.target.result;
@@ -274,7 +280,10 @@ async function uploadToS3(file, filename) {
                 // Upload via API
                 const response = await fetch(`https://ovajavet67.execute-api.eu-north-1.amazonaws.com/api/upload-image`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': adminKey
+                    },
                     body: JSON.stringify({
                         filename: filename,
                         contentType: file.type,
