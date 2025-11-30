@@ -864,7 +864,8 @@ def create_order(request_event: Dict) -> Dict:
                 amount=order.total_amount,
                 currency=order.currency,
                 email=order.customer.email,
-                event_id=event_id
+                event_id=event_id,
+                customer_name=order.customer.name
             )
         except Exception as e:
             print(f"Failed to create payment URL: {str(e)}")
@@ -1524,17 +1525,32 @@ def handle_allpay_webhook(event: Dict) -> Dict:
     Processes payment status updates from payment provider
     """
     try:
-        # Extract body and signature
+        # Extract body
         body = event.get('body', '')
         if event.get('isBase64Encoded'):
             body = base64.b64decode(body).decode('utf-8')
 
-        # Get signature from headers (all lowercase in Lambda events)
+        print(f"Received webhook: {body}")
+
+        # Get payment provider (respects PAYMENT_MODE)
+        payment_provider = get_payment_provider()
+
+        # AllPay puts signature in JSON body field 'sign'
+        # Mock puts signature in header 'x-webhook-signature'
         headers = event.get('headers', {})
-        signature = headers.get('x-allpay-signature') or headers.get('x-webhook-signature', '')
+        mock_signature = headers.get('x-webhook-signature', '')
+
+        # Parse body to check if it has 'sign' field
+        try:
+            body_json = json.loads(body)
+            allpay_signature = body_json.get('sign', '')
+        except:
+            allpay_signature = ''
+
+        # Use appropriate signature based on provider
+        signature = allpay_signature if allpay_signature else mock_signature
 
         # Verify signature
-        payment_provider = get_payment_provider()
         if not payment_provider.verify_webhook_signature(body.encode(), signature):
             print(f"Invalid webhook signature")
             return error_response(401, "Invalid signature")
@@ -1551,6 +1567,16 @@ def handle_allpay_webhook(event: Dict) -> Dict:
         transaction_id = webhook_data.get('transaction_id')
 
         print(f"Webhook received: order_id={order_id}, status={payment_status}, transaction_id={transaction_id}")
+
+        # Validate order exists BEFORE processing
+        order_data = db.get_order(order_id)
+        if not order_data:
+            print(f"ERROR: Order {order_id} not found")
+            # Return 200 to prevent AllPay retries
+            return success_response({
+                'status': 'ignored',
+                'message': f'Order {order_id} not found'
+            })
 
         # Update order payment status
         db.update_order_payment_status(

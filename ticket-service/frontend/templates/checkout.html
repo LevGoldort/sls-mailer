@@ -433,6 +433,10 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
     submitButton.disabled = true;
     submitButton.textContent = 'Обработка...';
 
+    // Open payment window IMMEDIATELY (before any async operations)
+    // This preserves the user gesture and prevents popup blocking
+    const paymentWindow = window.open('about:blank', '_blank');
+
     try {
         const formData = new FormData(this);
         const quantity = parseInt(document.getElementById('quantity').value);
@@ -493,16 +497,30 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 
             // Redirect to payment or success page
             if (result.payment_url) {
-                window.location.href = result.payment_url;
+                // Redirect the already-opened window to payment URL
+                if (paymentWindow && paymentWindow !== window) {
+                    paymentWindow.location.href = result.payment_url;
+                    // Redirect current window to processing page
+                    window.location.href = '/processing.html?order_id=' + result.order_id;
+                } else {
+                    // Fallback: if new window didn't open, redirect current window
+                    window.location.href = result.payment_url;
+                }
             } else {
+                // Close the blank window if no payment needed
+                paymentWindow.close();
                 window.location.href = '/orders/' + result.order_id + '.html';
             }
         } else {
+            // Close the blank payment window on error
+            paymentWindow.close();
             alert('Ошибка при создании заказа: ' + (result.error || 'Неизвестная ошибка'));
             submitButton.disabled = false;
             submitButton.textContent = 'Перейти к оплате';
         }
     } catch (error) {
+        // Close the blank payment window on error
+        paymentWindow.close();
         console.error('Error:', error);
         alert('Произошла ошибка при обработке заказа. Пожалуйста, попробуйте снова.');
         submitButton.disabled = false;
