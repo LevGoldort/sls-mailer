@@ -145,6 +145,9 @@ deploy_frontend() {
     # Update Lambda Layer first (unless skipping)
     if [ "$skip_layers" != "true" ]; then
         update_layer
+        # Wait for layer update to complete before deploying functions
+        echo -e "${BLUE}⏳ Waiting for layer update to complete...${NC}"
+        sleep 5
     else
         echo -e "${YELLOW}⚡ Skipping Lambda Layer update${NC}"
     fi

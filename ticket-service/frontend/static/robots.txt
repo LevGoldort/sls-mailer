@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /checkout.html
+Disallow: /processing.html
+Disallow: /mock_payment.html
+Disallow: /orders/
+
+Sitemap: https://yallabalagan.org/sitemap.xml

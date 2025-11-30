@@ -3,6 +3,55 @@
 {% block title %}{{ event.title }} - YallaBalagan{% endblock %}
 {% block description %}{{ event.description }}{% endblock %}
 
+{% block og_type %}event{% endblock %}
+{% block og_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
+{% block og_image %}{% if event.images and event.images|length > 0 %}{{ event.images[0] }}{% else %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endif %}{% endblock %}
+
+{% block twitter_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
+{% block twitter_image %}{% if event.images and event.images|length > 0 %}{{ event.images[0] }}{% else %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endif %}{% endblock %}
+
+{% block canonical_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
+
+{% block extra_css %}
+<!-- Schema.org Event Markup -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "{{ event.title }}",
+  "description": "{{ event.description | striptags }}",
+  "startDate": "{{ event.date }}",
+  "endDate": "{{ event.date }}",
+  "eventStatus": "https://schema.org/EventScheduled",
+  {% if event.images and event.images|length > 0 %}
+  "image": "{{ event.images[0] }}",
+  {% endif %}
+  "location": {
+    "@type": "Place",
+    "name": "{{ event.location_name }}"{% if location and location.address %},
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "{{ location.address.street }}",
+      "addressLocality": "{{ location.address.city }}",
+      "addressCountry": "IL"
+    }{% endif %}
+  },
+  "offers": {
+    "@type": "AggregateOffer",
+    "priceCurrency": "ILS",
+    "lowPrice": "{{ event.min_price }}",
+    "availability": "https://schema.org/InStock",
+    "url": "https://yallabalagan.org/events/{{ event.event_id }}.html"
+  },
+  "organizer": {
+    "@type": "Organization",
+    "name": "YallaBalagan",
+    "url": "https://yallabalagan.org"
+  }
+}
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="event-detail">
     <!-- Hero Image -->
@@ -263,6 +312,30 @@
 const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 const EVENT_ID = '{{ event.event_id }}';
 
+// Fire ViewContent event on page load
+if (typeof fbq !== 'undefined') {
+    fbq('track', 'ViewContent', {
+        content_ids: ['{{ event.event_id }}'],
+        content_name: '{{ event.title }}',
+        content_type: 'product',
+        value: {{ event.min_price }},
+        currency: 'ILS'
+    });
+}
+
+// Fire GA4 view_item event
+if (typeof gtag !== 'undefined') {
+    gtag('event', 'view_item', {
+        currency: 'ILS',
+        value: {{ event.min_price }},
+        items: [{
+            item_id: '{{ event.event_id }}',
+            item_name: '{{ event.title }}',
+            price: {{ event.min_price }}
+        }]
+    });
+}
+
 // Coupon state
 let appliedCoupon = null;
 
@@ -338,6 +411,24 @@ async function applyCoupon() {
             appliedCoupon = data;
             updatePricesWithCoupon(data);
             showCouponMessage(`✓ Купон применен! ${data.discount_description}`, 'success');
+
+            // Fire Lead event for FB Pixel
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'Lead', {
+                    content_name: '{{ event.title }}',
+                    content_category: 'Coupon Applied',
+                    value: testAmount,
+                    currency: 'ILS'
+                });
+            }
+
+            // Fire GA4 generate_lead event
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'generate_lead', {
+                    currency: 'ILS',
+                    value: testAmount
+                });
+            }
 
             // Disable input and button
             couponInput.disabled = true;

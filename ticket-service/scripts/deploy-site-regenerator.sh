@@ -45,7 +45,7 @@ if [[ "$FUNCTION_EXISTS" == *"not found"* ]]; then
       --zip-file fileb://site-regenerator.zip \
       --timeout 60 \
       --memory-size 512 \
-      --environment Variables="{API_URL=https://ovajavet67.execute-api.eu-north-1.amazonaws.com,S3_BUCKET=yallabalagan-tickets-frontend}" \
+      --environment Variables="{API_URL=https://ovajavet67.execute-api.eu-north-1.amazonaws.com,S3_BUCKET=yallabalagan-tickets-frontend,GA4_ID=G-RP1612BFV9,FB_PIXEL_ID=738718761834602}" \
       --region eu-north-1 \
       --no-cli-pager > /dev/null
 
@@ -65,6 +65,18 @@ else
     aws lambda update-function-code \
       --function-name yallabalagan-site-regenerator \
       --zip-file fileb://site-regenerator.zip \
+      --region eu-north-1 \
+      --no-cli-pager > /dev/null
+
+    # Wait for code update to complete before updating configuration
+    echo "⏳ Waiting for code update to complete..."
+    sleep 3
+
+    # Update environment variables
+    echo "🔄 Updating environment variables..."
+    aws lambda update-function-configuration \
+      --function-name yallabalagan-site-regenerator \
+      --environment Variables="{API_URL=https://ovajavet67.execute-api.eu-north-1.amazonaws.com,S3_BUCKET=yallabalagan-tickets-frontend,GA4_ID=G-RP1612BFV9,FB_PIXEL_ID=738718761834602}" \
       --region eu-north-1 \
       --no-cli-pager > /dev/null
 fi

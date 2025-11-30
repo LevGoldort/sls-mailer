@@ -187,13 +187,20 @@ function fireAnalytics(order) {
 
     // Facebook Pixel Purchase Event
     if (typeof fbq !== 'undefined') {
-        fbq('track', 'Purchase', {
+        const pixelData = {
             value: order.total_amount,
             currency: order.currency || 'ILS',
             content_ids: [order.event_id],
             content_type: 'product',
             num_items: order.tickets.reduce((sum, t) => sum + t.quantity, 0)
-        });
+        };
+
+        // Add event title if available
+        if (order.event_title) {
+            pixelData.content_name = order.event_title;
+        }
+
+        fbq('track', 'Purchase', pixelData);
         console.log('Facebook Pixel: Purchase event tracked');
     }
 

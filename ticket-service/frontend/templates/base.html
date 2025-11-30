@@ -6,6 +6,28 @@
     <title>{% block title %}YallaBalagan - События{% endblock %}</title>
     <meta name="description" content="{% block description %}Афиша культурных событий{% endblock %}">
 
+    <!-- SEO Meta Tags -->
+    <meta name="keywords" content="{% block keywords %}стендап, стендап в Израиле, комедия, юмор, развлечения, стендап-шоу, комедийные шоу, культурные события, Тель-Авив, Хайфа, Иерусалим, YallaBalagan{% endblock %}">
+    <meta name="author" content="YallaBalagan">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{% block canonical_url %}https://yallabalagan.org/{% endblock %}">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}https://yallabalagan.org/{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ self.description() }}{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:site_name" content="YallaBalagan">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{% block twitter_url %}https://yallabalagan.org/{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ self.title() }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ self.description() }}{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+
     <link rel="stylesheet" href="/static/css/style.css">
 
     {% if fb_pixel_id %}
@@ -39,6 +61,26 @@
     </script>
     <!-- End Google Analytics 4 -->
     {% endif %}
+
+    <!-- Schema.org Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "YallaBalagan",
+      "url": "https://yallabalagan.org",
+      "logo": "https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg",
+      "description": "Афиша культурных событий, стендап-шоу и развлечений в Израиле",
+      "email": "yalla@yallabalagan.org",
+      "telephone": "+972506491680",
+      "sameAs": [
+        "https://facebook.com/YallaBalaganIsrael",
+        "https://instagram.com/yallabala",
+        "https://t.me/yallabala",
+        "https://youtube.com/@yallabalagan"
+      ]
+    }
+    </script>
 
     {% block extra_css %}{% endblock %}
 </head>

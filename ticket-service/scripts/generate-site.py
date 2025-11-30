@@ -205,7 +205,39 @@ def create_test_data():
     return events, locations
 
 
-def generate_site(api_url=None, use_test_data=False):
+def generate_sitemap(events, locations):
+    """Generate sitemap.xml"""
+    from xml.etree.ElementTree import Element, SubElement, tostring
+    from xml.dom import minidom
+
+    urlset = Element('urlset', xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+
+    # Homepage
+    url = SubElement(urlset, 'url')
+    SubElement(url, 'loc').text = 'https://yallabalagan.org/'
+    SubElement(url, 'changefreq').text = 'daily'
+    SubElement(url, 'priority').text = '1.0'
+
+    # Events
+    for event in events:
+        url = SubElement(urlset, 'url')
+        SubElement(url, 'loc').text = f"https://yallabalagan.org/events/{event['event_id']}.html"
+        SubElement(url, 'changefreq').text = 'weekly'
+        SubElement(url, 'priority').text = '0.8'
+
+    # Locations
+    for location in locations:
+        url = SubElement(urlset, 'url')
+        SubElement(url, 'loc').text = f"https://yallabalagan.org/locations/{location['slug']}.html"
+        SubElement(url, 'changefreq').text = 'monthly'
+        SubElement(url, 'priority').text = '0.6'
+
+    # Pretty print
+    xml_str = minidom.parseString(tostring(urlset)).toprettyxml(indent="  ")
+    return xml_str
+
+
+def generate_site(api_url=None, use_test_data=False, ga4_id=None, fb_pixel_id=None):
     """Generate static site from templates"""
 
     print("🚀 Generating YallaBalagan static site...")
@@ -218,6 +250,13 @@ def generate_site(api_url=None, use_test_data=False):
         'min': min,
         'max': max
     })
+
+    # Create context for all templates
+    base_context = {
+        'api_url': api_url,
+        'ga4_id': ga4_id,
+        'fb_pixel_id': fb_pixel_id
+    }
 
     # Clean output directory
     if OUTPUT_DIR.exists():
@@ -276,7 +315,7 @@ def generate_site(api_url=None, use_test_data=False):
     # Generate index.html
     print("📄 Generating index.html...")
     template = env.get_template('index.html')
-    html = template.render(events=visible_events)
+    html = template.render(events=visible_events, **base_context)
     (OUTPUT_DIR / 'index.html').write_text(html, encoding='utf-8')
 
     # Generate event detail pages
@@ -286,7 +325,7 @@ def generate_site(api_url=None, use_test_data=False):
 
     for event in visible_events:
         location = location_map.get(event['location_id'])
-        html = template.render(event=event, location=location)
+        html = template.render(event=event, location=location, **base_context)
         (OUTPUT_DIR / 'events' / f"{event['event_id']}.html").write_text(html, encoding='utf-8')
 
         slug = event.get('slug')
@@ -302,7 +341,7 @@ def generate_site(api_url=None, use_test_data=False):
         # Get upcoming events at this location (only visible ones)
         upcoming_events = [e for e in visible_events if e['location_id'] == location['location_id']]
 
-        html = template.render(location=location, upcoming_events=upcoming_events)
+        html = template.render(location=location, upcoming_events=upcoming_events, **base_context)
         (OUTPUT_DIR / 'locations' / f"{location['slug']}.html").write_text(html, encoding='utf-8')
 
     # Generate checkout pages (examples) - only if we have visible events
@@ -311,7 +350,7 @@ def generate_site(api_url=None, use_test_data=False):
         template = env.get_template('checkout.html')
         event = visible_events[0]
         ticket_type = event['ticket_types'][0]
-        html = template.render(event=event, ticket_type=ticket_type, service_fee=10)
+        html = template.render(event=event, ticket_type=ticket_type, service_fee=10, **base_context)
         (OUTPUT_DIR / 'checkout.html').write_text(html, encoding='utf-8')
 
         # Generate order confirmation example
@@ -339,8 +378,13 @@ def generate_site(api_url=None, use_test_data=False):
                 {'code': 'YBEV-2025-0001-2', 'ticket_type': 'Обычный'}
             ]
         }
-        html = template.render(order=order, event=visible_events[0])
+        html = template.render(order=order, event=visible_events[0], **base_context)
         (OUTPUT_DIR / 'order-example.html').write_text(html, encoding='utf-8')
+
+    # Generate sitemap.xml
+    print("📄 Generating sitemap.xml...")
+    sitemap = generate_sitemap(visible_events, locations)
+    (OUTPUT_DIR / 'sitemap.xml').write_text(sitemap, encoding='utf-8')
 
     print(f"\n✅ Site generated successfully!")
     print(f"📂 Output directory: {OUTPUT_DIR}")
@@ -353,6 +397,8 @@ def generate_site(api_url=None, use_test_data=False):
     example_pages = 2 if visible_events else 0
     if example_pages > 0:
         print(f"   - {example_pages} example pages (checkout, order)")
+    print(f"   - 1 sitemap.xml")
+    print(f"   - 1 robots.txt")
     print(f"\n🌐 Open {OUTPUT_DIR}/index.html in your browser to preview")
 
 
@@ -362,13 +408,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate YallaBalagan static site')
     parser.add_argument('--api-url', help='API URL to fetch real data')
     parser.add_argument('--no-test-data', action='store_true', help='Use API instead of test data')
+    parser.add_argument('--ga4-id', help='Google Analytics 4 ID')
+    parser.add_argument('--fb-pixel-id', help='Facebook Pixel ID')
 
     args = parser.parse_args()
 
     # Use API URL from args, environment, or default
     api_url = args.api_url or os.environ.get('API_URL') or 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com'
 
+    # Get tracking IDs from args or environment variables
+    ga4_id = args.ga4_id or os.environ.get('GA4_ID') or 'G-RP1612BFV9'
+    fb_pixel_id = args.fb_pixel_id or os.environ.get('FB_PIXEL_ID') or '738718761834602'
+
     generate_site(
         api_url=api_url,
-        use_test_data=not args.no_test_data
+        use_test_data=not args.no_test_data,
+        ga4_id=ga4_id,
+        fb_pixel_id=fb_pixel_id
     )

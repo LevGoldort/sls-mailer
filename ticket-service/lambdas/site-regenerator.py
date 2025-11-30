@@ -32,6 +32,38 @@ def format_time(date_str):
     dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
     return dt.strftime('%H:%M')
 
+def generate_sitemap(events, locations):
+    """Generate sitemap.xml"""
+    from xml.etree.ElementTree import Element, SubElement, tostring
+    from xml.dom import minidom
+
+    urlset = Element('urlset', xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+
+    # Homepage
+    url = SubElement(urlset, 'url')
+    SubElement(url, 'loc').text = 'https://yallabalagan.org/'
+    SubElement(url, 'changefreq').text = 'daily'
+    SubElement(url, 'priority').text = '1.0'
+
+    # Events
+    for event in events:
+        url = SubElement(urlset, 'url')
+        SubElement(url, 'loc').text = f"https://yallabalagan.org/events/{event['event_id']}.html"
+        SubElement(url, 'changefreq').text = 'weekly'
+        SubElement(url, 'priority').text = '0.8'
+
+    # Locations
+    for location in locations:
+        url = SubElement(urlset, 'url')
+        slug = location.get('slug', location['location_id'])
+        SubElement(url, 'loc').text = f"https://yallabalagan.org/locations/{slug}.html"
+        SubElement(url, 'changefreq').text = 'monthly'
+        SubElement(url, 'priority').text = '0.6'
+
+    # Pretty print
+    xml_str = minidom.parseString(tostring(urlset)).toprettyxml(indent="  ")
+    return xml_str
+
 def is_event_past(event_date_str):
     """Check if event is past (event_date + 1 hour < now)"""
     from datetime import timedelta, timezone
@@ -147,7 +179,12 @@ def generate_html_files(events, locations, output_dir, templates_dir):
         (output_dir / 'mock_payment.html').write_text(html, encoding='utf-8')
         pages_generated += 1
 
-    print(f"Generated {pages_generated} HTML pages")
+    # Generate sitemap.xml
+    print("Generating sitemap.xml...")
+    sitemap = generate_sitemap(events, locations)
+    (output_dir / 'sitemap.xml').write_text(sitemap, encoding='utf-8')
+
+    print(f"Generated {pages_generated} HTML pages + sitemap.xml")
 
 def upload_to_s3(local_dir):
     """Upload generated files to S3 bucket"""
@@ -167,6 +204,10 @@ def upload_to_s3(local_dir):
                 content_type = 'text/css; charset=utf-8'
             elif file.endswith('.js'):
                 content_type = 'application/javascript; charset=utf-8'
+            elif file.endswith('.xml'):
+                content_type = 'application/xml; charset=utf-8'
+            elif file.endswith('.txt'):
+                content_type = 'text/plain; charset=utf-8'
             elif file.endswith(('.jpg', '.jpeg')):
                 content_type = 'image/jpeg'
             elif file.endswith('.png'):
@@ -217,6 +258,14 @@ def lambda_handler(event, context):
             (output_dir / 'static' / 'js').mkdir()
         else:
             shutil.copytree(static_dir, output_dir / 'static')
+
+        # Copy robots.txt if it exists
+        robots_txt = static_dir / 'robots.txt'
+        if robots_txt.exists():
+            print("Copying robots.txt...")
+            shutil.copy(robots_txt, output_dir / 'robots.txt')
+        else:
+            print("WARNING: robots.txt not found in static directory")
 
         # 3. Generate HTML
         generate_html_files(events, locations, output_dir, templates_dir)
