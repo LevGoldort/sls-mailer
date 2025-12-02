@@ -30,37 +30,8 @@
 
     <link rel="stylesheet" href="/static/css/style.css">
 
-    {% if fb_pixel_id %}
-    <!-- Facebook Pixel Code -->
-    <script>
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '{{ fb_pixel_id }}');
-    fbq('track', 'PageView');
-    </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id={{ fb_pixel_id }}&ev=PageView&noscript=1"
-    /></noscript>
-    <!-- End Facebook Pixel Code -->
-    {% endif %}
-
-    {% if ga4_id %}
-    <!-- Google Analytics 4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga4_id }}"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', '{{ ga4_id }}');
-    </script>
-    <!-- End Google Analytics 4 -->
-    {% endif %}
+    <!-- Cookie Consent Script - Loads analytics only after user consent -->
+    <script src="/static/js/cookie-consent.js"></script>
 
     <!-- Schema.org Organization -->
     <script type="application/ld+json">
@@ -112,6 +83,30 @@
             </p>
         </div>
     </footer>
+
+    <!-- Cookie Consent Banner -->
+    <div id="cookie-consent-banner" class="cookie-consent"
+         data-fb-pixel="{{ fb_pixel_id or '' }}"
+         data-ga4="{{ ga4_id or '' }}">
+        <div class="cookie-consent-content">
+            <div class="cookie-consent-text">
+                <h3>Мы используем cookies</h3>
+                <p>
+                    Этот сайт использует cookies и аналитические сервисы (Google Analytics, Facebook Pixel)
+                    для улучшения вашего опыта и анализа посещаемости.
+                    <a href="https://yallabalagan.org/privacy/" target="_blank">Подробнее</a>
+                </p>
+            </div>
+            <div class="cookie-consent-buttons">
+                <button id="cookie-accept" class="cookie-consent-btn cookie-consent-btn-accept">
+                    Принять
+                </button>
+                <button id="cookie-decline" class="cookie-consent-btn cookie-consent-btn-decline">
+                    Отклонить
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/js/main.js"></script>
     {% block extra_js %}{% endblock %}

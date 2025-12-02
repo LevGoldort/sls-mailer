@@ -159,6 +159,8 @@ def generate_footer_html():
                         <a href="/privacy">Privacy Policy</a>
                         <span class="separator">•</span>
                         <a href="/terms">Terms & Conditions</a>
+                        <span class="separator">•</span>
+                        <a href="/accessibility.html">Accessibility Statement</a>
                     </div>
                 </div>
     """
@@ -1030,21 +1032,140 @@ def generate_html(events, youtube_video=None):
     return html
 
 
-def upload_to_s3(html_content):
+def upload_to_s3(html_content, key='index.html'):
     """Загружает HTML на S3"""
     try:
         s3_client.put_object(
             Bucket=S3_BUCKET_NAME,
-            Key='index.html',
+            Key=key,
             Body=html_content.encode('utf-8'),
             ContentType='text/html; charset=utf-8',
             CacheControl='max-age=0'
         )
-        print(f"HTML uploaded to S3: {S3_BUCKET_NAME}/index.html")
+        print(f"HTML uploaded to S3: {S3_BUCKET_NAME}/{key}")
         return True
     except Exception as e:
         print(f"Error uploading to S3: {e}")
         return False
+
+
+def generate_accessibility_page():
+    """Генерирует страницу accessibility statement"""
+    footer_html = generate_footer_html()
+    footer_styles = generate_footer_styles()
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="he" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>הצהרת נגישות / Accessibility Statement | Ялла, Балаган</title>
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+                line-height: 1.6;
+                color: #1a1a1a;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                padding: 20px;
+            }}
+
+            .container {{
+                max-width: 800px;
+                margin: 40px auto;
+                background: white;
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            }}
+
+            h1 {{
+                color: #667eea;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 3px solid #667eea;
+                font-size: 2em;
+            }}
+
+            h2 {{
+                color: #764ba2;
+                margin-top: 30px;
+                margin-bottom: 15px;
+                font-size: 1.5em;
+            }}
+
+            p {{
+                margin-bottom: 15px;
+                line-height: 1.8;
+                color: #333;
+            }}
+
+            a {{
+                color: #667eea;
+                text-decoration: none;
+            }}
+
+            a:hover {{
+                text-decoration: underline;
+            }}
+
+            {footer_styles}
+
+            @media (max-width: 768px) {{
+                .container {{
+                    padding: 20px;
+                    margin: 20px auto;
+                }}
+
+                h1 {{
+                    font-size: 1.5em;
+                }}
+
+                h2 {{
+                    font-size: 1.2em;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>הצהרת נגישות / Accessibility Statement</h1>
+
+            <p>אנו ב-Yalla Balagan מחויבים לספק נגישות שווה לכל המשתמשים.</p>
+            <p>We at Yalla Balagan are committed to providing equal access to all users.</p>
+
+            <p>האתר שלנו עומד בתקן הישראלי ת"י 5568 ברמת AA והמלצות WCAG 2.0.</p>
+            <p>Our website complies with Israeli Standard IS 5568 Level AA and WCAG 2.0 guidelines.</p>
+
+            <h2>רכז נגישות / Accessibility Coordinator</h2>
+            <p>
+                שם: לב גולדורט<br>
+                Name: Lev Goldort<br>
+                דוא"ל: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a><br>
+                Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a><br>
+                טלפון: <a href="tel:{CONTACT_PHONE}">{CONTACT_PHONE}</a><br>
+                Phone: <a href="tel:{CONTACT_PHONE}">{CONTACT_PHONE}</a>
+            </p>
+
+            <p>אם נתקלתם בבעיית נגישות באתר, אנא צרו קשר ונטפל בכך.</p>
+            <p>If you encounter any accessibility issues, please contact us and we will address them.</p>
+
+            <p>עדכון אחרון: דצמבר 2025 / Last updated: December 2025</p>
+
+            {footer_html}
+        </div>
+    </body>
+    </html>
+    """
 
 
 def lambda_handler(event, context):
@@ -1074,6 +1195,11 @@ def lambda_handler(event, context):
 
         # 4. Загружаем в S3
         success = upload_to_s3(html)
+
+        # 5. Генерируем и загружаем accessibility page
+        accessibility_html = generate_accessibility_page()
+        accessibility_success = upload_to_s3(accessibility_html, 'accessibility.html')
+        print(f"Accessibility page uploaded: {accessibility_success}")
 
         if success:
             return {

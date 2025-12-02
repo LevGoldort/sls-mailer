@@ -242,6 +242,8 @@ def generate_footer_html():
             <a href="https://yallabalagan.org/privacy" target="_blank">Privacy Policy</a>
             <span class="separator">•</span>
             <a href="https://yallabalagan.org/terms" target="_blank">Terms & Conditions</a>
+            <span class="separator">•</span>
+            <a href="/accessibility.html">Accessibility Statement</a>
         </div>
     </div>
     """
@@ -3819,6 +3821,154 @@ def get_word_form(number, one, two, five):
     return five
 
 
+def generate_accessibility_page():
+    """Генерирует страницу accessibility statement"""
+    footer_html = generate_footer_html()
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="he" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>הצהרת נגישות / Accessibility Statement | Ялла, Балаган</title>
+        <link rel="icon" type="image/png" href="/favicon.png">
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+                line-height: 1.6;
+                color: #1a1a1a;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                padding: 20px;
+            }}
+
+            .container {{
+                max-width: 800px;
+                margin: 40px auto;
+                background: white;
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            }}
+
+            h1 {{
+                color: #667eea;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 3px solid #667eea;
+                font-size: 2em;
+            }}
+
+            h2 {{
+                color: #764ba2;
+                margin-top: 30px;
+                margin-bottom: 15px;
+                font-size: 1.5em;
+            }}
+
+            p {{
+                margin-bottom: 15px;
+                line-height: 1.8;
+                color: #333;
+            }}
+
+            a {{
+                color: #667eea;
+                text-decoration: none;
+            }}
+
+            a:hover {{
+                text-decoration: underline;
+            }}
+
+            .footer-contacts {{
+                margin-top: 40px;
+                padding-top: 30px;
+                border-top: 2px solid #eee;
+                text-align: center;
+            }}
+
+            .footer-contacts h3 {{
+                color: #764ba2;
+                margin-bottom: 20px;
+            }}
+
+            .contact-item {{
+                margin: 10px 0;
+                font-size: 1.1em;
+            }}
+
+            .contact-icon {{
+                margin-right: 10px;
+            }}
+
+            .footer-links {{
+                margin-top: 20px;
+                font-size: 0.9em;
+            }}
+
+            .separator {{
+                margin: 0 10px;
+                color: #999;
+            }}
+
+            @media (max-width: 768px) {{
+                .container {{
+                    padding: 20px;
+                    margin: 20px auto;
+                }}
+
+                h1 {{
+                    font-size: 1.5em;
+                }}
+
+                h2 {{
+                    font-size: 1.2em;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>הצהרת נגישות / Accessibility Statement</h1>
+
+            <p>אנו ב-Yalla Balagan מחויבים לספק נגישות שווה לכל המשתמשים.</p>
+            <p>We at Yalla Balagan are committed to providing equal access to all users.</p>
+
+            <p>האתר שלנו עומד בתקן הישראלי ת"י 5568 ברמת AA והמלצות WCAG 2.0.</p>
+            <p>Our website complies with Israeli Standard IS 5568 Level AA and WCAG 2.0 guidelines.</p>
+
+            <h2>רכז נגישות / Accessibility Coordinator</h2>
+            <p>
+                שם: לב גולדורט<br>
+                Name: Lev Goldort<br>
+                דוא"ל: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a><br>
+                Email: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a><br>
+                טלפון: <a href="tel:{CONTACT_PHONE}">{CONTACT_PHONE}</a><br>
+                Phone: <a href="tel:{CONTACT_PHONE}">{CONTACT_PHONE}</a>
+            </p>
+
+            <p>אם נתקלתם בבעיית נגישות באתר, אנא צרו קשר ונטפל בכך.</p>
+            <p>If you encounter any accessibility issues, please contact us and we will address them.</p>
+
+            <p>עדכון אחרון: דצמבר 2025 / Last updated: December 2025</p>
+
+            {footer_html}
+        </div>
+    </body>
+    </html>
+    """
+
+
 def lambda_handler(event, context):
     """Main handler"""
     print("Starting donate site generation...")
@@ -3844,6 +3994,11 @@ def lambda_handler(event, context):
         error_404_html = generate_404_page()
         upload_to_s3('404.html', error_404_html)
         print("404 page generated and uploaded")
+
+        # Генерируем страницу accessibility
+        accessibility_html = generate_accessibility_page()
+        upload_to_s3('accessibility.html', accessibility_html)
+        print("Accessibility page generated and uploaded")
 
         # Генерируем страницы талантов
         for talent in talents:
