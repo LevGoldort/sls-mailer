@@ -160,7 +160,7 @@ def generate_footer_html():
                         <span class="separator">•</span>
                         <a href="/terms">Terms & Conditions</a>
                         <span class="separator">•</span>
-                        <a href="/accessibility.html">Accessibility Statement</a>
+                        <a href="https://yallabalagan.org/accessibility.html">Accessibility Statement</a>
                     </div>
                 </div>
     """
@@ -340,7 +340,7 @@ def generate_html(events, youtube_video=None):
 
     html = f"""
     <!DOCTYPE html>
-    <html lang="ru">
+    <html lang="en" dir="ltr">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -388,6 +388,11 @@ def generate_html(events, youtube_video=None):
         <!-- End Meta Pixel Code -->
 
         <style>
+            :root {{
+                --a11y-font-scale: 1;
+                --a11y-line-height: 1.6;
+            }}
+
             * {{
                 margin: 0;
                 padding: 0;
@@ -397,7 +402,14 @@ def generate_html(events, youtube_video=None):
             body {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                 background: #f5f5f5;
-                line-height: 1.6;
+                font-size: calc(16px * var(--a11y-font-scale));
+                line-height: var(--a11y-line-height);
+            }}
+
+            .skip-link:focus {{
+                top: 0 !important;
+                outline: 3px solid #FFD700;
+                outline-offset: 2px;
             }}
 
             .top-banner {{
@@ -825,8 +837,12 @@ def generate_html(events, youtube_video=None):
                 }}
             }}
         </style>
+        <link rel="stylesheet" href="https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
+        <!-- Skip to main content link for keyboard navigation -->
+        <a href="#main-content" class="skip-link" style="position: absolute; top: -100px; left: 0; background: #6366f1; color: white; padding: 0.75rem 1.5rem; text-decoration: none; z-index: 10002; transition: top 0.2s; font-weight: 600; border-radius: 0 0 0.5rem 0;">דלג לתוכן הראשי | Skip to main content</a>
+
         <div class="top-banner"></div>
 
         <div class="donation-banner">
@@ -836,7 +852,7 @@ def generate_html(events, youtube_video=None):
             </div>
         </div>
 
-        <div class="container">
+        <div id="main-content" class="container">
             <aside class="sidebar">
                 <h2>О нас</h2>
                 <p class="description">
@@ -1025,6 +1041,7 @@ def generate_html(events, youtube_video=None):
                 document.body.removeChild(link);
             }}
         </script>
+        <script src="https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """

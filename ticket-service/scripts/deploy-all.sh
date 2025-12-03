@@ -137,10 +137,23 @@ regenerate_site() {
     rm -f /tmp/regenerate-response.json
 }
 
+# Sync static files
+sync_static_files() {
+    echo -e "${BLUE}📤 Syncing static files (CSS, JS, fonts, images)...${NC}"
+    aws s3 sync "$PROJECT_DIR/frontend/static/" "s3://$FRONTEND_BUCKET/static/" \
+        --region "$REGION" \
+        --exclude ".DS_Store" \
+        --delete
+    echo -e "${GREEN}✅ Static files synced successfully!${NC}"
+}
+
 # Deploy frontend
 deploy_frontend() {
     local skip_layers=$1
     echo -e "${GREEN}🚀 Deploying Frontend...${NC}"
+
+    # Sync static files first
+    sync_static_files
 
     # Update Lambda Layer first (unless skipping)
     if [ "$skip_layers" != "true" ]; then

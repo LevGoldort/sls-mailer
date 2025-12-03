@@ -81,9 +81,11 @@ if [ $# -eq 1 ]; then
             echo -e "${BLUE}Available functions:${NC}"
             for project in events-site donate-site newsletter; do
                 echo -e "${YELLOW}$project:${NC}"
-                for file in "$BASE_DIR/$project/lambdas"/*.py 2>/dev/null; do
-                    [ -f "$file" ] && echo "  - $(basename "${file%.py}")"
-                done
+                if [ -d "$BASE_DIR/$project/lambdas" ]; then
+                    for file in "$BASE_DIR/$project/lambdas"/*.py; do
+                        [ -f "$file" ] && echo "  - $(basename "${file%.py}")"
+                    done
+                fi
             done
             rm -rf "$TEMP_DIR"
             exit 1

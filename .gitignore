@@ -46,9 +46,17 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+.env.prod
+.env.dev
+.env.production
+.env.development
 
 # AWS
 *.zip
+
+# SAM build artifacts
+.aws-sam/
+samconfig.toml.bak
 
 # Logs
 *.log
@@ -71,6 +79,9 @@ TELEGRAM_BOT_ADMIN_DEPLOYED.md
 *_STATUS.md
 *_INFO.md
 AWS_SETUP.md
+
+# Implementation summary (contains deployment details)
+IMPLEMENTATION_SUMMARY.md
 
 # Security audit reports (may contain sensitive info)
 security_audit.md

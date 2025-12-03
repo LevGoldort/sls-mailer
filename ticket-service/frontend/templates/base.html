@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" dir="ltr">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,6 +29,7 @@
     <meta name="twitter:image" content="{% block twitter_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
 
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/accessibility-toolbar.css">
 
     <!-- Cookie Consent Script - Loads analytics only after user consent -->
     <script src="/static/js/cookie-consent.js"></script>
@@ -56,15 +57,18 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Skip to main content link for keyboard navigation -->
+    <a href="#main-content" class="skip-link">דלג לתוכן הראשי | Skip to main content</a>
+
     <header>
         <div class="container">
             <div class="header-content">
-                <a href="/" class="logo">🎭 YallaBalagan</a>
+                <a href="/" class="logo" data-critical>🎭 YallaBalagan</a>
             </div>
         </div>
     </header>
 
-    <main class="container">
+    <main id="main-content" class="container">
         {% block content %}{% endblock %}
     </main>
 
@@ -79,7 +83,7 @@
                 <span style="margin: 0 0.5rem;">•</span>
                 <a href="https://yallabalagan.org/terms/" style="color: inherit; text-decoration: underline;">Terms and Conditions</a>
                 <span style="margin: 0 0.5rem;">•</span>
-                <a href="https://yallabalagan.org/accessibility/" style="color: inherit; text-decoration: underline;">Accessibility Statement</a>
+                <a href="https://yallabalagan.org/accessibility.html" style="color: inherit; text-decoration: underline;">Accessibility Statement</a>
             </p>
         </div>
     </footer>
@@ -109,6 +113,7 @@
     </div>
 
     <script src="/static/js/main.js"></script>
+    <script src="/static/js/accessibility-toolbar.js"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
