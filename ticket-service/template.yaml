@@ -41,6 +41,12 @@ Parameters:
     Default: "738718761834602"
     Description: Facebook Pixel ID
 
+  AdminApiKeys:
+    Type: String
+    NoEcho: true
+    Default: "test,test2"
+    Description: Comma-separated list of admin API keys
+
 Globals:
   Function:
     Runtime: python3.12
@@ -52,6 +58,7 @@ Globals:
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
+        COUPONS_TABLE: !Ref CouponsTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -76,6 +83,8 @@ Resources:
           AttributeType: S
         - AttributeName: date
           AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
@@ -96,6 +105,12 @@ Resources:
               KeyType: HASH
             - AttributeName: date
               KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
           Projection:
             ProjectionType: ALL
       Tags:
@@ -178,6 +193,40 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  CouponsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-coupons-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: valid_until
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: valid_until
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   ##############################################################################
   # S3 Buckets
   ##############################################################################
@@ -218,7 +267,7 @@ Resources:
             Effect: Allow
             Principal: '*'
             Action: s3:GetObject
-            Resource: !Sub ${MediaBucket.Arn}/public/*
+            Resource: !Sub ${MediaBucket.Arn}/*
 
   FrontendBucket:
     Type: AWS::S3::Bucket
@@ -294,6 +343,7 @@ Resources:
       Environment:
         Variables:
           ALLPAY_WEBHOOK_SECRET: !Ref AllPayWebhookSecret
+          ADMIN_API_KEYS: !Ref AdminApiKeys
       Events:
         ApiEvent:
           Type: HttpApi
@@ -308,8 +358,16 @@ Resources:
             TableName: !Ref LocationsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref OrdersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CouponsTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-site-regenerator-${Environment}'
 
   # Site Regenerator
   SiteRegeneratorFunction:

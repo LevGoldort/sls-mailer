@@ -1411,7 +1411,7 @@ def handle_image_upload(event: Dict) -> Dict:
 
         # Initialize S3 client
         s3_client = boto3.client('s3', region_name='eu-north-1')
-        bucket_name = 'yallabalagan-ticket-media'
+        bucket_name = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
 
         # Upload to S3
         s3_client.put_object(
@@ -1458,9 +1458,18 @@ def handle_regenerate_site(event: Dict) -> Dict:
 
         lambda_client = boto3.client('lambda')
 
+        # Get environment to construct correct function name
+        environment = os.environ.get('ENVIRONMENT', 'prod')
+        if environment == 'prod':
+            # Prod function has no suffix
+            function_name = 'yallabalagan-site-regenerator'
+        else:
+            # Dev and other envs have suffix
+            function_name = f'yallabalagan-site-regenerator-{environment}'
+
         # Invoke site regenerator Lambda synchronously
         response = lambda_client.invoke(
-            FunctionName='yallabalagan-site-regenerator',
+            FunctionName=function_name,
             InvocationType='RequestResponse',  # Synchronous for immediate response
             Payload=json.dumps({})
         )

@@ -277,8 +277,9 @@ async function uploadToS3(file, filename) {
                         .reduce((data, byte) => data + String.fromCharCode(byte), '')
                 );
 
-                // Upload via API
-                const response = await fetch(`https://ovajavet67.execute-api.eu-north-1.amazonaws.com/api/upload-image`, {
+                // Upload via API (use API_BASE_URL from shared.js)
+                const apiBaseUrl = window.API_BASE_URL || API_BASE_URL;
+                const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
