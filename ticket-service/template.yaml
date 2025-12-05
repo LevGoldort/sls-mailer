@@ -1,0 +1,505 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: YallaBalagan Ticket Service - Serverless Infrastructure
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    Description: Environment name
+
+  # Telegram Bot Token (храните в AWS Secrets Manager или SSM Parameter Store)
+  TelegramBotToken:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Telegram Bot Token for admin bot (optional for dev)
+
+  # All-Pay Webhook Secret
+  AllPayWebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: All-Pay webhook secret for payment verification
+
+  # SES Email
+  SenderEmail:
+    Type: String
+    Description: Verified SES email for sending tickets
+    Default: tickets@yallabalagan.org
+
+  # Analytics IDs
+  GA4Id:
+    Type: String
+    Default: G-RP1612BFV9
+    Description: Google Analytics 4 Measurement ID
+
+  FBPixelId:
+    Type: String
+    Default: "738718761834602"
+    Description: Facebook Pixel ID
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        EVENTS_TABLE: !Ref EventsTable
+        LOCATIONS_TABLE: !Ref LocationsTable
+        ORDERS_TABLE: !Ref OrdersTable
+        MEDIA_BUCKET: !Ref MediaBucket
+        FRONTEND_BUCKET: !Ref FrontendBucket
+
+Resources:
+  ##############################################################################
+  # DynamoDB Tables
+  ##############################################################################
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-events-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: DateIndex
+          KeySchema:
+            - AttributeName: PK
+              KeyType: HASH
+            - AttributeName: date
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  LocationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-locations-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-orders-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: customer_email
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: EventIndex
+          KeySchema:
+            - AttributeName: event_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: customer_email
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  ##############################################################################
+  # S3 Buckets
+  ##############################################################################
+
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-ticket-media-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${MediaBucket.Arn}/public/*
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-tickets-frontend-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+
+  AdminBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-ticket-admin-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  AdminBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AdminBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${AdminBucket.Arn}/*
+
+  ##############################################################################
+  # Lambda Functions
+  ##############################################################################
+
+  # Main API Handler
+  TicketApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub yallabalagan-ticket-api-${Environment}
+      CodeUri: .
+      Handler: lambdas/api-handler.lambda_handler
+      Description: Main API handler for ticket service
+      Environment:
+        Variables:
+          ALLPAY_WEBHOOK_SECRET: !Ref AllPayWebhookSecret
+      Events:
+        ApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketApi
+            Path: /api/{proxy+}
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LocationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+        - S3CrudPolicy:
+            BucketName: !Ref MediaBucket
+
+  # Site Regenerator
+  SiteRegeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub yallabalagan-site-regenerator-${Environment}
+      CodeUri: .
+      Handler: lambdas/site-regenerator.lambda_handler
+      Description: Generates static site from DynamoDB data
+      Timeout: 60
+      Environment:
+        Variables:
+          API_URL: !Sub https://${TicketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+          S3_BUCKET: !Ref FrontendBucket
+          GA4_ID: !Ref GA4Id
+          FB_PIXEL_ID: !Ref FBPixelId
+      Layers:
+        - !Ref SiteTemplatesLayer
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocationsTable
+        - S3CrudPolicy:
+            BucketName: !Ref FrontendBucket
+      Events:
+        # Можно добавить EventBridge schedule для автоматической регенерации
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+            Enabled: false  # Включить при необходимости
+
+  # Email Sender
+  EmailSenderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub yallabalagan-email-sender-${Environment}
+      CodeUri: .
+      Handler: lambdas/email-sender.lambda_handler
+      Description: Sends ticket confirmation emails
+      MemorySize: 256
+      Environment:
+        Variables:
+          SENDER_EMAIL: !Ref SenderEmail
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocationsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref OrdersTable
+        - SESCrudPolicy:
+            IdentityName: !Ref SenderEmail
+
+  # Event Status Updater
+  EventStatusUpdaterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub yallabalagan-event-status-updater-${Environment}
+      CodeUri: .
+      Handler: lambdas/event-status-updater.lambda_handler
+      Description: Updates event status based on date/time
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(10 minutes)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+
+  # Pending Orders Cleaner
+  PendingOrdersCleanerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub yallabalagan-pending-orders-cleaner-${Environment}
+      CodeUri: .
+      Handler: lambdas/pending-orders-cleaner.lambda_handler
+      Description: Cleans up expired pending orders
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+
+  ##############################################################################
+  # Lambda Layers
+  ##############################################################################
+
+  SiteTemplatesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub yallabalagan-site-templates-${Environment}
+      Description: Jinja2 templates for site generation
+      ContentUri: frontend/
+      CompatibleRuntimes:
+        - python3.12
+
+  ##############################################################################
+  # API Gateway
+  ##############################################################################
+
+  TicketApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - '*'
+      Tags:
+        Project: YallaBalagan-TicketService
+        Environment: !Ref Environment
+
+  ##############################################################################
+  # CloudWatch Alarms (опционально)
+  ##############################################################################
+
+  ApiErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Environment}-ticket-api-errors
+      AlarmDescription: Alert when API has high error rate
+      MetricName: 5XXError
+      Namespace: AWS/ApiGateway
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref TicketApi
+
+##############################################################################
+# Outputs
+##############################################################################
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${TicketApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub ${Environment}-TicketApiUrl
+
+  FrontendUrl:
+    Description: Frontend S3 website URL
+    Value: !GetAtt FrontendBucket.WebsiteURL
+    Export:
+      Name: !Sub ${Environment}-FrontendUrl
+
+  AdminUrl:
+    Description: Admin S3 website URL
+    Value: !GetAtt AdminBucket.WebsiteURL
+    Export:
+      Name: !Sub ${Environment}-AdminUrl
+
+  EventsTableName:
+    Description: DynamoDB Events Table Name
+    Value: !Ref EventsTable
+    Export:
+      Name: !Sub ${Environment}-EventsTable
+
+  LocationsTableName:
+    Description: DynamoDB Locations Table Name
+    Value: !Ref LocationsTable
+    Export:
+      Name: !Sub ${Environment}-LocationsTable
+
+  OrdersTableName:
+    Description: DynamoDB Orders Table Name
+    Value: !Ref OrdersTable
+    Export:
+      Name: !Sub ${Environment}-OrdersTable
+
+  MediaBucketName:
+    Description: Media S3 Bucket Name
+    Value: !Ref MediaBucket
+    Export:
+      Name: !Sub ${Environment}-MediaBucket

@@ -320,9 +320,13 @@ def lambda_handler(event, context):
             return send_telegram_message(chat_id, help_text)
 
         elif text == '/refresh':
+            deleted = delete_old_events()
             success = trigger_site_regeneration()
             if success:
-                return send_telegram_message(chat_id, '✅ Сайт обновляется...')
+                msg = '✅ Сайт обновляется...'
+                if deleted:
+                    msg = f'✅ Удалено устаревших событий: {deleted}\n\n🌐 Сайт обновляется...'
+                return send_telegram_message(chat_id, msg)
             else:
                 return send_telegram_message(chat_id, '❌ Ошибка при обновлении сайта')
 

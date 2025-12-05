@@ -1,6 +1,9 @@
 # AWS SDK
 boto3==1.34.34
 
+# HTTP requests
+requests==2.31.0
+
 # Для будущих фич
 # QR code generation
 qrcode[pil]==7.4.2

@@ -1,0 +1,41 @@
+version = 0.1
+
+##############################################################################
+# PRODUCTION Environment
+##############################################################################
+[default.deploy.parameters]
+stack_name = "yallabalagan-events-site-prod"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-prod"
+s3_prefix = "yallabalagan-events-site"
+region = "eu-north-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Environment=prod"
+    # NOTE: Notion tokens, Telegram tokens нужно передать через --parameter-overrides
+    # или использовать AWS Secrets Manager / SSM Parameter Store
+]
+confirm_changeset = true
+image_repositories = []
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+##############################################################################
+# DEVELOPMENT Environment
+##############################################################################
+[dev.deploy.parameters]
+stack_name = "yallabalagan-events-site-dev"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-dev"
+s3_prefix = "yallabalagan-events-site"
+region = "eu-north-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Environment=dev"
+]
+confirm_changeset = false
+image_repositories = []
+
+[dev.build.parameters]
+cached = true
+parallel = true

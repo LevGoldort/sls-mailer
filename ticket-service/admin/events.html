@@ -363,7 +363,7 @@
         }
 
         async function deleteEvent(eventId, title) {
-            if (!confirm(`Вы уверены, что хотите удалить событие "${title}"?`)) {
+            if (!window.confirm(`Вы уверены, что хотите удалить событие "${title}"?`)) {
                 return;
             }
 

@@ -405,7 +405,7 @@
         }
 
         async function deleteCoupon(code) {
-            if (!confirm(`Удалить купон "${code}"?`)) return;
+            if (!window.confirm(`Удалить купон "${code}"?`)) return;
 
             try {
                 await API.deleteCoupon(code);

@@ -199,7 +199,7 @@
         }
 
         async function deleteLocation(locationId, name) {
-            if (!confirm(`Удалить локацию "${name}"?`)) return;
+            if (!window.confirm(`Удалить локацию "${name}"?`)) return;
 
             try {
                 await API.deleteLocation(locationId);

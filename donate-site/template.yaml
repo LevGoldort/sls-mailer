@@ -1,0 +1,302 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: YallaBalagan Donate Site - Fundraising with All-Pay integration
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    Description: Environment name
+
+  # Notion Integration (3 databases)
+  NotionToken:
+    Type: String
+    NoEcho: true
+    Description: Notion API Token
+
+  TalentsDbId:
+    Type: String
+    Description: Notion Database ID for talents
+
+  ProductsDbId:
+    Type: String
+    Description: Notion Database ID for products
+
+  ProjectsDbId:
+    Type: String
+    Description: Notion Database ID for projects
+
+  # All-Pay Payment Integration
+  AllPayWebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: All-Pay webhook secret for payment verification
+
+  # Telegram Bot
+  TelegramBotToken:
+    Type: String
+    NoEcho: true
+    Description: Telegram Bot Token for donate admin
+
+  AllowedUsers:
+    Type: String
+    Description: Comma-separated list of allowed Telegram user IDs
+    Default: ""
+
+  # Email
+  SenderEmail:
+    Type: String
+    Default: yalla@yallabalagan.org
+    Description: Verified SES email for donation receipts
+
+  AdminEmail:
+    Type: String
+    Default: yalla@yallabalagan.org
+    Description: Admin email for notifications
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        AWS_REGION: !Ref AWS::Region
+
+Resources:
+  ##############################################################################
+  # S3 Bucket for Website
+  ##############################################################################
+
+  DonateSiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-donate-site-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-DonateSite
+        - Key: Environment
+          Value: !Ref Environment
+
+  DonateSiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DonateSiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${DonateSiteBucket.Arn}/*
+
+  ##############################################################################
+  # DynamoDB для заказов/пожертвований
+  ##############################################################################
+
+  DonationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-donations-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: order_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+        - AttributeName: customer_email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: order_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: customer_email
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-DonateSite
+        - Key: Environment
+          Value: !Ref Environment
+
+  ##############################################################################
+  # Lambda Functions
+  ##############################################################################
+
+  # Site Generator - генерирует сайт из 3 Notion баз данных
+  DonateSiteGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub donate-site-generator-${Environment}
+      CodeUri: .
+      Handler: lambdas/donate-site-generator.lambda_handler
+      Description: Generates donate site from Notion databases
+      Timeout: 120
+      MemorySize: 1024
+      Environment:
+        Variables:
+          NOTION_TOKEN: !Ref NotionToken
+          TALENTS_DB_ID: !Ref TalentsDbId
+          PRODUCTS_DB_ID: !Ref ProductsDbId
+          PROJECTS_DB_ID: !Ref ProjectsDbId
+          S3_BUCKET_NAME: !Ref DonateSiteBucket
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref DonateSiteBucket
+      Events:
+        # Автоматическая регенерация каждые 2 часа
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 hours)
+            Enabled: true
+
+  # Payments Handler - обработка All-Pay webhooks
+  PaymentsHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub donate-payments-handler-${Environment}
+      CodeUri: .
+      Handler: lambdas/payments-handler.lambda_handler
+      Description: Handles All-Pay payment webhooks
+      Timeout: 30
+      Environment:
+        Variables:
+          ALLPAY_WEBHOOK_SECRET: !Ref AllPayWebhookSecret
+          NOTION_TOKEN: !Ref NotionToken
+          PRODUCTS_DB_ID: !Ref ProductsDbId
+          DYNAMODB_TABLE: !Ref DonationsTable
+          ORDER_MANAGER_LAMBDA: !Ref OrdersManagerFunction
+          SITE_GENERATOR_LAMBDA: !Ref DonateSiteGeneratorFunction
+          SENDER_EMAIL: !Ref SenderEmail
+          ADMIN_EMAIL: !Ref AdminEmail
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DonationsTable
+        - LambdaInvokePolicy:
+            FunctionName: !Ref OrdersManagerFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DonateSiteGeneratorFunction
+        - SESCrudPolicy:
+            IdentityName: !Ref SenderEmail
+      Events:
+        PaymentWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DonateApi
+            Path: /webhook/allpay
+            Method: POST
+
+  # Orders Manager - управление заказами
+  OrdersManagerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub donate-orders-manager-${Environment}
+      CodeUri: .
+      Handler: lambdas/orders-manager.lambda_handler
+      Description: Manages donation orders and inventory
+      Environment:
+        Variables:
+          NOTION_TOKEN: !Ref NotionToken
+          PRODUCTS_DB_ID: !Ref ProductsDbId
+          DYNAMODB_TABLE: !Ref DonationsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DonationsTable
+
+  # Telegram Donate Admin Bot
+  TelegramDonateAdminBotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub telegram-donate-admin-bot-${Environment}
+      CodeUri: .
+      Handler: lambdas/telegram-donate-admin-bot.lambda_handler
+      Description: Telegram bot for managing donate site
+      Environment:
+        Variables:
+          NOTION_TOKEN: !Ref NotionToken
+          TALENTS_DB_ID: !Ref TalentsDbId
+          PRODUCTS_DB_ID: !Ref ProductsDbId
+          PROJECTS_DB_ID: !Ref ProjectsDbId
+          S3_BUCKET_NAME: !Ref DonateSiteBucket
+          TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+          ALLOWED_USERS: !Ref AllowedUsers
+          SITE_GENERATOR_LAMBDA: !Ref DonateSiteGeneratorFunction
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref DonateSiteBucket
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DonateSiteGeneratorFunction
+      Events:
+        TelegramWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DonateApi
+            Path: /telegram/webhook
+            Method: POST
+
+  ##############################################################################
+  # API Gateway
+  ##############################################################################
+
+  DonateApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - '*'
+      Tags:
+        Project: YallaBalagan-DonateSite
+        Environment: !Ref Environment
+
+##############################################################################
+# Outputs
+##############################################################################
+
+Outputs:
+  WebsiteUrl:
+    Description: Donate Site S3 Website URL
+    Value: !GetAtt DonateSiteBucket.WebsiteURL
+    Export:
+      Name: !Sub ${Environment}-DonateSiteUrl
+
+  PaymentWebhookUrl:
+    Description: All-Pay Payment Webhook URL
+    Value: !Sub https://${DonateApi}.execute-api.${AWS::Region}.amazonaws.com/webhook/allpay
+    Export:
+      Name: !Sub ${Environment}-PaymentWebhookUrl
+
+  TelegramWebhookUrl:
+    Description: Telegram Webhook URL
+    Value: !Sub https://${DonateApi}.execute-api.${AWS::Region}.amazonaws.com/telegram/webhook
+    Export:
+      Name: !Sub ${Environment}-DonateTelegramWebhookUrl
+
+  DonationsTableName:
+    Description: Donations DynamoDB Table Name
+    Value: !Ref DonationsTable
+    Export:
+      Name: !Sub ${Environment}-DonationsTable

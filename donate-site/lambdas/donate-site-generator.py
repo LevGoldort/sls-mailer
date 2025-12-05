@@ -441,6 +441,7 @@ def generate_404_page():
                 }}
             }}
         </style>
+        <link rel="stylesheet" href="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
         <div class="container">
@@ -460,6 +461,7 @@ def generate_404_page():
         <footer class="site-footer">
             {footer_html}
         </footer>
+        <script src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """
@@ -1221,6 +1223,7 @@ def generate_index_page(talents, products, projects, total_raised):
                 }}
             }}
         </style>
+        <link rel="stylesheet" href="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
         <div class="top-banner"></div>
@@ -1326,6 +1329,7 @@ def generate_index_page(talents, products, projects, total_raised):
                 }});
             }}
         </script>
+        <script src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """
@@ -1837,6 +1841,7 @@ def generate_project_page(project, all_talents, all_products):
                 }}
             }}
         </style>
+        <link rel="stylesheet" href="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
         <div class="container">
@@ -1869,6 +1874,7 @@ def generate_project_page(project, all_talents, all_products):
                 {footer_html}
             </footer>
         </div>
+        <script src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """
@@ -2549,6 +2555,7 @@ def generate_talent_page(talent, all_products, all_talents):
                 color: #718096;
             }}
         </style>
+        <link rel="stylesheet" href="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
         <div class="container">
@@ -2591,6 +2598,7 @@ def generate_talent_page(talent, all_products, all_talents):
                     {footer_html}
             </footer>
         </div>
+        <script src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """
@@ -3624,6 +3632,7 @@ def generate_product_page(product, talent, all_products, all_talents):
                 initAutoSave('telegramForm', STORAGE_KEY_TELEGRAM);
             }});
         </script>
+        <link rel="stylesheet" href="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
         <div class="container">
@@ -3793,6 +3802,7 @@ def generate_product_page(product, talent, all_products, all_talents):
                 </form>
             </div>
         </div>
+        <script src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """
@@ -3936,6 +3946,7 @@ def generate_accessibility_page():
                 }}
             }}
         </style>
+        <link rel="stylesheet" href="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/css/accessibility-toolbar.css">
     </head>
     <body>
         <div class="container">
@@ -3964,6 +3975,7 @@ def generate_accessibility_page():
 
             {footer_html}
         </div>
+        <script src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/static/js/accessibility-toolbar.js"></script>
     </body>
     </html>
     """

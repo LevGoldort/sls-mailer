@@ -1,0 +1,281 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: YallaBalagan Events Site - Main website with Notion integration
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    Description: Environment name
+
+  # Notion Integration
+  NotionToken:
+    Type: String
+    NoEcho: true
+    Description: Notion API Token
+
+  NotionDatabaseId:
+    Type: String
+    Description: Notion Database ID for events
+
+  # Telegram Bot
+  TelegramBotToken:
+    Type: String
+    NoEcho: true
+    Description: Telegram Bot Token for admin
+
+  AllowedUsers:
+    Type: String
+    Description: Comma-separated list of allowed Telegram user IDs
+    Default: ""
+
+  # YouTube (optional)
+  YouTubeApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: YouTube API Key (optional)
+
+  YouTubePlaylistId:
+    Type: String
+    Default: ""
+    Description: YouTube Playlist ID (optional)
+
+  # Ticket Service Integration (если используется)
+  TicketApiUrl:
+    Type: String
+    Default: ""
+    Description: Ticket Service API URL
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 60
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        AWS_REGION: !Ref AWS::Region
+
+Resources:
+  ##############################################################################
+  # S3 Bucket for Website
+  ##############################################################################
+
+  EventsSiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-events-site-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-EventsSite
+        - Key: Environment
+          Value: !Ref Environment
+
+  EventsSiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EventsSiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${EventsSiteBucket.Arn}/*
+
+  # S3 для медиа (фото событий, артистов и т.д.)
+  EventsMediaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-events-media-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-EventsSite
+        - Key: Environment
+          Value: !Ref Environment
+
+  EventsMediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EventsMediaBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${EventsMediaBucket.Arn}/*
+
+  ##############################################################################
+  # DynamoDB для Telegram Sessions (если используется telegram bot)
+  ##############################################################################
+
+  TelegramSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub telegram-sessions-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-EventsSite
+        - Key: Environment
+          Value: !Ref Environment
+
+  ##############################################################################
+  # Lambda Functions
+  ##############################################################################
+
+  # Site Generator - генерирует HTML из Notion
+  EventsSiteGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub events-site-generator-${Environment}
+      CodeUri: .
+      Handler: lambdas/events-site-generator.lambda_handler
+      Description: Generates events site from Notion database
+      Timeout: 120
+      MemorySize: 1024
+      Environment:
+        Variables:
+          NOTION_TOKEN: !Ref NotionToken
+          NOTION_DATABASE_ID: !Ref NotionDatabaseId
+          S3_BUCKET_NAME: !Ref EventsSiteBucket
+          YOUTUBE_API_KEY: !Ref YouTubeApiKey
+          YOUTUBE_PLAYLIST_ID: !Ref YouTubePlaylistId
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref EventsSiteBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:PutObjectAcl
+              Resource: !Sub ${EventsSiteBucket.Arn}/*
+      Events:
+        # Автоматическая регенерация сайта каждый час
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+            Enabled: true
+
+  # Telegram Admin Bot
+  TelegramNotionBotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub telegram-notion-bot-${Environment}
+      CodeUri: .
+      Handler: lambdas/telegram-notion-bot.lambda_handler
+      Description: Telegram bot for managing Notion events
+      Timeout: 30
+      Environment:
+        Variables:
+          NOTION_TOKEN: !Ref NotionToken
+          NOTION_DATABASE_ID: !Ref NotionDatabaseId
+          ALLOWED_USERS: !Ref AllowedUsers
+          SITE_GENERATOR_LAMBDA: !Ref EventsSiteGeneratorFunction
+          TICKET_API_URL: !Ref TicketApiUrl
+          TELEGRAM_SESSIONS_TABLE: !Ref TelegramSessionsTable
+          TICKETS_MEDIA_BUCKET: !Ref EventsMediaBucket
+          TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TelegramSessionsTable
+        - S3CrudPolicy:
+            BucketName: !Ref EventsMediaBucket
+        - LambdaInvokePolicy:
+            FunctionName: !Ref EventsSiteGeneratorFunction
+      Events:
+        # Webhook для Telegram
+        TelegramWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EventsApi
+            Path: /telegram/webhook
+            Method: POST
+
+  ##############################################################################
+  # API Gateway
+  ##############################################################################
+
+  EventsApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - '*'
+      Tags:
+        Project: YallaBalagan-EventsSite
+        Environment: !Ref Environment
+
+##############################################################################
+# Outputs
+##############################################################################
+
+Outputs:
+  WebsiteUrl:
+    Description: Events Site S3 Website URL
+    Value: !GetAtt EventsSiteBucket.WebsiteURL
+    Export:
+      Name: !Sub ${Environment}-EventsSiteUrl
+
+  TelegramWebhookUrl:
+    Description: Telegram Webhook URL
+    Value: !Sub https://${EventsApi}.execute-api.${AWS::Region}.amazonaws.com/telegram/webhook
+    Export:
+      Name: !Sub ${Environment}-TelegramWebhookUrl
+
+  SiteGeneratorFunctionName:
+    Description: Site Generator Lambda Function Name
+    Value: !Ref EventsSiteGeneratorFunction
+    Export:
+      Name: !Sub ${Environment}-SiteGeneratorFunction
+
+  MediaBucketName:
+    Description: Events Media Bucket Name
+    Value: !Ref EventsMediaBucket
+    Export:
+      Name: !Sub ${Environment}-EventsMediaBucket

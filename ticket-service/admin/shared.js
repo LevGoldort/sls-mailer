@@ -197,9 +197,7 @@ function setLoading(element, isLoading) {
 }
 
 // ===== Confirmation Dialog =====
-function confirm(message) {
-    return window.confirm(message);
-}
+// Note: Using window.confirm directly in code instead of this wrapper to avoid recursion
 
 // ===== Navigation =====
 function navigateTo(page) {
@@ -287,11 +285,16 @@ function calculateOrdersStats(orders) {
         return { totalOrders: 0, totalTickets: 0, totalRevenue: 0 };
     }
 
-    let totalOrders = orders.length;
+    // Filter only completed orders (payment.status === 'completed')
+    const completedOrders = orders.filter(order =>
+        order.payment && order.payment.status === 'completed'
+    );
+
+    let totalOrders = completedOrders.length;
     let totalTickets = 0;
     let totalRevenue = 0;
 
-    orders.forEach(order => {
+    completedOrders.forEach(order => {
         if (order.tickets) {
             order.tickets.forEach(ticket => {
                 totalTickets += ticket.quantity || 0;

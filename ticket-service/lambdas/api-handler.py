@@ -92,6 +92,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     http_method = event.get('httpMethod', event.get('requestContext', {}).get('http', {}).get('method'))
     path = event.get('path', event.get('rawPath', ''))
 
+    # Remove stage from path for HTTP API v2.0
+    stage = event.get('requestContext', {}).get('stage')
+    if stage and path.startswith(f'/{stage}/'):
+        path = path[len(stage)+1:]  # Remove '/stage' prefix
+
     # Handle CORS preflight
     if http_method == 'OPTIONS':
         return {

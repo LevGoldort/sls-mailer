@@ -1,0 +1,411 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: YallaBalagan Newsletter System - Email marketing with SES
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    Description: Environment name
+
+  # Email Configuration
+  SenderEmail:
+    Type: String
+    Default: newsletter@yallabalagan.org
+    Description: Verified SES email for sending newsletters
+
+  # Security
+  SecretKey:
+    Type: String
+    NoEcho: true
+    Description: Secret key for HMAC tokens (unsubscribe, tracking)
+
+  # Admin Auth (simple password or can use Cognito)
+  AdminPassword:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Simple password for admin panel (optional)
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        AWS_REGION: !Ref AWS::Region
+        SECRET_KEY: !Ref SecretKey
+
+Resources:
+  ##############################################################################
+  # DynamoDB Tables
+  ##############################################################################
+
+  ContactsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-newsletter-contacts-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CreatedAtIndex
+          KeySchema:
+            - AttributeName: created_at
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-Newsletter
+        - Key: Environment
+          Value: !Ref Environment
+
+  CampaignsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-newsletter-campaigns-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: campaign_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: campaign_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CreatedAtIndex
+          KeySchema:
+            - AttributeName: created_at
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-Newsletter
+        - Key: Environment
+          Value: !Ref Environment
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-newsletter-events-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: campaign_id
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CampaignIndex
+          KeySchema:
+            - AttributeName: campaign_id
+              KeyType: HASH
+            - AttributeName: email
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-Newsletter
+        - Key: Environment
+          Value: !Ref Environment
+
+  ##############################################################################
+  # S3 Buckets
+  ##############################################################################
+
+  AdminBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-newsletter-admin-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-Newsletter
+        - Key: Environment
+          Value: !Ref Environment
+
+  AdminBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AdminBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${AdminBucket.Arn}/*
+
+  # Bucket для загрузки изображений в письма
+  ImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub yallabalagan-newsletter-images-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-Newsletter
+        - Key: Environment
+          Value: !Ref Environment
+
+  ImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ImagesBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${ImagesBucket.Arn}/*
+
+  ##############################################################################
+  # Lambda Functions
+  ##############################################################################
+
+  # Newsletter API - CRUD для кампаний и контактов
+  NewsletterApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub newsletter-api-${Environment}
+      CodeUri: .
+      Handler: lambdas/newsletter-api.lambda_handler
+      Description: REST API for newsletter admin panel
+      MemorySize: 512
+      Environment:
+        Variables:
+          CONTACTS_TABLE: !Ref ContactsTable
+          CAMPAIGNS_TABLE: !Ref CampaignsTable
+          EVENTS_TABLE: !Ref EventsTable
+          SES_FROM_EMAIL: !Ref SenderEmail
+          TRACKING_BASE_URL: !Sub https://${NewsletterApi}.execute-api.${AWS::Region}.amazonaws.com
+          SENDER_LAMBDA: !Ref NewsletterSenderFunction
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ContactsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CampaignsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NewsletterSenderFunction
+      Events:
+        ApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NewsletterApi
+            Path: /api/{proxy+}
+            Method: ANY
+
+  # Newsletter Sender - отправка писем батчами
+  NewsletterSenderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub newsletter-sender-${Environment}
+      CodeUri: .
+      Handler: lambdas/newsletter-sender.lambda_handler
+      Description: Sends newsletter emails in batches via SES
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          CONTACTS_TABLE: !Ref ContactsTable
+          CAMPAIGNS_TABLE: !Ref CampaignsTable
+          EVENTS_TABLE: !Ref EventsTable
+          SES_FROM_EMAIL: !Ref SenderEmail
+          TRACKING_BASE_URL: !Sub https://${NewsletterApi}.execute-api.${AWS::Region}.amazonaws.com
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ContactsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CampaignsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+        - SESCrudPolicy:
+            IdentityName: !Ref SenderEmail
+
+  # Newsletter Tracker - tracking открытий и кликов
+  NewsletterTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub newsletter-tracker-${Environment}
+      CodeUri: .
+      Handler: lambdas/newsletter-tracker.lambda_handler
+      Description: Tracks email opens and link clicks
+      MemorySize: 256
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        # Tracking pixel для открытий
+        TrackOpen:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NewsletterApi
+            Path: /track/open/{token}
+            Method: GET
+        # Redirect для кликов по ссылкам
+        TrackClick:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NewsletterApi
+            Path: /track/click/{token}
+            Method: GET
+
+  # Newsletter Unsubscribe Handler
+  NewsletterUnsubscribeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub newsletter-unsubscribe-handler-${Environment}
+      CodeUri: .
+      Handler: lambdas/newsletter-unsubscribe-handler.lambda_handler
+      Description: Handles newsletter unsubscribe requests
+      Environment:
+        Variables:
+          CONTACTS_TABLE: !Ref ContactsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ContactsTable
+      Events:
+        UnsubscribeGet:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NewsletterApi
+            Path: /unsubscribe
+            Method: GET
+        UnsubscribePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NewsletterApi
+            Path: /unsubscribe
+            Method: POST
+
+  # Image Upload Handler (опционально)
+  NewsletterImageUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub newsletter-image-upload-${Environment}
+      CodeUri: .
+      Handler: lambdas/newsletter-image-upload.lambda_handler
+      Description: Handles image uploads for newsletters
+      Environment:
+        Variables:
+          IMAGES_BUCKET: !Ref ImagesBucket
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref ImagesBucket
+      Events:
+        UploadImage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NewsletterApi
+            Path: /api/upload
+            Method: POST
+
+  ##############################################################################
+  # API Gateway
+  ##############################################################################
+
+  NewsletterApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - '*'
+      Tags:
+        Project: YallaBalagan-Newsletter
+        Environment: !Ref Environment
+
+##############################################################################
+# Outputs
+##############################################################################
+
+Outputs:
+  AdminUrl:
+    Description: Newsletter Admin S3 Website URL
+    Value: !GetAtt AdminBucket.WebsiteURL
+    Export:
+      Name: !Sub ${Environment}-NewsletterAdminUrl
+
+  ApiUrl:
+    Description: Newsletter API Gateway URL
+    Value: !Sub https://${NewsletterApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub ${Environment}-NewsletterApiUrl
+
+  TrackingBaseUrl:
+    Description: Tracking base URL for emails
+    Value: !Sub https://${NewsletterApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub ${Environment}-TrackingBaseUrl
+
+  ContactsTableName:
+    Description: Newsletter Contacts Table
+    Value: !Ref ContactsTable
+    Export:
+      Name: !Sub ${Environment}-NewsletterContactsTable
+
+  CampaignsTableName:
+    Description: Newsletter Campaigns Table
+    Value: !Ref CampaignsTable
+    Export:
+      Name: !Sub ${Environment}-NewsletterCampaignsTable
+
+  ImagesBucketName:
+    Description: Newsletter Images Bucket
+    Value: !Ref ImagesBucket
+    Export:
+      Name: !Sub ${Environment}-NewsletterImagesBucket

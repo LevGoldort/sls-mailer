@@ -375,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Apply coupon
 async function applyCoupon() {
     const couponInput = document.getElementById('coupon-input');
-    const couponCode = couponInput.value.trim().toUpperCase();
+    const couponCode = couponInput.value.trim();
     const applyBtn = document.getElementById('apply-coupon-btn');
     const messageDiv = document.getElementById('coupon-message');
 
