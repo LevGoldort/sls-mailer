@@ -14,7 +14,7 @@ import re
 # Add parent directory to path для импорта models и utils
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from models import Event, Location, Order, Customer, OrderTicket, TicketType, Coupon, Address, Coordinates, Parking, Media, Contact
+from models import Event, Location, Order, Customer, OrderTicket, TicketType, Coupon, Address, Coordinates, Parking, Media, Contact, SeatingMapConfig, VenueConfig
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
 from utils.auth import get_admin_authenticator
@@ -521,6 +521,44 @@ def create_location(request_event: Dict) -> Dict:
             videos=media_data.get('videos', [])
         )
 
+        # Парсим и валидируем venue_config
+        venue_config_data = body.get('venue_config', {'venue_type': 'standing'})
+        venue_type = venue_config_data.get('venue_type', 'standing')
+
+        # Валидация venue_type
+        if venue_type not in ['seated', 'standing']:
+            return error_response(400, "venue_type must be 'seated' or 'standing'")
+
+        seating_map = None
+        if venue_type == 'seated':
+            seating_map_data = venue_config_data.get('seating_map')
+            if seating_map_data:
+                # Валидация seating_map
+                rows = seating_map_data.get('rows', 0)
+                seats_per_row = seating_map_data.get('seats_per_row', 0)
+
+                if rows < 1 or rows > 30:
+                    return error_response(400, "seating_map.rows must be between 1 and 30")
+                if seats_per_row < 1 or seats_per_row > 50:
+                    return error_response(400, "seating_map.seats_per_row must be between 1 and 50")
+
+                numbering_direction = seating_map_data.get('numbering_direction', 'left-to-right')
+                if numbering_direction not in ['left-to-right', 'right-to-left']:
+                    return error_response(400, "numbering_direction must be 'left-to-right' or 'right-to-left'")
+
+                seating_map = SeatingMapConfig(
+                    rows=rows,
+                    seats_per_row=seats_per_row,
+                    disabled_seats=seating_map_data.get('disabled_seats', []),
+                    custom_numbers=seating_map_data.get('custom_numbers', {}),
+                    numbering_direction=numbering_direction
+                )
+
+        venue_config = VenueConfig(
+            venue_type=venue_type,
+            seating_map=seating_map
+        )
+
         # Создаем локацию
         location_id = Location.generate_id()
         loc = Location(
@@ -532,7 +570,8 @@ def create_location(request_event: Dict) -> Dict:
             description=body.get('description', ''),
             short_description=body.get('short_description', ''),
             parkings=parkings,
-            media=media
+            media=media,
+            venue_config=venue_config
         )
 
         # Сохраняем в DynamoDB
@@ -608,6 +647,42 @@ def update_location(location_id: str, request_event: Dict) -> Dict:
                 photos=media_data.get('photos', []),
                 videos=media_data.get('videos', [])
             )
+
+        # Обработка venue_config с проверкой immutability
+        if 'venue_config' in body:
+            venue_config_data = body['venue_config']
+            new_venue_type = venue_config_data.get('venue_type')
+
+            # IMMUTABILITY: Проверяем что venue_type не изменяется
+            if new_venue_type and new_venue_type != loc.venue_config.venue_type:
+                return error_response(400,
+                    f"Cannot change venue_type from '{loc.venue_config.venue_type}' to '{new_venue_type}'. "
+                    "Venue type is immutable after creation.")
+
+            # Разрешаем обновление seating_map для seated venues
+            if loc.venue_config.venue_type == 'seated' and 'seating_map' in venue_config_data:
+                seating_map_data = venue_config_data['seating_map']
+
+                # Валидация seating_map
+                rows = seating_map_data.get('rows', 0)
+                seats_per_row = seating_map_data.get('seats_per_row', 0)
+
+                if rows < 1 or rows > 30:
+                    return error_response(400, "seating_map.rows must be between 1 and 30")
+                if seats_per_row < 1 or seats_per_row > 50:
+                    return error_response(400, "seating_map.seats_per_row must be between 1 and 50")
+
+                numbering_direction = seating_map_data.get('numbering_direction', 'left-to-right')
+                if numbering_direction not in ['left-to-right', 'right-to-left']:
+                    return error_response(400, "numbering_direction must be 'left-to-right' or 'right-to-left'")
+
+                loc.venue_config.seating_map = SeatingMapConfig(
+                    rows=rows,
+                    seats_per_row=seats_per_row,
+                    disabled_seats=seating_map_data.get('disabled_seats', []),
+                    custom_numbers=seating_map_data.get('custom_numbers', {}),
+                    numbering_direction=numbering_direction
+                )
 
         loc.updated_at = datetime.utcnow().isoformat()
 
@@ -1507,7 +1582,7 @@ def success_response(data: Dict, status_code: int = 200) -> Dict:
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',  # CORS
-            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
             'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
         },
         'body': json.dumps(data, ensure_ascii=False, cls=DecimalEncoder)
@@ -1519,13 +1594,13 @@ def error_response(status_code: int, message: str, extra_data: Dict = None) -> D
     body_data = {'error': message}
     if extra_data:
         body_data.update(extra_data)
-    
+
     return {
         'statusCode': status_code,
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
             'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
         },
         'body': json.dumps(body_data, ensure_ascii=False, cls=DecimalEncoder)

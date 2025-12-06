@@ -70,7 +70,7 @@
             color: #333;
         }
 
-        input, textarea {
+        input, textarea, select {
             width: 100%;
             padding: 12px 15px;
             border: 1px solid #ddd;
@@ -184,6 +184,198 @@
         .btn-danger:hover {
             background: #da190b;
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .seating-map-modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 1200px;
+            width: 95%;
+            max-height: 95vh;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px;
+            margin-bottom: 0;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 32px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            line-height: 32px;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .seating-editor-container {
+            padding: 30px;
+        }
+
+        .editor-panel {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .editor-panel h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .import-divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .import-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #ddd;
+        }
+
+        .import-divider span {
+            background: #f9f9f9;
+            padding: 0 15px;
+            position: relative;
+            color: #999;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .editor-toolbar button {
+            padding: 8px 12px;
+            font-size: 13px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .editor-toolbar button:hover {
+            background: #5568d3;
+        }
+
+        .editor-toolbar button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .toolbar-divider {
+            height: 24px;
+            width: 1px;
+            background: #ddd;
+            margin: 0 5px;
+        }
+
+        .canvas-viewport {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: auto;
+            max-height: 500px;
+            position: relative;
+            cursor: grab;
+        }
+
+        .canvas-viewport:active {
+            cursor: grabbing;
+        }
+
+        /* SVG seat styles */
+        .seat {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .seat-available {
+            fill: #4caf50;
+            stroke: #2e7d32;
+            stroke-width: 1;
+        }
+
+        .seat-disabled {
+            fill: #f5f5f5;
+            stroke: #ddd;
+            stroke-width: 1;
+        }
+
+        .seat-selected {
+            fill: #667eea;
+            stroke: #5568d3;
+            stroke-width: 2;
+        }
+
+        .seat:hover:not(.seat-disabled) {
+            filter: brightness(1.1);
+        }
+
+        .seat-text {
+            font-size: 10px;
+            fill: white;
+            text-anchor: middle;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            padding: 20px 30px;
+            border-top: 1px solid #ddd;
+        }
     </style>
 </head>
 <body>
@@ -211,6 +403,24 @@
                 <div class="form-group">
                     <label for="capacity">Вместимость *</label>
                     <input type="number" id="capacity" name="capacity" required min="1" placeholder="150">
+                </div>
+
+                <div class="form-group">
+                    <label for="venue-type">Тип локации *</label>
+                    <select id="venue-type" name="venue-type" required>
+                        <option value="">Выберите тип...</option>
+                        <option value="standing">Без карты билетов (свободная рассадка)</option>
+                        <option value="seated">С картой билетов (фиксированные места)</option>
+                    </select>
+                    <div class="help-text">⚠️ Тип нельзя изменить после сохранения!</div>
+                </div>
+
+                <div class="form-group" id="seating-map-section" style="display: none;">
+                    <label>Карта мест</label>
+                    <button type="button" class="btn btn-secondary" onclick="openSeatingMapEditor()">
+                        <span id="seating-map-btn-text">Создать карту мест</span>
+                    </button>
+                    <div class="help-text" id="seating-map-summary" style="display: none;"></div>
                 </div>
 
                 <div class="form-group">
@@ -294,6 +504,8 @@
         let parkingCounter = 0;
         let imageUrls = [];
         let isEditMode = false;
+        let seatingMapConfig = null;
+        let existingVenueType = null;
 
         // Check if editing existing location
         async function checkEditMode() {
@@ -417,6 +629,32 @@
                         };
                         addParking(parkingData);
                     });
+                }
+
+                // Load venue_config
+                if (location.venue_config) {
+                    const venueTypeEl = document.getElementById('venue-type');
+                    if (venueTypeEl) {
+                        venueTypeEl.value = location.venue_config.venue_type || 'standing';
+                        existingVenueType = location.venue_config.venue_type;
+
+                        // Show seating map section if seated
+                        if (location.venue_config.venue_type === 'seated') {
+                            document.getElementById('seating-map-section').style.display = 'block';
+
+                            // Load seating map config
+                            if (location.venue_config.seating_map) {
+                                seatingMapConfig = location.venue_config.seating_map;
+                                const totalSeats = seatingMapConfig.rows * seatingMapConfig.seats_per_row
+                                                   - seatingMapConfig.disabled_seats.length;
+                                document.getElementById('seating-map-btn-text').textContent = 'Редактировать карту';
+                                document.getElementById('seating-map-summary').style.display = 'block';
+                                document.getElementById('seating-map-summary').textContent =
+                                    `${seatingMapConfig.rows} рядов × ${seatingMapConfig.seats_per_row} мест ` +
+                                    `(${seatingMapConfig.disabled_seats.length} отключено, ${totalSeats} доступно)`;
+                            }
+                        }
+                    }
                 }
 
                 showToast('Локация загружена', 'success');
@@ -559,9 +797,224 @@
             }
         }
 
+        // Seating map editor functions
+        function openSeatingMapEditor() {
+            if (seatingMapConfig) {
+                // Load existing config
+                loadSeatingMapIntoEditor(seatingMapConfig);
+            }
+            document.getElementById('seating-map-modal').classList.add('show');
+
+            // Setup event listeners after modal is shown
+            if (seatingEditor) {
+                seatingEditor.setupEventListeners();
+            }
+        }
+
+        function closeSeatingMapEditor() {
+            document.getElementById('seating-map-modal').classList.remove('show');
+        }
+
+        function generateSeatingMap() {
+            const rows = parseInt(document.getElementById('map-rows').value);
+            const seatsPerRow = parseInt(document.getElementById('map-seats-per-row').value);
+
+            // Validation
+            if (rows < 1 || rows > 30) {
+                showToast('Количество рядов: 1-30', 'error');
+                return;
+            }
+            if (seatsPerRow < 1 || seatsPerRow > 50) {
+                showToast('Мест в ряду: 1-50', 'error');
+                return;
+            }
+
+            if (typeof seatingEditor !== 'undefined' && seatingEditor) {
+                seatingEditor.generateMap(rows, seatsPerRow);
+            }
+        }
+
+        function importFromEventBuzz() {
+            const htmlInput = document.getElementById('eventbuzz-html').value.trim();
+
+            if (!htmlInput) {
+                showToast('Вставьте HTML код карты EventBuzz', 'error');
+                return;
+            }
+
+            try {
+                // Parse HTML string to DOM
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlInput, 'text/html');
+
+                // Find all circle elements
+                const circles = doc.querySelectorAll('circle[id]');
+
+                if (circles.length === 0) {
+                    showToast('Не найдено мест в HTML. Убедитесь, что вы вставили правильный HTML с картой мест.', 'error');
+                    return;
+                }
+
+                // Parse seat data from IDs (format: venueId-row-seat)
+                const existingSeatsSet = new Set(); // Track which seats exist in EventBuzz
+                const disabledSeatsSet = new Set();
+                const customNumbersMap = {}; // Store EventBuzz numbering
+                const seatMapping = new Map(); // Map EventBuzz seat number to our 0-indexed position
+                let maxRow = 0;
+                let maxSeat = 0;
+
+                circles.forEach(circle => {
+                    const id = circle.getAttribute('id');
+                    const fill = circle.getAttribute('fill');
+
+                    // Parse ID: "59a3f841a46da1119b8b4817-1-23" -> row=1, seat=23
+                    const parts = id.split('-');
+                    if (parts.length >= 3) {
+                        // Last two parts are row and seat (1-indexed in EventBuzz)
+                        const eventbuzzRow = parseInt(parts[parts.length - 2]);
+                        const eventbuzzSeat = parseInt(parts[parts.length - 1]);
+
+                        if (!isNaN(eventbuzzRow) && !isNaN(eventbuzzSeat)) {
+                            maxRow = Math.max(maxRow, eventbuzzRow);
+                            maxSeat = Math.max(maxSeat, eventbuzzSeat);
+
+                            // Convert to 0-indexed for our system
+                            const ourRow = eventbuzzRow - 1;
+                            const ourSeat = eventbuzzSeat - 1;
+                            const seatId = `${ourRow}-${ourSeat}`;
+
+                            // Mark this seat as existing
+                            existingSeatsSet.add(seatId);
+
+                            // Store the EventBuzz numbering as custom numbers
+                            customNumbersMap[seatId] = {
+                                row: eventbuzzRow,
+                                seat: eventbuzzSeat
+                            };
+
+                            // Check if seat is disabled (gray fill)
+                            if (fill && fill.toLowerCase() === 'gray') {
+                                disabledSeatsSet.add(seatId);
+                            }
+                        }
+                    }
+                });
+
+                console.log('EventBuzz Import Debug:', {
+                    totalSeats: circles.length,
+                    maxRow,
+                    maxSeat,
+                    existingSeats: existingSeatsSet.size,
+                    disabledSeats: disabledSeatsSet.size
+                });
+
+                if (maxRow === 0 || maxSeat === 0) {
+                    showToast('Не удалось определить размеры зала из HTML', 'error');
+                    return;
+                }
+
+                // Validate dimensions
+                if (maxRow > 30 || maxSeat > 50) {
+                    showToast(`Размеры зала превышают максимум: ${maxRow} рядов × ${maxSeat} мест (макс: 30×50)`, 'error');
+                    return;
+                }
+
+                // Update input fields
+                document.getElementById('map-rows').value = maxRow;
+                document.getElementById('map-seats-per-row').value = maxSeat;
+
+                // Generate the seating map
+                if (typeof seatingEditor !== 'undefined' && seatingEditor) {
+                    seatingEditor.generateMap(maxRow, maxSeat);
+
+                    // Mark all non-existing seats as disabled
+                    // Loop through entire grid and disable seats that don't exist in EventBuzz
+                    for (let row = 0; row < maxRow; row++) {
+                        for (let seat = 0; seat < maxSeat; seat++) {
+                            const seatId = `${row}-${seat}`;
+                            if (!existingSeatsSet.has(seatId)) {
+                                // This seat doesn't exist in EventBuzz, so disable it
+                                disabledSeatsSet.add(seatId);
+                            }
+                        }
+                    }
+
+                    // Apply all disabled seats (both gray ones and non-existing ones)
+                    seatingEditor.disabledSeats = disabledSeatsSet;
+
+                    // Apply EventBuzz custom numbering
+                    seatingEditor.customNumbers = customNumbersMap;
+
+                    seatingEditor.renderSeatingChart();
+
+                    const enabledSeats = existingSeatsSet.size - disabledSeatsSet.size;
+                    showToast(
+                        `✅ Импортировано из EventBuzz: ${maxRow} рядов × ${maxSeat} мест максимум (${enabledSeats} мест доступно, ${disabledSeatsSet.size} отключено)`,
+                        'success'
+                    );
+
+                    // Clear textarea
+                    document.getElementById('eventbuzz-html').value = '';
+                } else {
+                    showToast('Редактор карты не инициализирован', 'error');
+                }
+
+            } catch (error) {
+                console.error('Ошибка парсинга EventBuzz HTML:', error);
+                showToast('Ошибка при парсинге HTML. Проверьте правильность вставленного кода.', 'error');
+            }
+        }
+
+        function saveSeatingMap() {
+            if (typeof seatingEditor === 'undefined' || !seatingEditor) {
+                showToast('Редактор карты не инициализирован', 'error');
+                return;
+            }
+
+            seatingMapConfig = seatingEditor.exportConfig();
+
+            // Update UI summary
+            const totalSeats = seatingMapConfig.rows * seatingMapConfig.seats_per_row
+                               - seatingMapConfig.disabled_seats.length;
+            document.getElementById('seating-map-btn-text').textContent = 'Редактировать карту';
+            document.getElementById('seating-map-summary').style.display = 'block';
+            document.getElementById('seating-map-summary').textContent =
+                `${seatingMapConfig.rows} рядов × ${seatingMapConfig.seats_per_row} мест ` +
+                `(${seatingMapConfig.disabled_seats.length} отключено, ${totalSeats} доступно)`;
+
+            closeSeatingMapEditor();
+            showToast('Карта мест сохранена', 'success');
+        }
+
+        function loadSeatingMapIntoEditor(config) {
+            if (typeof seatingEditor !== 'undefined' && seatingEditor) {
+                seatingEditor.loadConfig(config);
+            }
+        }
+
+        // Handle venue type changes
+        function setupVenueTypeHandler() {
+            const venueTypeSelect = document.getElementById('venue-type');
+            if (venueTypeSelect) {
+                venueTypeSelect.addEventListener('change', (e) => {
+                    const isSeated = e.target.value === 'seated';
+                    document.getElementById('seating-map-section').style.display = isSeated ? 'block' : 'none';
+
+                    // If in edit mode and changing from seated to standing, warn user
+                    if (isEditMode && existingVenueType && existingVenueType !== e.target.value) {
+                        showToast('Тип локации изменить нельзя после создания!', 'error');
+                        e.target.value = existingVenueType;
+                    }
+                });
+            }
+        }
+
         async function init() {
             // Initialize image upload component
             initImageUploadComponent();
+
+            // Setup venue type handler
+            setupVenueTypeHandler();
 
             // Check if editing existing location
             await checkEditMode();
@@ -611,6 +1064,10 @@
                     media: {
                         photos: imageUrls,
                         videos: video ? [video] : []
+                    },
+                    venue_config: {
+                        venue_type: document.getElementById('venue-type').value || 'standing',
+                        seating_map: seatingMapConfig
                     }
                 };
 
@@ -635,5 +1092,106 @@
 
         init();
     </script>
+
+    <!-- Seating Map Editor Modal -->
+    <div id="seating-map-modal" class="modal">
+        <div class="modal-content seating-map-modal-content">
+            <div class="modal-header">
+                <h2>Редактор карты мест</h2>
+                <button class="close-btn" onclick="closeSeatingMapEditor()">&times;</button>
+            </div>
+
+            <div class="seating-editor-container">
+                <!-- Panel 1: Size Configuration -->
+                <div class="editor-panel">
+                    <h3>1. Размер зала</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="map-rows">Количество рядов</label>
+                            <input type="number" id="map-rows" min="1" max="30" value="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="map-seats-per-row">Мест в ряду (максимум)</label>
+                            <input type="number" id="map-seats-per-row" min="1" max="50" value="20">
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="generateSeatingMap()">Создать сетку</button>
+
+                    <div class="import-divider">
+                        <span>ИЛИ</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="eventbuzz-html">Импорт из EventBuzz</label>
+                        <textarea id="eventbuzz-html"
+                                  rows="4"
+                                  placeholder="Вставьте HTML код карты мест из EventBuzz (весь <svg>...</svg> блок)"
+                                  style="width: 100%; font-family: monospace; font-size: 11px;"></textarea>
+                        <div class="help-text">
+                            💡 Откройте карту зала на EventBuzz, скопируйте HTML элемент SVG с картой (через DevTools) и вставьте сюда
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="importFromEventBuzz()">📥 Импортировать из EventBuzz</button>
+                </div>
+
+                <!-- Panel 2: Visual Editor -->
+                <div class="editor-panel">
+                    <h3>2. Редактирование карты</h3>
+                    <div class="editor-toolbar">
+                        <button id="zoom-in-btn" onclick="seatingEditor.zoomIn()">🔍 +</button>
+                        <button id="zoom-out-btn" onclick="seatingEditor.zoomOut()">🔍 -</button>
+                        <button id="zoom-reset-btn" onclick="seatingEditor.resetZoom()">↺ Сбросить</button>
+                        <button id="undo-btn" onclick="seatingEditor.undo()" disabled>↶ Отменить</button>
+                        <button id="redo-btn" onclick="seatingEditor.redo()" disabled>↷ Повторить</button>
+                        <span class="toolbar-divider"></span>
+                        <button id="center-rows-btn" onclick="seatingEditor.centerRows()" style="background: #4CAF50;">🎯 Центрировать</button>
+                        <button id="select-row-btn" onclick="seatingEditor.selectEntireRow()" disabled>📏 Выбрать ряд</button>
+                        <button id="select-col-btn" onclick="seatingEditor.selectEntireColumn()" disabled>📐 Выбрать колонку</button>
+                        <button id="delete-selected-btn" onclick="seatingEditor.deleteSelected()" disabled style="background: #f44336;">🗑️ Удалить выбранные</button>
+                        <button id="enable-selected-btn" onclick="seatingEditor.enableSelected()" disabled style="background: #4CAF50;">↩️ Восстановить выбранные</button>
+                        <button id="clear-selection-btn" onclick="seatingEditor.clearSelection()" disabled>✕ Снять выбор</button>
+                        <button id="custom-number-btn" onclick="seatingEditor.openCustomNumberModal()" disabled>🔢 Изменить номер</button>
+                    </div>
+
+                    <!-- SVG Canvas -->
+                    <div id="seating-canvas-container" class="canvas-viewport">
+                        <svg id="seating-canvas" width="800" height="600"></svg>
+                    </div>
+
+                    <div class="help-text">
+                        💡 <strong>Выбор мест:</strong> Кликните на место для выбора, Shift+клик для множественного выбора<br>
+                        💡 <strong>Управление:</strong> Используйте кнопки выше для удаления мест или изменения номеров<br>
+                        💡 <strong>Навигация:</strong> Колесико мыши для масштабирования, перетаскивание для перемещения по карте
+                    </div>
+                </div>
+
+                <!-- Panel 3: Numbering -->
+                <div class="editor-panel">
+                    <h3>3. Нумерация</h3>
+                    <div class="form-group">
+                        <label for="numbering-direction">Направление нумерации</label>
+                        <select id="numbering-direction">
+                            <option value="left-to-right">Слева направо (→)</option>
+                            <option value="right-to-left">Справа налево (←)</option>
+                        </select>
+                        <div class="help-text">Изменение направления автоматически обновит нумерацию</div>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-secondary" onclick="seatingEditor.recalculateNumbers()" style="width: 100%;">
+                            🔄 Пересчитать номера мест
+                        </button>
+                        <div class="help-text">⚠️ Удалит все кастомные номера и пересчитает нумерацию с учетом удаленных мест</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn" onclick="closeSeatingMapEditor()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveSeatingMap()">Сохранить карту</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="seating-map-editor.js"></script>
 </body>
 </html>
