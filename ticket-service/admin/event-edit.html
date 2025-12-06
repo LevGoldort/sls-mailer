@@ -466,9 +466,10 @@
                 document.getElementById('description').value = event.description;
 
                 // Parse date and time
-                const dateTime = new Date(event.date);
-                document.getElementById('date').value = dateTime.toISOString().split('T')[0];
-                document.getElementById('time').value = dateTime.toTimeString().slice(0, 5);
+                const dateTime = event.date.replace('Z', '');  // Remove Z if present
+                const [datePart, timePart] = dateTime.split('T');
+                document.getElementById('date').value = datePart;
+                document.getElementById('time').value = timePart.slice(0, 5);
 
                 document.getElementById('location_id').value = event.location_id;
                 document.getElementById('status').value = event.status;
@@ -580,7 +581,7 @@
                 // Build event data
                 const date = document.getElementById('date').value;
                 const time = document.getElementById('time').value;
-                const dateTime = `${date}T${time}:00Z`;
+                const dateTime = `${date}T${time}:00`;  // NO Z suffix - naive datetime
 
                 const eventData = {
                     title: document.getElementById('title').value,

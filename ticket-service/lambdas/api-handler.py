@@ -784,11 +784,16 @@ def create_order(request_event: Dict) -> Dict:
 
         evt = Event.from_dynamodb_item(event_item)
 
-        # Проверяем что событие не прошло (event_date + 1 hour >= now)
-        from datetime import datetime, timedelta, timezone
-        event_dt = datetime.fromisoformat(evt.date.replace('Z', '+00:00'))
-        event_end_time = event_dt + timedelta(hours=1)
-        now = datetime.now(timezone.utc)
+        # Проверяем что событие не прошло (event_date + 30 minutes >= now)
+        from datetime import datetime, timedelta
+        import pytz
+
+        # Parse as naive datetime, then localize to Israel timezone
+        naive_dt = datetime.fromisoformat(evt.date.replace('Z', ''))
+        israel_tz = pytz.timezone('Asia/Jerusalem')
+        event_dt = israel_tz.localize(naive_dt)
+        event_end_time = event_dt + timedelta(minutes=30)  # Fixed: 30 minutes
+        now = datetime.now(israel_tz)
 
         if event_end_time <= now:
             return error_response(400, "This event has already ended. Ticket sales are closed.")

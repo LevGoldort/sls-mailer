@@ -12,8 +12,16 @@ echo "📦 Creating deployment package..."
 mkdir -p lambda-event-status-updater
 cp lambdas/event-status-updater.py lambda-event-status-updater/lambda_function.py
 
-# Install dependencies (minimal - boto3 is already available in Lambda)
-# No external dependencies needed, but we keep the parameter for consistency
+# Install dependencies
+if [ "$SKIP_DEPS" != "true" ]; then
+    echo "📥 Installing dependencies (pytz for timezone handling)..."
+    cd lambda-event-status-updater
+    pip install -q pytz -t .
+    cd ..
+else
+    echo "⚡ Skipping dependency installation"
+fi
+
 cd lambda-event-status-updater
 zip -r ../event-status-updater.zip .
 cd ..

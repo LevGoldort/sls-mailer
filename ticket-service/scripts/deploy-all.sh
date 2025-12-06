@@ -83,18 +83,41 @@ deploy_lambdas() {
 update_layer() {
     echo -e "${GREEN}🚀 Updating Lambda Layer...${NC}"
 
-    # Create and publish new layer version
-    echo -e "${BLUE}📦 Creating new layer with templates...${NC}"
-    "$SCRIPT_DIR/create-lambda-layer.sh"
+    # Create layer zip
+    echo -e "${BLUE}📦 Creating layer package...${NC}"
+    cd "$PROJECT_DIR"
+    mkdir -p lambda-layer/templates
+    mkdir -p lambda-layer/static
+    cp -r frontend/templates/* lambda-layer/templates/
+    cp -r frontend/static/* lambda-layer/static/
+    cd lambda-layer
+    zip -r ../site-templates-layer.zip . > /dev/null
+    cd ..
+    rm -rf lambda-layer
 
-    # Get latest layer version ARN
-    LAYER_ARN=$(aws lambda list-layer-versions \
+    # Publish new layer version and capture ARN
+    echo -e "${BLUE}📤 Publishing new layer version...${NC}"
+    LAYER_ARN=$(aws lambda publish-layer-version \
         --layer-name yallabalagan-site-templates \
+        --description "Jinja2 templates and static files for site generation" \
+        --zip-file fileb://site-templates-layer.zip \
+        --compatible-runtimes python3.11 python3.12 \
         --region "$REGION" \
-        --query 'LayerVersions[0].LayerVersionArn' \
+        --query 'LayerVersionArn' \
         --output text \
         --no-cli-pager)
 
+    # Cleanup
+    rm -f site-templates-layer.zip
+
+    if [ -z "$LAYER_ARN" ] || [ "$LAYER_ARN" = "None" ]; then
+        echo -e "${RED}❌ Failed to create layer!${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ Layer published: $LAYER_ARN${NC}"
+
+    # Update site-regenerator to use new layer
     echo -e "${BLUE}🔄 Updating site-regenerator to use latest layer...${NC}"
     aws lambda update-function-configuration \
         --function-name yallabalagan-site-regenerator \

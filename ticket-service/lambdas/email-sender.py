@@ -125,7 +125,9 @@ def load_email_template() -> str:
 def format_event_date(event_date: str) -> str:
     """Форматирует дату события для отображения"""
     try:
-        dt = datetime.fromisoformat(event_date.replace('Z', '+00:00'))
+        # Parse as naive datetime (already in Israel time)
+        clean_str = event_date.replace('Z', '')  # Remove Z if present
+        dt = datetime.fromisoformat(clean_str)
         # Format: "15 января 2025, 19:00"
         months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
                  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']

@@ -152,8 +152,10 @@ function formatDate(dateStr) {
 }
 
 function formatTime(dateStr) {
-    const dt = new Date(dateStr);
-    return dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
+    // Simply extract time from the ISO string (already in Israel time)
+    const cleanStr = dateStr.replace('Z', '');
+    const timePart = cleanStr.split('T')[1];
+    return timePart.slice(0, 5);  // HH:MM
 }
 
 // Load event and ticket data

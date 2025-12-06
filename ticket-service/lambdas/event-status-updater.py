@@ -15,11 +15,16 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 def is_event_past(event_date_str):
-    """Check if event is past (event_date + 1 hour < now)"""
+    """Check if event is past (event_date + 30 minutes < now)"""
     try:
-        event_dt = datetime.fromisoformat(event_date_str.replace('Z', '+00:00'))
-        event_end_time = event_dt + timedelta(hours=1)
-        now = datetime.now(timezone.utc)
+        import pytz
+
+        # Parse as naive datetime, then localize to Israel timezone
+        naive_dt = datetime.fromisoformat(event_date_str.replace('Z', ''))
+        israel_tz = pytz.timezone('Asia/Jerusalem')
+        event_dt = israel_tz.localize(naive_dt)
+        event_end_time = event_dt + timedelta(minutes=30)  # Fixed: 30 minutes
+        now = datetime.now(israel_tz)
         return event_end_time <= now
     except Exception as e:
         print(f"Error parsing date {event_date_str}: {e}")

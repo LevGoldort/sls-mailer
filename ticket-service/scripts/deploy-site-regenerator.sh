@@ -22,7 +22,7 @@ if [ "$SKIP_DEPS" = "true" ]; then
     fi
 else
     echo "📥 Installing dependencies..."
-    pip install requests jinja2 -t . --platform manylinux2014_x86_64 --only-binary=:all:
+    pip install requests jinja2 pytz -t . --platform manylinux2014_x86_64 --only-binary=:all:
     # Cache dependencies
     mkdir -p /tmp/site-regenerator-deps-cache
     rsync -a --exclude='lambda_function.py' . /tmp/site-regenerator-deps-cache/ 2>/dev/null || true

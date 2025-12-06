@@ -19,7 +19,9 @@ REGION = os.environ.get('AWS_REGION', 'eu-north-1')
 
 def format_date(date_str):
     """Format date for display"""
-    dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+    # Parse as naive datetime (already in Israel time)
+    clean_str = date_str.replace('Z', '')
+    dt = datetime.fromisoformat(clean_str)
     months = {
         1: 'января', 2: 'февраля', 3: 'марта', 4: 'апреля',
         5: 'мая', 6: 'июня', 7: 'июля', 8: 'августа',
@@ -29,7 +31,9 @@ def format_date(date_str):
 
 def format_time(date_str):
     """Format time for display"""
-    dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+    # Parse as naive datetime (already in Israel time)
+    clean_str = date_str.replace('Z', '')
+    dt = datetime.fromisoformat(clean_str)
     return dt.strftime('%H:%M')
 
 def generate_sitemap(events, locations):
@@ -72,11 +76,17 @@ def generate_sitemap(events, locations):
     return xml_str
 
 def is_event_past(event_date_str):
-    """Check if event is past (event_date + 1 hour < now)"""
-    from datetime import timedelta, timezone
-    event_dt = datetime.fromisoformat(event_date_str.replace('Z', '+00:00'))
-    event_end_time = event_dt + timedelta(hours=1)
-    now = datetime.now(timezone.utc)
+    """Check if event is past (event_date + 30 minutes < now)"""
+    import pytz
+    from datetime import timedelta
+
+    # Parse as naive datetime, then localize to Israel timezone
+    clean_str = event_date_str.replace('Z', '')
+    naive_dt = datetime.fromisoformat(clean_str)
+    israel_tz = pytz.timezone('Asia/Jerusalem')
+    event_dt = israel_tz.localize(naive_dt)
+    event_end_time = event_dt + timedelta(minutes=30)  # Fixed: 30 minutes
+    now = datetime.now(israel_tz)
     return event_end_time <= now
 
 def fetch_data():
