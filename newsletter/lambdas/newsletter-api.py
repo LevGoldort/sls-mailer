@@ -22,6 +22,7 @@ import json
 import os
 import hmac
 import hashlib
+import re
 from datetime import datetime
 from decimal import Decimal
 import boto3
@@ -388,6 +389,125 @@ def delete_campaign(event):
         return cors_response(500, {'error': str(e)})
 
 
+# Email validation regex
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
+def import_contacts(event):
+    """POST /contacts/import - Bulk import contacts with tag assignment"""
+    try:
+        body = json.loads(event['body'])
+
+        emails_raw = body.get('emails', [])
+        tags = body.get('tags', [])
+
+        # Validate inputs
+        if not emails_raw or not isinstance(emails_raw, list):
+            return cors_response(400, {'error': 'emails must be a non-empty array'})
+
+        if not tags or not isinstance(tags, list):
+            return cors_response(400, {'error': 'tags must be a non-empty array'})
+
+        # Validate and deduplicate emails
+        valid_emails = []
+        invalid_emails = []
+        seen = set()
+        duplicates = []
+
+        for email in emails_raw:
+            email = email.strip().lower()
+            if not email:
+                continue
+
+            # Check for duplicates
+            if email in seen:
+                duplicates.append(email)
+                continue
+            seen.add(email)
+
+            # Validate format
+            if EMAIL_REGEX.match(email):
+                valid_emails.append(email)
+            else:
+                invalid_emails.append(email)
+
+        # Process each valid email
+        new_count = 0
+        updated_count = 0
+        unsubscribed_count = 0
+        added_emails = []
+        updated_emails = []
+        unsubscribed_emails = []
+
+        for email in valid_emails:
+            try:
+                # Check if contact exists
+                response = contacts_table.get_item(Key={'email': email})
+                contact = response.get('Item')
+
+                if not contact:
+                    # New contact - CREATE with active status
+                    contacts_table.put_item(Item={
+                        'email': email,
+                        'name': email.split('@')[0],  # default name from email
+                        'tags': tags,
+                        'status': 'active',
+                        'created_at': int(datetime.utcnow().timestamp())
+                    })
+                    new_count += 1
+                    added_emails.append(email)
+
+                elif contact.get('status') == 'unsubscribed':
+                    # Unsubscribed - UPDATE TAGS ONLY, DO NOT change status
+                    contacts_table.update_item(
+                        Key={'email': email},
+                        UpdateExpression='SET tags = :tags',
+                        ExpressionAttributeValues={':tags': tags}
+                    )
+                    unsubscribed_count += 1
+                    unsubscribed_emails.append(email)
+
+                else:  # status == 'active'
+                    # Active - UPDATE TAGS
+                    contacts_table.update_item(
+                        Key={'email': email},
+                        UpdateExpression='SET tags = :tags',
+                        ExpressionAttributeValues={':tags': tags}
+                    )
+                    updated_count += 1
+                    updated_emails.append(email)
+
+            except Exception as e:
+                print(f"Error processing {email}: {str(e)}")
+                invalid_emails.append(email)
+
+        # Build response
+        return cors_response(200, {
+            'success': True,
+            'summary': {
+                'total_submitted': len(emails_raw),
+                'new_contacts_added': new_count,
+                'existing_active_updated': updated_count,
+                'unsubscribed_contacts': unsubscribed_count,
+                'invalid_emails': len(invalid_emails),
+                'duplicates_in_input': len(duplicates)
+            },
+            'details': {
+                'added': added_emails[:10],  # Limit to first 10 for display
+                'updated': updated_emails[:10],
+                'unsubscribed': unsubscribed_emails[:10],
+                'invalid': invalid_emails[:10],
+                'duplicates': duplicates[:10]
+            }
+        })
+
+    except Exception as e:
+        print(f"Error importing contacts: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return cors_response(500, {'error': str(e)})
+
+
 def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Event: {json.dumps(event)}")
@@ -422,6 +542,9 @@ def lambda_handler(event, context):
 
         elif method == 'GET' and path == '/contacts/preview':
             return preview_contacts(event)
+
+        elif method == 'POST' and path == '/contacts/import':
+            return import_contacts(event)
 
         elif method == 'POST' and path == '/unsubscribe':
             return unsubscribe_contact(event)

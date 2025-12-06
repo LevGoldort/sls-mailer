@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Contacts - Newsletter Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .back-btn {
+            padding: 8px 16px;
+            background: white;
+            color: #666;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-right: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #e535ab;
+        }
+
+        .form-card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .email-textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        .help-text {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .tags-section {
+            margin-bottom: 20px;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            min-height: 40px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #e535ab;
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .tag-chip .remove-btn {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 4px;
+            opacity: 0.8;
+        }
+
+        .tag-chip .remove-btn:hover {
+            opacity: 1;
+        }
+
+        .add-tag-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .add-tag-btn {
+            padding: 6px 12px;
+            background: white;
+            color: #666;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .add-tag-btn:hover {
+            background: #f5f5f5;
+            border-color: #e535ab;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: white;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-radius: 6px;
+            z-index: 1000;
+            margin-top: 5px;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .dropdown-item:hover {
+            background: #f5f5f5;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .dropdown-search {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            position: sticky;
+            top: 0;
+            background: white;
+        }
+
+        .dropdown-search input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .new-tag-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+
+        .new-tag-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .new-tag-input input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .new-tag-input button {
+            padding: 8px 16px;
+            background: #e535ab;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .new-tag-input button:hover {
+            background: #c72d94;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #e535ab;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #c72d94;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .import-results {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 30px;
+            display: none;
+        }
+
+        .import-results.show {
+            display: block;
+        }
+
+        .result-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            border-left: 4px solid #ddd;
+        }
+
+        .result-card.success { border-left-color: #00b894; }
+        .result-card.info { border-left-color: #74b9ff; }
+        .result-card.warning { border-left-color: #fdcb6e; }
+        .result-card.error { border-left-color: #d63031; }
+
+        .result-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .result-card .label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .details-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+
+        .details-section h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .email-list {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #55efc4;
+            color: #00b894;
+        }
+
+        .alert-error {
+            background: #ff7675;
+            color: white;
+        }
+
+        .alert-warning {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← Back</a>
+            <h1>Import Contacts</h1>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <div class="form-card">
+            <form id="import-form">
+                <div class="form-group">
+                    <label for="emails">Email Addresses *</label>
+                    <textarea id="emails" class="email-textarea" required
+                              placeholder="user1@example.com&#10;user2@example.com&#10;user3@example.com"></textarea>
+                    <p class="help-text">
+                        Paste one email per line. Empty lines and duplicates will be removed.
+                    </p>
+                </div>
+
+                <div class="tags-section">
+                    <label>Tags to Assign *</label>
+                    <p class="help-text">
+                        Select tags to assign to all imported contacts
+                    </p>
+
+                    <div class="tags-container" id="tags-container">
+                        <div class="add-tag-dropdown">
+                            <button type="button" class="add-tag-btn" onclick="toggleTagDropdown()">+ Add Tag</button>
+                            <div class="dropdown-content" id="tags-dropdown">
+                                <div class="dropdown-search">
+                                    <input type="text" placeholder="Search tags..." onkeyup="filterTags()" id="tag-search">
+                                </div>
+                                <div id="dropdown-items"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Tag Section -->
+                    <div class="new-tag-section">
+                        <label>Or create new tag:</label>
+                        <div class="new-tag-input">
+                            <input type="text" id="new-tag-input" placeholder="new-tag-name" maxlength="50">
+                            <button type="button" onclick="addNewTag()">Add New Tag</button>
+                        </div>
+                        <p class="help-text">
+                            Only lowercase letters, numbers, and hyphens allowed
+                        </p>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary" id="import-btn">
+                        Import Contacts
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='index.html'">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Import Results -->
+        <div class="import-results" id="import-results">
+            <h2>Import Results</h2>
+
+            <div class="result-cards">
+                <div class="result-card success">
+                    <div class="number" id="new-count">0</div>
+                    <div class="label">New Contacts Added</div>
+                </div>
+                <div class="result-card info">
+                    <div class="number" id="updated-count">0</div>
+                    <div class="label">Existing Updated</div>
+                </div>
+                <div class="result-card warning">
+                    <div class="number" id="unsubscribed-count">0</div>
+                    <div class="label">Unsubscribed (Tags Updated)</div>
+                </div>
+                <div class="result-card error">
+                    <div class="number" id="invalid-count">0</div>
+                    <div class="label">Invalid Emails</div>
+                </div>
+            </div>
+
+            <div class="details-section">
+                <h4>Details</h4>
+                <div id="details-content"></div>
+            </div>
+
+            <div class="actions" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="window.location.reload()">Import More</button>
+                <button class="btn btn-secondary" onclick="window.location.href='index.html'">Back to Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
+
+        let allTags = [];
+        let selectedTags = [];
+
+        // Load tags on page load
+        async function loadTags() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/contacts/preview`);
+                if (!response.ok) throw new Error('Failed to load tags');
+
+                const data = await response.json();
+                allTags = data.all_tags || [];
+                renderTagDropdown();
+            } catch (error) {
+                console.error('Error loading tags:', error);
+                showAlert('Failed to load tags', 'error');
+            }
+        }
+
+        // Render tag dropdown
+        function renderTagDropdown() {
+            const dropdownItems = document.getElementById('dropdown-items');
+
+            if (allTags.length === 0) {
+                dropdownItems.innerHTML = '<div style="padding: 10px; color: #999;">No tags available</div>';
+                return;
+            }
+
+            dropdownItems.innerHTML = allTags.map(tag => {
+                const isSelected = selectedTags.includes(tag);
+                return `
+                    <div class="dropdown-item ${isSelected ? 'disabled' : ''}"
+                         onclick="${isSelected ? '' : `addTag('${escapeHtml(tag)}')`}">
+                        ${escapeHtml(tag)} ${isSelected ? '(added)' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleTagDropdown() {
+            const dropdown = document.getElementById('tags-dropdown');
+            dropdown.classList.toggle('show');
+
+            // Reset search
+            document.getElementById('tag-search').value = '';
+            renderTagDropdown();
+        }
+
+        function filterTags() {
+            const searchValue = document.getElementById('tag-search').value.toLowerCase();
+            const dropdownItems = document.getElementById('dropdown-items');
+
+            const filteredTags = allTags.filter(tag => tag.toLowerCase().includes(searchValue));
+
+            dropdownItems.innerHTML = filteredTags.map(tag => {
+                const isSelected = selectedTags.includes(tag);
+                return `
+                    <div class="dropdown-item ${isSelected ? 'disabled' : ''}"
+                         onclick="${isSelected ? '' : `addTag('${escapeHtml(tag)}')`}">
+                        ${escapeHtml(tag)} ${isSelected ? '(added)' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addTag(tag) {
+            if (!selectedTags.includes(tag)) {
+                selectedTags.push(tag);
+                renderTags();
+                renderTagDropdown();
+            }
+
+            // Close dropdown
+            document.getElementById('tags-dropdown').classList.remove('show');
+        }
+
+        function removeTag(tag) {
+            const index = selectedTags.indexOf(tag);
+
+            if (index > -1) {
+                selectedTags.splice(index, 1);
+                renderTags();
+                renderTagDropdown();
+            }
+        }
+
+        function renderTags() {
+            const container = document.getElementById('tags-container');
+
+            const tagsHtml = selectedTags.map(tag => `
+                <div class="tag-chip">
+                    ${escapeHtml(tag)}
+                    <span class="remove-btn" onclick="removeTag('${escapeHtml(tag)}')">&times;</span>
+                </div>
+            `).join('');
+
+            container.innerHTML = tagsHtml + `
+                <div class="add-tag-dropdown">
+                    <button type="button" class="add-tag-btn" onclick="toggleTagDropdown()">+ Add Tag</button>
+                    <div class="dropdown-content" id="tags-dropdown">
+                        <div class="dropdown-search">
+                            <input type="text" placeholder="Search tags..." onkeyup="filterTags()" id="tag-search">
+                        </div>
+                        <div id="dropdown-items"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.matches('.add-tag-btn') &&
+                !event.target.closest('.dropdown-content')) {
+                const dropdowns = document.getElementsByClassName('dropdown-content');
+                for (let dropdown of dropdowns) {
+                    if (dropdown.classList.contains('show')) {
+                        dropdown.classList.remove('show');
+                    }
+                }
+            }
+        });
+
+        // Add new tag functionality
+        function addNewTag() {
+            const input = document.getElementById('new-tag-input');
+            const newTag = input.value.trim().toLowerCase();
+
+            if (!newTag) {
+                showAlert('Please enter a tag name', 'error');
+                return;
+            }
+
+            if (!/^[a-z0-9-]+$/.test(newTag)) {
+                showAlert('Tag must contain only lowercase letters, numbers, and hyphens', 'error');
+                return;
+            }
+
+            if (selectedTags.includes(newTag)) {
+                showAlert('Tag already selected', 'warning');
+                return;
+            }
+
+            // Add to both allTags and selectedTags
+            if (!allTags.includes(newTag)) {
+                allTags.push(newTag);
+                allTags.sort();
+            }
+
+            selectedTags.push(newTag);
+            renderTags();
+            renderTagDropdown();
+            input.value = '';
+            showAlert(`Tag "${newTag}" added!`, 'success');
+        }
+
+        // Handle form submission
+        document.getElementById('import-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const emailsText = document.getElementById('emails').value;
+            const emailsArray = emailsText
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+
+            if (emailsArray.length === 0) {
+                showAlert('Please enter at least one email address', 'error');
+                return;
+            }
+
+            if (selectedTags.length === 0) {
+                showAlert('Please select at least one tag', 'error');
+                return;
+            }
+
+            const importBtn = document.getElementById('import-btn');
+            importBtn.disabled = true;
+            importBtn.textContent = 'Importing...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/contacts/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        emails: emailsArray,
+                        tags: selectedTags
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error ${response.status}: ${errorText}`);
+                }
+
+                const result = await response.json();
+                displayResults(result);
+
+            } catch (error) {
+                console.error('Error importing contacts:', error);
+                showAlert('Failed to import contacts: ' + error.message, 'error');
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import Contacts';
+            }
+        });
+
+        // Display import results
+        function displayResults(result) {
+            const summary = result.summary;
+            const details = result.details;
+
+            // Update summary cards
+            document.getElementById('new-count').textContent = summary.new_contacts_added;
+            document.getElementById('updated-count').textContent = summary.existing_active_updated;
+            document.getElementById('unsubscribed-count').textContent = summary.unsubscribed_contacts;
+            document.getElementById('invalid-count').textContent = summary.invalid_emails;
+
+            // Build details content
+            let detailsHtml = '';
+
+            if (details.added && details.added.length > 0) {
+                detailsHtml += `<p><strong>Added:</strong><br><span class="email-list">${details.added.join(', ')}</span></p>`;
+            }
+            if (details.updated && details.updated.length > 0) {
+                detailsHtml += `<p><strong>Updated:</strong><br><span class="email-list">${details.updated.join(', ')}</span></p>`;
+            }
+            if (details.unsubscribed && details.unsubscribed.length > 0) {
+                detailsHtml += `<p><strong>Unsubscribed (tags updated, not reactivated):</strong><br><span class="email-list">${details.unsubscribed.join(', ')}</span></p>`;
+            }
+            if (details.invalid && details.invalid.length > 0) {
+                detailsHtml += `<p><strong>Invalid:</strong><br><span class="email-list">${details.invalid.join(', ')}</span></p>`;
+            }
+            if (details.duplicates && details.duplicates.length > 0) {
+                detailsHtml += `<p><strong>Duplicates removed:</strong><br><span class="email-list">${details.duplicates.join(', ')}</span></p>`;
+            }
+
+            document.getElementById('details-content').innerHTML = detailsHtml;
+
+            // Show results section
+            document.getElementById('import-results').classList.add('show');
+
+            // Scroll to results
+            document.getElementById('import-results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadTags();
+    </script>
+</body>
+</html>

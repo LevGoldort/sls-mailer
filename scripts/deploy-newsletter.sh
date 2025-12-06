@@ -78,21 +78,31 @@ deploy_lambda() {
     mkdir -p "$work_dir"
 
     # Copy the Lambda file as lambda_function.py
+    echo -e "${YELLOW}  Copying source file: $lambda_file${NC}"
     cp "$lambda_file" "$work_dir/lambda_function.py"
 
     # Create zip archive
     local zip_file="$temp_dir/${function_name}.zip"
-    (cd "$work_dir" && zip -q "$zip_file" lambda_function.py)
+    echo -e "${YELLOW}  Creating zip archive: ${function_name}.zip${NC}"
+    if ! (cd "$work_dir" && zip -q "$zip_file" lambda_function.py); then
+        echo -e "${RED}✗ Failed to create zip archive${NC}"
+        rm -rf "$temp_dir"
+        return 1
+    fi
 
     # Upload to AWS Lambda
-    if aws lambda update-function-code \
+    echo -e "${YELLOW}  Uploading to AWS Lambda...${NC}"
+
+    if output=$(aws lambda update-function-code \
         --function-name "$function_name" \
         --zip-file "fileb://$zip_file" \
         --region "$REGION" \
-        --no-cli-pager > /dev/null 2>&1; then
+        --no-cli-pager 2>&1); then
         echo -e "${GREEN}✓ Successfully deployed $function_name${NC}"
     else
         echo -e "${RED}✗ Failed to deploy $function_name${NC}"
+        echo -e "${RED}Error details:${NC}"
+        echo "$output" | sed 's/^/    /'
         rm -rf "$temp_dir"
         return 1
     fi
