@@ -848,6 +848,9 @@ def create_order(request_event: Dict) -> Dict:
         # Calculate total with discount
         total_amount = subtotal - discount_amount
 
+        # Определяем является ли заказ бесплатным (100% скидка)
+        is_free_order = (total_amount == 0)
+
         # Создаем заказ
         customer = Customer(**body['customer'])
         order = Order(
@@ -860,33 +863,107 @@ def create_order(request_event: Dict) -> Dict:
             discount_amount=discount_amount
         )
 
-        # НЕ генерируем QR коды и НЕ уменьшаем билеты до успешной оплаты!
-        # Это будет сделано в webhook handler при получении статуса 'completed'
+        if is_free_order:
+            # БЕСПЛАТНЫЙ ЗАКАЗ - финализируем сразу без платежного сервиса
+            # Обновляем статус оплаты на 'completed'
+            order.payment.status = 'completed'
+            order.payment.paid_at = datetime.utcnow().isoformat()
+            # allpay_transaction_id остается None для бесплатных заказов
 
-        # Сохраняем заказ со статусом pending
-        db.put_order(order.to_dynamodb_item())
+            print(f"Processing free order {order.order_id} with 100% discount")
 
-        # Generate payment URL via payment provider
-        payment_provider = get_payment_provider()
-        try:
-            payment_url = payment_provider.create_payment_url(
-                order_id=order.order_id,
-                amount=order.total_amount,
-                currency=order.currency,
-                email=order.customer.email,
-                event_id=event_id,
-                customer_name=order.customer.name
-            )
-        except Exception as e:
-            print(f"Failed to create payment URL: {str(e)}")
-            payment_url = f"/processing.html?order_id={order.order_id}"  # Fallback
+            try:
+                # 1. Генерируем QR коды
+                print(f"Generating QR codes for free order {order.order_id}")
+                order.generate_qr_codes()
 
-        return success_response({
-            'message': 'Order created successfully',
-            'order_id': order.order_id,
-            'order': order.to_dynamodb_item(),
-            'payment_url': payment_url
-        }, status_code=201)
+                # 2. Уменьшаем доступные билеты
+                event_data = db.get_event(order.event_id)
+                if event_data:
+                    evt = Event.from_dynamodb_item(event_data)
+
+                    for ticket in order.tickets:
+                        success = evt.decrease_available(ticket.type_id, ticket.quantity)
+                        if not success:
+                            raise Exception(f"Not enough tickets available for {ticket.type_name}")
+                        print(f"Decreased {ticket.quantity} tickets of type {ticket.type_id}")
+
+                    # Сохраняем обновленное событие
+                    db.put_event(evt.to_dynamodb_item())
+
+                # 3. Инкрементируем использование промокода
+                if order.coupon_code:
+                    coupon_data = db.get_coupon(order.coupon_code)
+                    if coupon_data:
+                        coupon = Coupon.from_dynamodb_item(coupon_data)
+                        coupon.increment_uses()
+                        db.put_coupon(coupon.to_dynamodb_item())
+                        print(f"Incremented coupon usage for {order.coupon_code}")
+
+                # 4. Сохраняем завершенный заказ с QR кодами
+                db.put_order(order.to_dynamodb_item())
+                print(f"Free order {order.order_id} completed successfully")
+
+                # 5. Триггерим email Lambda асинхронно
+                lambda_client = boto3.client('lambda')
+                lambda_client.invoke(
+                    FunctionName=os.environ.get('EMAIL_SENDER_LAMBDA', 'yallabalagan-email-sender'),
+                    InvocationType='Event',
+                    Payload=json.dumps({'order_id': order.order_id})
+                )
+                print(f"Email Lambda triggered for free order {order.order_id}")
+
+                # Возвращаем успешный ответ БЕЗ payment_url
+                return success_response({
+                    'message': 'Free order completed successfully',
+                    'order_id': order.order_id,
+                    'order': order.to_dynamodb_item(),
+                    'free_order': True  # Флаг для фронтенда
+                }, status_code=201)
+
+            except Exception as e:
+                # При ошибке логируем и возвращаем ошибку
+                print(f"Failed to process free order {order.order_id}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+                # Пытаемся удалить частично созданный заказ
+                try:
+                    db.delete_order(order.order_id)
+                except:
+                    pass
+
+                return error_response(500, f"Failed to process free order: {str(e)}")
+
+        else:
+            # ПЛАТНЫЙ ЗАКАЗ - существующая логика
+            # НЕ генерируем QR коды и НЕ уменьшаем билеты до успешной оплаты!
+            # Это будет сделано в webhook handler при получении статуса 'completed'
+
+            # Сохраняем заказ со статусом pending
+            db.put_order(order.to_dynamodb_item())
+
+            # Generate payment URL via payment provider
+            payment_provider = get_payment_provider()
+            try:
+                payment_url = payment_provider.create_payment_url(
+                    order_id=order.order_id,
+                    amount=order.total_amount,
+                    currency=order.currency,
+                    email=order.customer.email,
+                    event_id=event_id,
+                    customer_name=order.customer.name
+                )
+            except Exception as e:
+                print(f"Failed to create payment URL: {str(e)}")
+                payment_url = f"/processing.html?order_id={order.order_id}"  # Fallback
+
+            return success_response({
+                'message': 'Order created successfully',
+                'order_id': order.order_id,
+                'order': order.to_dynamodb_item(),
+                'payment_url': payment_url
+            }, status_code=201)
 
     except json.JSONDecodeError:
         return error_response(400, "Invalid JSON")

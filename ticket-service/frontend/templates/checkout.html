@@ -509,9 +509,11 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
                     window.location.href = result.payment_url;
                 }
             } else {
-                // Close the blank window if no payment needed
-                paymentWindow.close();
-                window.location.href = '/orders/' + result.order_id + '.html';
+                // Free order (100% discount) - close payment window and redirect to processing page
+                if (paymentWindow && paymentWindow !== window) {
+                    paymentWindow.close();
+                }
+                window.location.href = '/processing.html?order_id=' + result.order_id;
             }
         } else {
             // Close the blank payment window on error

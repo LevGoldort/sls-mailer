@@ -51,6 +51,41 @@ deploy_admin() {
     echo -e "${BLUE}🌐 Admin URL: http://$ADMIN_BUCKET.s3-website-$REGION.amazonaws.com/${NC}"
 }
 
+# Deploy event status updater (inline function)
+deploy_event_status_updater() {
+    local skip_deps=$1
+    local FUNCTION_NAME="yallabalagan-event-status-updater"
+
+    echo -e "${BLUE}📦 Deploying event status updater...${NC}"
+
+    # Create deployment package
+    local TEMP_DIR=$(mktemp -d)
+    cp lambdas/event-status-updater.py "$TEMP_DIR/lambda_function.py"
+
+    # Install dependencies if not skipping
+    if [ "$skip_deps" != "true" ]; then
+        cd "$TEMP_DIR"
+        pip install -q pytz -t . > /dev/null 2>&1
+        cd - > /dev/null
+    fi
+
+    # Create zip
+    cd "$TEMP_DIR"
+    local ZIP_FILE="$TEMP_DIR/deployment.zip"
+    zip -rq "$ZIP_FILE" .
+    cd - > /dev/null
+
+    # Update function
+    aws lambda update-function-code \
+        --function-name "$FUNCTION_NAME" \
+        --zip-file "fileb://$ZIP_FILE" \
+        --region "$REGION" \
+        --no-cli-pager > /dev/null
+
+    # Cleanup
+    rm -rf "$TEMP_DIR"
+}
+
 # Deploy lambdas
 deploy_lambdas() {
     local skip_deps=$1
@@ -72,9 +107,8 @@ deploy_lambdas() {
     echo -e "${BLUE}📦 Deploying email sender...${NC}"
     "$SCRIPT_DIR/deploy-email-sender.sh" "$skip_deps"
 
-    # Deploy event status updater
-    echo -e "${BLUE}📦 Deploying event status updater...${NC}"
-    "$SCRIPT_DIR/deploy-event-status-updater.sh" "$skip_deps"
+    # Deploy event status updater (inline)
+    deploy_event_status_updater "$skip_deps"
 
     echo -e "${GREEN}✅ All Lambda functions deployed successfully!${NC}"
 }
