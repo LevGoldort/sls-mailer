@@ -152,6 +152,26 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
     if method == 'POST' and path == '/api/events':
         return create_event(event)
 
+    # GET /api/events/{id}/purchased-seats - получить проданные места
+    if method == 'GET' and path.endswith('/purchased-seats'):
+        event_id = path.split('/')[-2]
+        return get_purchased_seats(event_id)
+
+    # GET /api/events/{id}/seating-map - получить карту мест
+    if method == 'GET' and path.endswith('/seating-map'):
+        event_id = path.split('/')[-2]
+        return get_seating_map(event_id)
+
+    # GET /api/events/{id}/seat-availability - получить доступность мест
+    if method == 'GET' and path.endswith('/seat-availability'):
+        event_id = path.split('/')[-2]
+        return get_seat_availability(event_id)
+
+    # POST /api/events/{id}/seat-allocation - сохранить распределение мест (admin)
+    if method == 'POST' and path.endswith('/seat-allocation'):
+        event_id = path.split('/')[-2]
+        return save_seat_allocation(event_id, event)
+
     # GET /api/events/{id} - детали события
     if method == 'GET' and path.startswith('/api/events/'):
         event_id = path.split('/')[-1]
@@ -230,6 +250,205 @@ def get_event_by_slug(slug: str) -> Dict:
     })
 
 
+def get_purchased_seats(event_id: str) -> Dict:
+    """
+    GET /api/events/{event_id}/purchased-seats
+    Returns all purchased seats for an event with their ticket types
+    Used by admin editor to lock sold seats
+    """
+    try:
+        # Get all orders for this event
+        orders = db.get_orders_by_event(event_id)
+
+        purchased_seats = {}
+        counts_by_type = {}
+
+        for order in orders:
+            payment_status = order.get('payment', {}).get('status', '')
+
+            # Only include completed and pending orders (pending = reserved)
+            if payment_status not in ['completed', 'pending']:
+                continue
+
+            for ticket in order.get('tickets', []):
+                ticket_type_id = ticket.get('type_id')
+                seats = ticket.get('purchased_seats', [])
+
+                for seat_id in seats:
+                    purchased_seats[seat_id] = {
+                        'ticket_type_id': ticket_type_id,
+                        'order_id': order.get('order_id'),
+                        'status': payment_status
+                    }
+
+                # Count tickets by type
+                if seats:  # Only count if seats are specified
+                    counts_by_type[ticket_type_id] = counts_by_type.get(ticket_type_id, 0) + len(seats)
+
+        return success_response({
+            'event_id': event_id,
+            'purchased_seats': purchased_seats,
+            'counts_by_type': counts_by_type
+        })
+
+    except Exception as e:
+        print(f"Error getting purchased seats for event {event_id}")
+        return error_response(500, str(e))
+
+
+def get_seating_map(event_id: str) -> Dict:
+    """
+    GET /api/events/{event_id}/seating-map
+    Returns the seating map configuration for the event's location
+    """
+    try:
+        # Get event
+        event_item = db.get_event(event_id)
+        if not event_item:
+            return error_response(404, "Event not found")
+
+        evt = Event.from_dynamodb_item(event_item)
+
+        # Get location
+        location_item = db.get_location(evt.location_id)
+        if not location_item:
+            return error_response(404, "Location not found")
+
+        location = Location.from_dynamodb_item(location_item)
+
+        # Return seating map
+        if location.venue_config.venue_type != 'seated':
+            return success_response({
+                'event_id': event_id,
+                'venue_type': 'standing',
+                'seating_map': None
+            })
+
+        seating_map = location.venue_config.seating_map.to_dict() if location.venue_config.seating_map else None
+
+        return success_response({
+            'event_id': event_id,
+            'venue_type': 'seated',
+            'seating_map': seating_map
+        })
+
+    except Exception as e:
+        print(f"Error getting seating map for event {event_id}: {str(e)}")
+        return error_response(500, str(e))
+
+
+def get_seat_availability(event_id: str) -> Dict:
+    """
+    GET /api/events/{event_id}/seat-availability
+    Returns seat allocation, purchased seats, and reserved seats for an event
+    """
+    try:
+        # Get event
+        event_item = db.get_event(event_id)
+        if not event_item:
+            return error_response(404, "Event not found")
+
+        evt = Event.from_dynamodb_item(event_item)
+
+        # Get purchased seats
+        purchased_seats_data = get_purchased_seats_dict(event_id)
+        purchased_seat_ids = list(purchased_seats_data.keys())
+
+        # Get reserved seats
+        reservations = db.get_seat_reservations(event_id)
+        reserved_seats = [{'seat_id': r['seat_id'], 'session_id': r['session_id'], 'expires_at': r['expires_at']} for r in reservations]
+        reserved_seat_ids = [r['seat_id'] for r in reservations]
+
+        return success_response({
+            'event_id': event_id,
+            'seat_allocation': evt.seat_allocation or {},
+            'purchased_seats': purchased_seat_ids,
+            'reserved_seats': reserved_seat_ids,
+            'reserved_seats_details': reserved_seats
+        })
+
+    except Exception as e:
+        print(f"Error getting seat availability for event {event_id}: {str(e)}")
+        return error_response(500, str(e))
+
+
+def save_seat_allocation(event_id: str, request_event: Dict) -> Dict:
+    """
+    ADMIN ONLY - POST /api/events/{event_id}/seat-allocation
+    Saves seat allocation for an event with validation against sold seats
+    """
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_seat_allocation_save', {
+            'event_id': event_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        # Get event
+        event_item = db.get_event(event_id)
+        if not event_item:
+            return error_response(404, "Event not found")
+
+        evt = Event.from_dynamodb_item(event_item)
+
+        # Parse body
+        body_str = request_event.get('body') or '{}'
+        body = json.loads(body_str)
+        seat_allocation = body.get('seat_allocation', {})
+
+        if not seat_allocation:
+            return error_response(400, "seat_allocation is required")
+
+        # Get locked (purchased) seats
+        purchased_seats_data = get_purchased_seats_dict(event_id)
+
+        # Validate that purchased seats haven't changed allocation
+        if evt.seat_allocation:
+            for seat_id, details in purchased_seats_data.items():
+                old_type = evt.seat_allocation.get(seat_id)
+                new_type = seat_allocation.get(seat_id)
+
+                if old_type != new_type:
+                    return error_response(400,
+                        f"Cannot modify seat {seat_id} - already sold to ticket type {old_type}")
+
+        # Count seats per ticket type
+        allocation_counts = {}
+        for seat_id, ticket_type_id in seat_allocation.items():
+            allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
+
+        # Validate against ticket type totals
+        for tt in evt.ticket_types:
+            allocated = allocation_counts.get(tt.id, 0)
+            if allocated > tt.total:
+                return error_response(400,
+                    f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
+
+        # Update event
+        evt.seat_allocation = seat_allocation
+        evt.updated_at = datetime.utcnow().isoformat()
+        db.put_event(evt.to_dynamodb_item())
+
+        return success_response({
+            'message': 'Seat allocation saved successfully',
+            'event_id': event_id,
+            'seat_allocation': seat_allocation
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON")
+    except Exception as e:
+        print(f"Error saving seat allocation for event {event_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, str(e))
+
+
 def create_event(request_event: Dict) -> Dict:
     """ADMIN ONLY - POST /api/events"""
 
@@ -271,6 +490,23 @@ def create_event(request_event: Dict) -> Dict:
             except ValueError as exc:
                 return error_response(400, str(exc))
 
+        # Валидация seat_allocation (опционально)
+        seat_allocation = None
+        if body.get('seat_allocation'):
+            seat_allocation = body['seat_allocation']
+
+            # Подсчитываем места для каждого типа билета
+            allocation_counts = {}
+            for seat_id, ticket_type_id in seat_allocation.items():
+                allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
+
+            # Проверяем что количество не превышает total для каждого типа
+            for tt in ticket_types:
+                allocated = allocation_counts.get(tt.id, 0)
+                if allocated > tt.total:
+                    return error_response(400,
+                        f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
+
         # Создаем событие
         event_id = Event.generate_id()
         evt = Event(
@@ -282,7 +518,8 @@ def create_event(request_event: Dict) -> Dict:
             ticket_types=ticket_types,
             currency=body.get('currency', 'ILS'),
             images=body.get('images', []),
-            slug=slug_value
+            slug=slug_value,
+            seat_allocation=seat_allocation
         )
 
         # Сохраняем в DynamoDB
@@ -298,6 +535,40 @@ def create_event(request_event: Dict) -> Dict:
         return error_response(400, "Invalid JSON")
     except Exception as e:
         return error_response(500, f"Failed to create event: {str(e)}")
+
+
+def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
+    """
+    Helper function: Returns {seat_id: {ticket_type_id, order_id, status}}
+    for all purchased seats in an event
+    """
+    orders = db.get_orders_by_event(event_id)
+    purchased = {}
+
+    for order in orders:
+        if order.get('payment', {}).get('status') in ['completed', 'pending']:
+            for ticket in order.get('tickets', []):
+                for seat_id in ticket.get('purchased_seats', []):
+                    purchased[seat_id] = {
+                        'ticket_type_id': ticket['type_id'],
+                        'order_id': order.get('order_id'),
+                        'status': order.get('payment', {}).get('status')
+                    }
+
+    return purchased
+
+
+def get_purchased_seats_set(event_id: str) -> set:
+    """Helper function: Returns set of all purchased seat IDs for an event"""
+    orders = db.get_orders_by_event(event_id)
+    purchased = set()
+
+    for order in orders:
+        if order.get('payment', {}).get('status') in ['completed', 'pending']:
+            for ticket in order.get('tickets', []):
+                purchased.update(ticket.get('purchased_seats', []))
+
+    return purchased
 
 
 def update_event(event_id: str, request_event: Dict) -> Dict:
@@ -352,6 +623,24 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
         if 'status' in body:
             evt.status = body['status']
         if 'ticket_types' in body:
+            # NEW: Validate ticket type deletions - prevent deletion of types with sales
+            new_type_ids = {tt['id'] for tt in body['ticket_types']}
+            old_type_ids = {tt.id for tt in evt.ticket_types}
+            deleted_type_ids = old_type_ids - new_type_ids
+
+            if deleted_type_ids:
+                # Check if deleted types have sales
+                orders = db.get_orders_by_event(event_id)
+                for order in orders:
+                    if order.get('payment', {}).get('status') in ['completed', 'pending']:
+                        for ticket in order.get('tickets', []):
+                            if ticket['type_id'] in deleted_type_ids:
+                                # Find ticket type name
+                                tt = next((t for t in evt.ticket_types if t.id == ticket['type_id']), None)
+                                type_name = tt.name if tt else ticket['type_id']
+                                return error_response(400,
+                                    f"Cannot delete ticket type '{type_name}' - it has sold tickets")
+
             # Обновляем типы билетов
             ticket_types = []
             for tt in body['ticket_types']:
@@ -363,6 +652,40 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
                     available=tt.get('available', tt['total'])
                 ))
             evt.ticket_types = ticket_types
+
+        # Валидация seat_allocation при обновлении
+        if 'seat_allocation' in body:
+            seat_allocation = body['seat_allocation']
+
+            if seat_allocation:
+                # NEW: Validate that purchased seats haven't changed allocation
+                if evt.seat_allocation:  # Only validate if event already had seat allocation
+                    purchased_seats_data = get_purchased_seats_dict(event_id)
+
+                    for seat_id, details in purchased_seats_data.items():
+                        old_type = evt.seat_allocation.get(seat_id)
+                        new_type = seat_allocation.get(seat_id)
+
+                        if old_type != new_type:
+                            return error_response(400,
+                                f"Cannot change allocation for seat {seat_id} - "
+                                f"already sold to ticket type {old_type}")
+
+                # Подсчитываем места для каждого типа билета
+                allocation_counts = {}
+                for seat_id, ticket_type_id in seat_allocation.items():
+                    allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
+
+                # Проверяем против обновлённых типов билетов
+                types_to_validate = evt.ticket_types
+
+                for tt in types_to_validate:
+                    allocated = allocation_counts.get(tt.id, 0)
+                    if allocated > tt.total:
+                        return error_response(400,
+                            f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
+
+            evt.seat_allocation = seat_allocation
 
         evt.updated_at = datetime.utcnow().isoformat()
 
@@ -744,6 +1067,14 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     if method == 'POST' and path == '/api/orders':
         return create_order(event)
 
+    # POST /api/orders/reserve-seats - резервировать места
+    if method == 'POST' and path == '/api/orders/reserve-seats':
+        return reserve_seats(event)
+
+    # POST /api/orders/release-seats - освободить резервации
+    if method == 'POST' and path == '/api/orders/release-seats':
+        return release_seats(event)
+
     # GET /api/orders/verify/{ticket_code} - проверить билет
     if method == 'GET' and path.startswith('/api/orders/verify/'):
         ticket_code = path.split('/')[-1]
@@ -873,6 +1204,7 @@ def create_order(request_event: Dict) -> Dict:
         for ticket_req in body['tickets']:
             type_id = ticket_req['type_id']
             quantity = ticket_req['quantity']
+            purchased_seats = ticket_req.get('purchased_seats')
 
             ticket_type = evt.get_ticket_type(type_id)
             if not ticket_type:
@@ -885,8 +1217,42 @@ def create_order(request_event: Dict) -> Dict:
                 type_id=type_id,
                 type_name=ticket_type.name,
                 quantity=quantity,
-                price_per_ticket=ticket_type.price
+                price_per_ticket=ticket_type.price,
+                purchased_seats=purchased_seats
             ))
+
+        # NEW: Validate seat allocation for seated events
+        if evt.seat_allocation:
+            # This is a seated event - validate purchased_seats
+            for ticket in order_tickets:
+                if not ticket.purchased_seats:
+                    return error_response(400,
+                        "Seated events require 'purchased_seats' for all tickets")
+
+                if len(ticket.purchased_seats) != ticket.quantity:
+                    return error_response(400,
+                        f"purchased_seats length ({len(ticket.purchased_seats)}) "
+                        f"must match quantity ({ticket.quantity})")
+
+                # Validate seats match ticket type in event allocation
+                for seat_id in ticket.purchased_seats:
+                    if seat_id not in evt.seat_allocation:
+                        return error_response(400,
+                            f"Seat {seat_id} does not exist in venue")
+
+                    expected_type = evt.seat_allocation[seat_id]
+                    if expected_type != ticket.type_id:
+                        return error_response(400,
+                            f"Seat {seat_id} is allocated to ticket type {expected_type}, "
+                            f"not {ticket.type_id}")
+
+            # Check for seat conflicts with existing orders
+            existing_purchased = get_purchased_seats_set(event_id)
+            for ticket in order_tickets:
+                for seat_id in ticket.purchased_seats:
+                    if seat_id in existing_purchased:
+                        return error_response(400,
+                            f"Seat {seat_id} is already reserved")
 
         # Calculate subtotal
         subtotal = sum(t.get_total() for t in order_tickets)
@@ -964,6 +1330,124 @@ def create_order(request_event: Dict) -> Dict:
         import traceback
         traceback.print_exc()
         return error_response(500, f"Failed to create order: {str(e)}")
+
+
+def reserve_seats(request_event: Dict) -> Dict:
+    """
+    POST /api/orders/reserve-seats
+    Temporarily reserves seats for a customer session (10 minutes TTL)
+    Uses optimistic locking to prevent race conditions
+    """
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+
+        # Validate required fields
+        required = ['event_id', 'seat_ids', 'session_id']
+        for field in required:
+            if field not in body:
+                return error_response(400, f"Missing required field: {field}")
+
+        event_id = body['event_id']
+        seat_ids = body['seat_ids']
+        session_id = body['session_id']
+
+        if not isinstance(seat_ids, list) or len(seat_ids) == 0:
+            return error_response(400, "seat_ids must be a non-empty array")
+
+        # Get event
+        event_item = db.get_event(event_id)
+        if not event_item:
+            return error_response(404, "Event not found")
+
+        evt = Event.from_dynamodb_item(event_item)
+
+        # Check that seats exist in allocation
+        if evt.seat_allocation:
+            for seat_id in seat_ids:
+                if seat_id not in evt.seat_allocation:
+                    return error_response(400, f"Seat {seat_id} does not exist in venue")
+
+        # Check that seats are not already purchased
+        purchased_seats = get_purchased_seats_set(event_id)
+        for seat_id in seat_ids:
+            if seat_id in purchased_seats:
+                return error_response(400, f"Seat {seat_id} is already purchased")
+
+        # Try to reserve seats with optimistic locking
+        import time
+        timestamp = int(time.time())
+        ttl = timestamp + 600  # 10 minutes
+
+        reserved_seats = []
+        failed_seat = None
+
+        for seat_id in seat_ids:
+            success = db.reserve_seat(event_id, seat_id, session_id, ttl)
+            if success:
+                reserved_seats.append(seat_id)
+            else:
+                failed_seat = seat_id
+                break
+
+        # If any reservation failed, rollback all reservations
+        if failed_seat:
+            db.release_seats(event_id, reserved_seats, session_id)
+            return error_response(409, f"Seat {failed_seat} is already reserved")
+
+        return success_response({
+            'message': 'Seats reserved successfully',
+            'event_id': event_id,
+            'seat_ids': seat_ids,
+            'session_id': session_id,
+            'reserved_until': ttl,
+            'expires_in_seconds': 600
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to reserve seats: {str(e)}")
+
+
+def release_seats(request_event: Dict) -> Dict:
+    """
+    POST /api/orders/release-seats
+    Releases temporary seat reservations for a session
+    """
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+
+        # Validate required fields
+        required = ['event_id', 'seat_ids', 'session_id']
+        for field in required:
+            if field not in body:
+                return error_response(400, f"Missing required field: {field}")
+
+        event_id = body['event_id']
+        seat_ids = body['seat_ids']
+        session_id = body['session_id']
+
+        if not isinstance(seat_ids, list):
+            return error_response(400, "seat_ids must be an array")
+
+        # Release seats
+        released_count = db.release_seats(event_id, seat_ids, session_id)
+
+        return success_response({
+            'message': 'Seats released successfully',
+            'event_id': event_id,
+            'released_count': released_count,
+            'total_requested': len(seat_ids)
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to release seats: {str(e)}")
 
 
 def get_order(order_id: str) -> Dict:

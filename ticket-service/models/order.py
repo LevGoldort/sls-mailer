@@ -25,6 +25,7 @@ class OrderTicket:
     type_name: str
     quantity: int
     price_per_ticket: float
+    purchased_seats: Optional[List[str]] = None  # NEW: ["0-5", "0-6"] for seated events
 
     def get_total(self) -> float:
         # Convert to float to handle Decimal types from DynamoDB
@@ -32,12 +33,15 @@ class OrderTicket:
 
     def to_dict(self):
         from decimal import Decimal
-        return {
+        result = {
             'type_id': self.type_id,
             'type_name': self.type_name,
             'quantity': self.quantity,
             'price_per_ticket': Decimal(str(self.price_per_ticket))
         }
+        if self.purchased_seats:  # Only include if present
+            result['purchased_seats'] = self.purchased_seats
+        return result
 
 
 @dataclass
@@ -194,7 +198,16 @@ class Order:
         """Создает объект из DynamoDB item"""
         customer = Customer(**item["customer"])
 
-        tickets = [OrderTicket(**t) for t in item["tickets"]]
+        tickets = [
+            OrderTicket(
+                type_id=t['type_id'],
+                type_name=t['type_name'],
+                quantity=t['quantity'],
+                price_per_ticket=t['price_per_ticket'],
+                purchased_seats=t.get('purchased_seats')  # Backward compatible
+            )
+            for t in item["tickets"]
+        ]
 
         payment_data = item["payment"]
         refund = None

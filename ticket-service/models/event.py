@@ -56,6 +56,7 @@ class Event:
     recurrence: Optional[Recurrence] = None
     refund_policy: RefundPolicy = field(default_factory=lambda: RefundPolicy())
     slug: Optional[str] = None  # Короткий URL /events/<slug>.html
+    seat_allocation: Optional[Dict[str, str]] = None  # {"0-5": "tt-xxx", ...} - распределение мест по типам билетов
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -90,6 +91,9 @@ class Event:
         if self.slug:
             item["slug"] = self.slug
 
+        if self.seat_allocation:
+            item["seat_allocation"] = self.seat_allocation
+
         return item
 
     @classmethod
@@ -122,6 +126,7 @@ class Event:
             recurrence=recurrence,
             refund_policy=refund_policy,
             slug=item.get("slug"),
+            seat_allocation=item.get("seat_allocation"),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )

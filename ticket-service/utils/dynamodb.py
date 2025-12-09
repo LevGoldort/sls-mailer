@@ -16,11 +16,13 @@ class DynamoDBClient:
         self.locations_table_name = os.environ.get('LOCATIONS_TABLE', 'yallabalagan-locations')
         self.orders_table_name = os.environ.get('ORDERS_TABLE', 'yallabalagan-orders')
         self.coupons_table_name = os.environ.get('COUPONS_TABLE', 'yallabalagan-coupons')
+        self.seat_reservations_table_name = os.environ.get('SEAT_RESERVATIONS_TABLE', 'yallabalagan-seat-reservations')
 
         self.events_table = self.dynamodb.Table(self.events_table_name)
         self.locations_table = self.dynamodb.Table(self.locations_table_name)
         self.orders_table = self.dynamodb.Table(self.orders_table_name)
         self.coupons_table = self.dynamodb.Table(self.coupons_table_name)
+        self.seat_reservations_table = self.dynamodb.Table(self.seat_reservations_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -362,3 +364,94 @@ class DynamoDBClient:
                 ':now': datetime.utcnow().isoformat()
             }
         )
+
+    # ===== Seat Reservations =====
+    def get_seat_reservations(self, event_id: str) -> List[Dict]:
+        """Получает все активные резервации для события"""
+        import time
+        current_time = int(time.time())
+
+        response = self.seat_reservations_table.query(
+            KeyConditionExpression='event_id = :event_id',
+            FilterExpression='expires_at > :now',
+            ExpressionAttributeValues={
+                ':event_id': event_id,
+                ':now': current_time
+            }
+        )
+        return response.get('Items', [])
+
+    def reserve_seat(self, event_id: str, seat_id: str, session_id: str, expires_at: int) -> bool:
+        """
+        Резервирует место с optimistic locking.
+        Возвращает True если резервация успешна, False если место уже зарезервировано.
+        """
+        import time
+        from botocore.exceptions import ClientError
+
+        current_time = int(time.time())
+
+        try:
+            self.seat_reservations_table.put_item(
+                Item={
+                    'event_id': event_id,
+                    'seat_id': seat_id,
+                    'session_id': session_id,
+                    'reserved_at': current_time,
+                    'expires_at': expires_at
+                },
+                ConditionExpression='attribute_not_exists(seat_id) OR expires_at < :now',
+                ExpressionAttributeValues={
+                    ':now': current_time
+                }
+            )
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                return False
+            raise
+
+    def release_seat(self, event_id: str, seat_id: str, session_id: str = None) -> bool:
+        """
+        Освобождает резервацию места.
+        Если указан session_id, освобождает только если резервация принадлежит этой сессии.
+        """
+        from botocore.exceptions import ClientError
+
+        try:
+            if session_id:
+                # Освобождаем только если принадлежит этой сессии
+                self.seat_reservations_table.delete_item(
+                    Key={
+                        'event_id': event_id,
+                        'seat_id': seat_id
+                    },
+                    ConditionExpression='session_id = :sid',
+                    ExpressionAttributeValues={
+                        ':sid': session_id
+                    }
+                )
+            else:
+                # Освобождаем без проверки
+                self.seat_reservations_table.delete_item(
+                    Key={
+                        'event_id': event_id,
+                        'seat_id': seat_id
+                    }
+                )
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                return False
+            raise
+
+    def release_seats(self, event_id: str, seat_ids: List[str], session_id: str = None) -> int:
+        """
+        Освобождает несколько резерваций.
+        Возвращает количество успешно освобождённых мест.
+        """
+        released_count = 0
+        for seat_id in seat_ids:
+            if self.release_seat(event_id, seat_id, session_id):
+                released_count += 1
+        return released_count
