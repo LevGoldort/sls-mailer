@@ -6,7 +6,7 @@
 
 set -e
 
-FUNCTION_NAME="yallabalagan-ticket-api"
+FUNCTION_NAME="yallabalagan-ticket-api-dev"
 REGION="eu-north-1"
 SKIP_DEPS=${1:-false}
 
@@ -20,7 +20,8 @@ echo "📦 Creating deployment package in $TEMP_DIR"
 # Копируем код
 cp -r models "$TEMP_DIR/"
 cp -r utils "$TEMP_DIR/"
-cp lambdas/api-handler.py "$TEMP_DIR/lambda_function.py"
+mkdir -p "$TEMP_DIR/lambdas"
+cp lambdas/api-handler.py "$TEMP_DIR/lambdas/api-handler.py"
 
 # Устанавливаем зависимости (если не пропускаем)
 if [ "$SKIP_DEPS" = "true" ]; then

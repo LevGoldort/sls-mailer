@@ -20,7 +20,7 @@ def generate_qr_image(code: str, order_id: str, bucket_name: str = None) -> Opti
     """
     try:
         # Get bucket name from env or parameter
-        bucket = bucket_name or os.environ.get('QR_BUCKET', 'yallabalagan-ticket-media')
+        bucket = bucket_name or os.environ.get('MEDIA_BUCKET') or os.environ.get('QR_BUCKET', 'yallabalagan-ticket-media')
         region = os.environ.get('AWS_REGION', 'eu-north-1')
 
         print(f"Generating QR code for {code}, bucket: {bucket}, region: {region}")

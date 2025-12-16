@@ -88,3 +88,26 @@ security_audit.md
 **/security_audit.md
 /ticket-service/docs/CHECKOUT_HTML_README.md
 /ticket-service/docs/UTF8_ENCODING_CHECKLIST.md
+
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+node_modules/
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 
+/.mcp.json
+/.taskmaster/

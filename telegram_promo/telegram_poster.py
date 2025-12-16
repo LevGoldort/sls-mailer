@@ -122,7 +122,7 @@ async def post_to_telegram(bot, chat_id, talent_info, screenshot_paths, max_retr
     Постит скриншоты в Telegram для одного таланта
 
     Args:
-        bot: Telegram Bot instance
+        bot: Telegram Bot instanceес
         chat_id: ID чата куда постить
         talent_info: dict с информацией о таланте
         screenshot_paths: list путей к скриншотам

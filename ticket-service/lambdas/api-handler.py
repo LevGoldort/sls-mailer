@@ -208,7 +208,8 @@ def list_events() -> Dict:
                 'status': evt.status,
                 'images': evt.images,
                 'slug': evt.slug,
-                'currency': evt.currency
+                'currency': evt.currency,
+                'seat_allocation': evt.seat_allocation  # Include for frontend seat picker
             })
         except Exception as e:
             print(f"Error parsing event: {e}")
@@ -429,6 +430,20 @@ def save_seat_allocation(event_id: str, request_event: Dict) -> Dict:
                 return error_response(400,
                     f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
 
+        # Count already sold tickets per type (to preserve sold count)
+        sold_counts = {}
+        for tt in evt.ticket_types:
+            sold_counts[tt.id] = tt.total - tt.available
+
+        # Update ticket type availability based on seat allocation
+        for tt in evt.ticket_types:
+            allocated_seats = allocation_counts.get(tt.id, 0)
+            already_sold = sold_counts.get(tt.id, 0)
+
+            # Available = allocated seats - already sold
+            tt.available = max(0, allocated_seats - already_sold)
+            print(f"Updated ticket type '{tt.name}': allocated={allocated_seats}, sold={already_sold}, available={tt.available}")
+
         # Update event
         evt.seat_allocation = seat_allocation
         evt.updated_at = datetime.utcnow().isoformat()
@@ -501,11 +516,16 @@ def create_event(request_event: Dict) -> Dict:
                 allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
 
             # Проверяем что количество не превышает total для каждого типа
+            # И обновляем available на основе выделенных мест
             for tt in ticket_types:
                 allocated = allocation_counts.get(tt.id, 0)
                 if allocated > tt.total:
                     return error_response(400,
                         f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
+
+                # For seated events, available = allocated seats (not total)
+                tt.available = allocated
+                print(f"Set ticket type '{tt.name}' available={allocated} based on seat allocation")
 
         # Создаем событие
         event_id = Event.generate_id()
@@ -2169,22 +2189,96 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                 # Создаем Order объект
                 order = Order.from_dynamodb_item(order_data)
 
+                # Получаем событие
+                event_data = db.get_event(order.event_id)
+                if not event_data:
+                    raise Exception(f"Event {order.event_id} not found")
+
+                evt = Event.from_dynamodb_item(event_data)
+
+                # ✅ КРИТИЧЕСКАЯ ВАЛИДАЦИЯ для seated events
+                # Проверяем доступность мест перед финализацией
+                if evt.seat_allocation:
+                    # Собираем все места из заказа
+                    order_seats = set()
+                    for ticket in order.tickets:
+                        if ticket.purchased_seats:
+                            order_seats.update(ticket.purchased_seats)
+
+                    if order_seats:  # Если есть места в заказе
+                        print(f"Validating seat availability for order {order_id}: seats {order_seats}")
+
+                        # Получаем уже проданные места (исключая текущий заказ)
+                        existing_purchased = set()
+                        all_orders = db.get_orders_by_event(order.event_id)
+                        for other_order in all_orders:
+                            # Пропускаем текущий заказ и неоплаченные
+                            if other_order.get('order_id') == order_id:
+                                continue
+                            if other_order.get('payment', {}).get('status') not in ['completed', 'pending']:
+                                continue
+
+                            for ticket in other_order.get('tickets', []):
+                                existing_purchased.update(ticket.get('purchased_seats', []))
+
+                        # ✅ ТАКЖЕ проверяем активные резервации (TTL не истек)
+                        active_reservations = db.get_seat_reservations(order.event_id)
+                        reserved_seats = {r['seat_id'] for r in active_reservations}
+
+                        # Объединяем проданные и зарезервированные места
+                        unavailable_seats = existing_purchased | reserved_seats
+
+                        # Проверяем конфликты
+                        conflicts = order_seats & unavailable_seats
+                        if conflicts:
+                            print(f"❌ SEAT CONFLICT DETECTED: Order {order_id} seats {conflicts} already sold!")
+
+                            # Обновляем статус заказа на failed
+                            db.update_order_payment_status(
+                                order_id=order_id,
+                                status='failed',
+                                transaction_id=transaction_id
+                            )
+
+                            # Инициируем возврат средств
+                            try:
+                                refund_result = payment_provider.refund(
+                                    order_id=order_id,
+                                    amount=order.total_amount,
+                                    transaction_id=transaction_id
+                                )
+                                print(f"Refund initiated: {refund_result}")
+                            except Exception as refund_error:
+                                print(f"ERROR: Failed to initiate refund: {str(refund_error)}")
+                                # Продолжаем, чтобы отправить email пользователю
+
+                            # TODO: Отправить email пользователю о проблеме и возврате средств
+                            # send_seat_conflict_email(order, conflicts)
+
+                            # Возвращаем успех в webhook (чтобы AllPay не повторял)
+                            # но логируем критическую ошибку
+                            print(f"⚠️ CRITICAL: Seats no longer available for order {order_id}. Refund processed.")
+
+                            return success_response({
+                                'status': 'failed_seat_conflict',
+                                'message': f'Seats {list(conflicts)} are no longer available',
+                                'refund_initiated': True,
+                                'order_id': order_id
+                            })
+
+                        print(f"✅ Seat validation passed: all {len(order_seats)} seats are available")
+
                 # Генерируем QR коды для билетов
                 print(f"Generating QR codes for order {order_id}")
                 order.generate_qr_codes()
 
-                # Получаем событие и уменьшаем доступные билеты
-                event_data = db.get_event(order.event_id)
-                if event_data:
-                    evt = Event.from_dynamodb_item(event_data)
+                # Уменьшаем количество доступных билетов
+                for ticket in order.tickets:
+                    evt.decrease_available(ticket.type_id, ticket.quantity)
+                    print(f"Decreased {ticket.quantity} tickets of type {ticket.type_id} for event {order.event_id}")
 
-                    # Уменьшаем количество доступных билетов
-                    for ticket in order.tickets:
-                        evt.decrease_available(ticket.type_id, ticket.quantity)
-                        print(f"Decreased {ticket.quantity} tickets of type {ticket.type_id} for event {order.event_id}")
-
-                    # Сохраняем обновленное событие
-                    db.put_event(evt.to_dynamodb_item())
+                # Сохраняем обновленное событие
+                db.put_event(evt.to_dynamodb_item())
 
                 # Increment coupon usage if coupon was used
                 if order.coupon_code:

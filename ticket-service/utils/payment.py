@@ -54,12 +54,40 @@ class PaymentProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    def refund(
+        self,
+        order_id: str,
+        amount: float,
+        transaction_id: str = None
+    ) -> Dict:
+        """
+        Issue a refund for a completed payment
+
+        Args:
+            order_id: Unique order identifier
+            amount: Amount to refund
+            transaction_id: Original transaction ID (optional)
+
+        Returns:
+            Dict with refund status and details
+
+        Raises:
+            Exception if refund fails
+        """
+        pass
+
 
 class MockPaymentProvider(PaymentProvider):
     """Mock payment provider for development and testing"""
 
     def __init__(self):
-        self.base_url = os.environ.get('BASE_URL', 'http://yallabalagan-tickets-frontend.s3-website.eu-north-1.amazonaws.com')
+        # Build base_url from FRONTEND_BUCKET if available, otherwise use BASE_URL
+        frontend_bucket = os.environ.get('FRONTEND_BUCKET')
+        if frontend_bucket:
+            self.base_url = f'http://{frontend_bucket}.s3-website.eu-north-1.amazonaws.com'
+        else:
+            self.base_url = os.environ.get('BASE_URL', 'http://yallabalagan-tickets-frontend.s3-website.eu-north-1.amazonaws.com')
         self.webhook_url = os.environ.get('API_URL', 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com')
 
     def create_payment_url(
@@ -100,6 +128,28 @@ class MockPaymentProvider(PaymentProvider):
         result = bool(signature and len(signature) > 0)
         print(f"[MOCK] Signature verification result: {result}")
         return result
+
+    def refund(
+        self,
+        order_id: str,
+        amount: float,
+        transaction_id: str = None
+    ) -> Dict:
+        """
+        Mock refund - always succeeds for testing
+
+        Returns:
+            Dict with success status
+        """
+        print(f"[MOCK] Processing refund: order_id={order_id}, amount={amount}, transaction_id={transaction_id}")
+
+        return {
+            'success': True,
+            'order_id': order_id,
+            'refund_status': 'completed',
+            'refunded_amount': amount,
+            'message': 'Mock refund successful'
+        }
 
 
 class AllPayProvider(PaymentProvider):
@@ -234,6 +284,81 @@ class AllPayProvider(PaymentProvider):
             traceback.print_exc()
             return False
 
+    def refund(
+        self,
+        order_id: str,
+        amount: float,
+        transaction_id: str = None
+    ) -> Dict:
+        """
+        Issue refund via AllPay API
+
+        API Endpoint: POST https://allpay.to/app/?show=refund&mode=api9
+        Required: login, order_id, amount, sign (SHA256)
+
+        Args:
+            order_id: Our internal order identifier
+            amount: Amount to refund (in ILS, e.g., 100.50)
+            transaction_id: AllPay receipt/transaction ID (optional)
+
+        Returns:
+            Dict with refund status
+
+        Raises:
+            Exception if refund fails
+        """
+        import requests
+
+        # Get AllPay credentials from environment
+        allpay_login = os.environ.get('ALLPAY_LOGIN')
+        if not allpay_login:
+            raise ValueError("ALLPAY_LOGIN must be set for refunds")
+
+        # Build refund request
+        refund_data = {
+            'login': allpay_login,
+            'order_id': order_id,
+            'amount': f"{amount:.2f}"  # Format as decimal string
+        }
+
+        # Calculate signature: SHA256(login:order_id:amount:secret)
+        sign_string = f"{allpay_login}:{order_id}:{refund_data['amount']}:{self.webhook_secret}"
+        signature = hashlib.sha256(sign_string.encode('utf-8')).hexdigest()
+        refund_data['sign'] = signature
+
+        # Make API request
+        refund_url = 'https://allpay.to/app/?show=refund&mode=api9'
+
+        print(f"Requesting refund from AllPay: order_id={order_id}, amount={amount}")
+
+        try:
+            response = requests.post(
+                refund_url,
+                json=refund_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            # AllPay returns: {order_id, status: 3 (full refund) or 4 (partial)}
+            if result.get('status') in [3, 4]:
+                print(f"Refund successful: {result}")
+                return {
+                    'success': True,
+                    'order_id': order_id,
+                    'refund_status': 'completed',
+                    'refunded_amount': amount,
+                    'allpay_response': result
+                }
+            else:
+                raise Exception(f"AllPay refund failed with status: {result.get('status')}")
+
+        except requests.RequestException as e:
+            print(f"AllPay refund request failed: {str(e)}")
+            raise Exception(f"Failed to process refund: {str(e)}")
+
 
 def get_payment_provider() -> PaymentProvider:
     """
@@ -253,7 +378,7 @@ def get_payment_provider() -> PaymentProvider:
 # Helper function for webhook processing
 def parse_webhook_payload(body: str) -> Dict:
     """
-    Parse and validate AllPay webhook payload
+    Parse and validate webhook payload from AllPay or Mock payment provider
 
     AllPay Webhook Fields:
     - status: 1 = success, other = failure
@@ -262,6 +387,12 @@ def parse_webhook_payload(body: str) -> Dict:
     - client_name, client_email, client_phone
     - card_mask, card_brand, foreign_card
     - sign: HMAC signature
+
+    Mock Webhook Fields:
+    - order_id: order identifier
+    - status: 'completed' or 'failed'
+    - transaction_id: mock transaction ID
+    - amount, currency, timestamp
 
     Args:
         body: Raw webhook body (JSON string)
@@ -275,7 +406,21 @@ def parse_webhook_payload(body: str) -> Dict:
     try:
         data = json.loads(body)
 
-        # Validate AllPay required fields
+        # Check if this is a Mock webhook (has 'order_id' field directly)
+        if 'order_id' in data:
+            # Mock webhook format
+            if 'status' not in data:
+                raise ValueError("Missing 'status' field in Mock webhook")
+
+            normalized = {
+                'order_id': data['order_id'],
+                'status': data['status'],  # 'completed' or 'failed'
+                'transaction_id': data.get('transaction_id', ''),
+            }
+
+            return normalized
+
+        # AllPay webhook format
         if 'status' not in data:
             raise ValueError("Missing 'status' field in AllPay webhook")
 

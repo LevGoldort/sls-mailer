@@ -47,6 +47,9 @@ Parameters:
     Default: "test,test2"
     Description: Comma-separated list of admin API keys
 
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
 Globals:
   Function:
     Runtime: python3.12
@@ -55,10 +58,13 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
+        PAYMENT_MODE: !If [IsProd, production, mock]
+        EMAIL_SENDER_LAMBDA: !Sub yallabalagan-email-sender-${Environment}
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
         COUPONS_TABLE: !Ref CouponsTable
+        SEAT_RESERVATIONS_TABLE: !Ref SeatReservationsTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -227,6 +233,41 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  SeatReservationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub yallabalagan-seat-reservations-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: seat_id
+          AttributeType: S
+        - AttributeName: expires_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+        - AttributeName: seat_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ExpirationIndex
+          KeySchema:
+            - AttributeName: event_id
+              KeyType: HASH
+            - AttributeName: expires_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   ##############################################################################
   # S3 Buckets
   ##############################################################################
@@ -360,6 +401,8 @@ Resources:
             TableName: !Ref OrdersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref CouponsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SeatReservationsTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
         - Version: '2012-10-17'
@@ -418,7 +461,7 @@ Resources:
             TableName: !Ref EventsTable
         - DynamoDBReadPolicy:
             TableName: !Ref LocationsTable
-        - DynamoDBReadPolicy:
+        - DynamoDBCrudPolicy:
             TableName: !Ref OrdersTable
         - SESCrudPolicy:
             IdentityName: !Ref SenderEmail
@@ -561,3 +604,9 @@ Outputs:
     Value: !Ref MediaBucket
     Export:
       Name: !Sub ${Environment}-MediaBucket
+
+  SeatReservationsTableName:
+    Description: DynamoDB Seat Reservations Table Name
+    Value: !Ref SeatReservationsTable
+    Export:
+      Name: !Sub ${Environment}-SeatReservationsTable

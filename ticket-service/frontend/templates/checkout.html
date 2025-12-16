@@ -74,6 +74,14 @@
                         <span id="summary-subtotal"></span>
                     </div>
 
+                    <!-- Selected Seats (for seated venues) -->
+                    <div id="selected-seats-section" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 0.5rem;">
+                        <h4 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem;">Выбранные места:</h4>
+                        <div id="selected-seats-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            <!-- Seats will be populated by JS -->
+                        </div>
+                    </div>
+
                     <div class="summary-row" id="coupon-row" style="display: none; color: var(--success, #059669);">
                         <span>Купон (<span id="summary-coupon-code"></span>)</span>
                         <span id="summary-discount"></span>
@@ -126,9 +134,25 @@
 <script>
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
-const eventId = urlParams.get('event_id');
-const ticketTypeId = urlParams.get('ticket_type');
-const couponCode = urlParams.get('coupon');
+const isSeatedCheckout = urlParams.get('seated') === 'true';
+
+// Check for sessionStorage data (seated venues)
+let orderDataFromSession = null;
+if (isSeatedCheckout) {
+    const storedData = sessionStorage.getItem('orderData');
+    if (storedData) {
+        try {
+            orderDataFromSession = JSON.parse(storedData);
+        } catch (e) {
+            console.error('Failed to parse orderData from sessionStorage:', e);
+        }
+    }
+}
+
+// Fallback to URL parameters (unseated venues)
+const eventId = orderDataFromSession ? orderDataFromSession.event_id : urlParams.get('event_id');
+const ticketTypeId = !orderDataFromSession ? urlParams.get('ticket_type') : null;
+const couponCode = orderDataFromSession?.coupon_code || urlParams.get('coupon');
 
 // API Configuration
 const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
@@ -158,7 +182,9 @@ function formatTime(dateStr) {
 
 // Load event and ticket data
 async function loadCheckoutData() {
-    if (!eventId || !ticketTypeId) {
+    // For seated venues, we need event_id and sessionStorage data
+    // For unseated venues, we need event_id and ticket_type
+    if (!eventId || (!orderDataFromSession && !ticketTypeId)) {
         showError('Неверные параметры. Пожалуйста, выберите событие и тип билета.');
         return;
     }
@@ -190,18 +216,33 @@ async function loadCheckoutData() {
             }
         }
 
-        // Find ticket type
-        ticketTypeData = eventData.ticket_types.find(t => t.id === ticketTypeId);
-        if (!ticketTypeData) {
-            throw new Error('Тип билета не найден');
-        }
+        // Handle ticket data differently for seated vs unseated
+        if (orderDataFromSession) {
+            // Seated venue: use data from sessionStorage
+            // Calculate total price from all selected tickets
+            ticketPrice = 0;
+            orderDataFromSession.tickets.forEach(ticket => {
+                const type = eventData.ticket_types.find(t => t.id === ticket.type_id);
+                if (type) {
+                    ticketPrice += type.price * ticket.quantity;
+                }
+            });
+            // For summary display, use first ticket type
+            ticketTypeData = eventData.ticket_types.find(t => t.id === orderDataFromSession.tickets[0].type_id);
+        } else {
+            // Unseated venue: use single ticket type from URL
+            ticketTypeData = eventData.ticket_types.find(t => t.id === ticketTypeId);
+            if (!ticketTypeData) {
+                throw new Error('Тип билета не найден');
+            }
 
-        if (ticketTypeData.available === 0) {
-            throw new Error('К сожалению, билеты этого типа проданы');
-        }
+            if (ticketTypeData.available === 0) {
+                throw new Error('К сожалению, билеты этого типа проданы');
+            }
 
-        // Set ticket price
-        ticketPrice = ticketTypeData.price;
+            // Set ticket price
+            ticketPrice = ticketTypeData.price;
+        }
 
         // Validate and apply coupon if provided
         if (couponCode) {
@@ -264,8 +305,8 @@ function renderCheckout() {
                     </div>
                 </div>
 
-                <!-- Quantity Selector -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <!-- Quantity Selector (only for unseated venues) -->
+                <div class="form-group" id="quantity-selector" style="margin-bottom: 0; ${orderDataFromSession ? 'display: none;' : ''}">
                     <label class="form-label">Количество билетов</label>
                     <select id="quantity" class="form-select" onchange="updateTotal()">
                         ${Array.from({length: Math.min(ticketTypeData.available, 10)}, (_, i) => i + 1)
@@ -279,6 +320,11 @@ function renderCheckout() {
                         : ''
                     }
                 </div>
+
+                <!-- Selected seats info (only for seated venues) -->
+                <div id="checkout-seats-info" style="${orderDataFromSession ? '' : 'display: none;'}">
+                    <!-- Will be populated by displayCheckoutSeats() -->
+                </div>
             </div>
         </div>
     `;
@@ -289,11 +335,84 @@ function renderCheckout() {
     document.getElementById('back-link').href = `/events/${backSlug}.html`;
 
     // Update summary
-    document.getElementById('summary-ticket-name').textContent = ticketTypeData.name;
+    if (orderDataFromSession) {
+        // Seated venue: show all tickets
+        const totalTickets = orderDataFromSession.tickets.reduce((sum, t) => sum + t.quantity, 0);
+        document.getElementById('summary-ticket-name').textContent = 'Билеты';
+        document.getElementById('summary-quantity').textContent = totalTickets;
+
+        // Display selected seats in summary section
+        if (orderDataFromSession.purchased_seats && orderDataFromSession.purchased_seats.length > 0) {
+            displaySelectedSeats(orderDataFromSession.purchased_seats);
+        }
+
+        // Display detailed seats info in checkout area
+        displayCheckoutSeats(orderDataFromSession);
+    } else {
+        // Unseated venue: show single ticket type
+        document.getElementById('summary-ticket-name').textContent = ticketTypeData.name;
+    }
     updateTotal();
 
     // Fire analytics on page load (begin checkout)
     fireInitiateCheckout();
+}
+
+// Display selected seats (summary section - compact badges)
+function displaySelectedSeats(seats) {
+    const section = document.getElementById('selected-seats-section');
+    const list = document.getElementById('selected-seats-list');
+
+    section.style.display = 'block';
+    list.innerHTML = '';
+
+    seats.forEach(seatId => {
+        const [row, seat] = seatId.split('-');
+        const badge = document.createElement('span');
+        badge.style.cssText = 'padding: 0.375rem 0.75rem; background: var(--primary); color: white; border-radius: 1rem; font-size: 0.875rem; font-weight: 500;';
+        badge.textContent = `Ряд ${parseInt(row) + 1}, Место ${parseInt(seat) + 1}`;
+        list.appendChild(badge);
+    });
+}
+
+// Display checkout seats info (detailed breakdown by ticket type)
+function displayCheckoutSeats(orderData) {
+    const container = document.getElementById('checkout-seats-info');
+    if (!container) return;
+
+    // Group seats by ticket type
+    const seatsByType = {};
+    orderData.tickets.forEach(ticket => {
+        const ticketType = eventData.ticket_types.find(t => t.id === ticket.type_id);
+        if (ticketType && ticket.purchased_seats) {
+            seatsByType[ticket.type_id] = {
+                name: ticketType.name,
+                price: ticketType.price,
+                seats: ticket.purchased_seats
+            };
+        }
+    });
+
+    let html = '<div style="margin-top: 0.5rem;">';
+    html += '<label class="form-label" style="margin-bottom: 0.5rem;">Выбранные места:</label>';
+
+    Object.values(seatsByType).forEach(typeInfo => {
+        html += `<div style="margin-bottom: 0.75rem;">`;
+        html += `<div style="font-weight: 500; margin-bottom: 0.25rem;">${typeInfo.name} (${typeInfo.price}₪)</div>`;
+        html += `<div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">`;
+
+        typeInfo.seats.forEach(seatId => {
+            const [row, seat] = seatId.split('-');
+            html += `<span style="padding: 0.25rem 0.625rem; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 0.375rem; font-size: 0.875rem;">`;
+            html += `Ряд ${parseInt(row) + 1}, М. ${parseInt(seat) + 1}`;
+            html += `</span>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 // Validate coupon
@@ -332,12 +451,20 @@ async function validateCoupon(code) {
 
 // Update total
 function updateTotal() {
-    const quantity = parseInt(document.getElementById('quantity').value);
+    let quantity, subtotal;
+
+    if (orderDataFromSession) {
+        // Seated venue: quantity is total from sessionStorage
+        quantity = orderDataFromSession.tickets.reduce((sum, t) => sum + t.quantity, 0);
+        subtotal = ticketPrice; // ticketPrice already calculated as total
+    } else {
+        // Unseated venue: get quantity from selector
+        quantity = parseInt(document.getElementById('quantity').value);
+        subtotal = ticketPrice * quantity;
+    }
 
     // Update summary
     document.getElementById('summary-quantity').textContent = quantity;
-
-    let subtotal = ticketPrice * quantity;
     document.getElementById('summary-subtotal').textContent = subtotal + '₪';
 
     // Apply coupon discount
@@ -439,24 +566,46 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 
     try {
         const formData = new FormData(this);
-        const quantity = parseInt(document.getElementById('quantity').value);
 
-        const data = {
-            event_id: eventId,
-            customer: {
-                name: formData.get('customer_name'),
-                email: formData.get('customer_email'),
-                phone: formData.get('customer_phone')
-            },
-            tickets: [{
-                type_id: ticketTypeId,
-                quantity: quantity
-            }]
-        };
+        let data;
+        if (orderDataFromSession) {
+            // Seated venue: use data from sessionStorage
+            data = {
+                event_id: eventId,
+                customer: {
+                    name: formData.get('customer_name'),
+                    email: formData.get('customer_email'),
+                    phone: formData.get('customer_phone')
+                },
+                tickets: orderDataFromSession.tickets // Already includes purchased_seats
+            };
+
+            // Add session_id if available
+            if (orderDataFromSession.session_id) {
+                data.session_id = orderDataFromSession.session_id;
+            }
+        } else {
+            // Unseated venue: traditional flow
+            const quantity = parseInt(document.getElementById('quantity').value);
+            data = {
+                event_id: eventId,
+                customer: {
+                    name: formData.get('customer_name'),
+                    email: formData.get('customer_email'),
+                    phone: formData.get('customer_phone')
+                },
+                tickets: [{
+                    type_id: ticketTypeId,
+                    quantity: quantity
+                }]
+            };
+        }
 
         // Add coupon if applied
         if (appliedCoupon) {
             data.coupon_code = appliedCoupon.coupon.coupon_code;
+        } else if (orderDataFromSession?.coupon_code) {
+            data.coupon_code = orderDataFromSession.coupon_code;
         }
 
         const response = await fetch(`${API_URL}/api/orders`, {
