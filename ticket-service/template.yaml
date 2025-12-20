@@ -18,11 +18,40 @@ Parameters:
     Default: ""
     Description: Telegram Bot Token for admin bot (optional for dev)
 
+  # All-Pay Login
+  AllPayLogin:
+    Type: String
+    NoEcho: true
+    Description: AllPay login username for API and refunds
+    Default: ""
+
   # All-Pay Webhook Secret
   AllPayWebhookSecret:
     Type: String
     NoEcho: true
     Description: All-Pay webhook secret for payment verification
+
+  # All-Pay API Key
+  AllPayApiKey:
+    Type: String
+    NoEcho: true
+    Description: AllPay API key for request signatures
+    Default: ""
+
+  # All-Pay Use API Flag
+  AllPayUseApi:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Feature flag - use API instead of payment links
+
+  # Payment Expiration Minutes
+  PaymentExpireMinutes:
+    Type: Number
+    Default: 10
+    MinValue: 5
+    MaxValue: 60
+    Description: Payment expiration timeout in minutes
 
   # SES Email
   SenderEmail:
@@ -383,7 +412,11 @@ Resources:
       Description: Main API handler for ticket service
       Environment:
         Variables:
+          ALLPAY_LOGIN: !Ref AllPayLogin
           ALLPAY_WEBHOOK_SECRET: !Ref AllPayWebhookSecret
+          ALLPAY_API_KEY: !Ref AllPayApiKey
+          ALLPAY_USE_API: !Ref AllPayUseApi
+          PAYMENT_EXPIRE_MINUTES: !Ref PaymentExpireMinutes
           ADMIN_API_KEYS: !Ref AdminApiKeys
       Events:
         ApiEvent:

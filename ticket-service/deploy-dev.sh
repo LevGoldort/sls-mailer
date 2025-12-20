@@ -26,8 +26,12 @@ sam deploy \
   --config-env dev \
   --parameter-overrides \
     "Environment=dev" \
+    "SenderEmail=${SENDER_EMAIL}" \
+    "AllPayLogin=${ALLPAY_LOGIN}" \
     "AllPayWebhookSecret=${ALLPAY_WEBHOOK_SECRET}" \
-    "SenderEmail=${SENDER_EMAIL}"
+    "AllPayApiKey=${ALLPAY_API_KEY}" \
+    "AllPayUseApi=${ALLPAY_USE_API}" \
+    "PaymentExpireMinutes=${PAYMENT_EXPIRE_MINUTES}"
 
 echo ""
 echo "Syncing admin files to S3..."

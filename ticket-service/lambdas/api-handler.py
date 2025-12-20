@@ -1331,7 +1331,9 @@ def create_order(request_event: Dict) -> Dict:
                 currency=order.currency,
                 email=order.customer.email,
                 event_id=event_id,
-                customer_name=order.customer.name
+                customer_name=order.customer.name,
+                tickets=order_tickets,  # NEW: for API mode items array
+                order_created_at=order.created_at  # NEW: for expire calculation
             )
         except Exception as e:
             print(f"Failed to create payment URL: {str(e)}")

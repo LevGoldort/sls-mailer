@@ -14,6 +14,7 @@ parameter_overrides = [
     "SenderEmail=tickets@yallabalagan.org",
     "GA4Id=G-RP1612BFV9",
     "FBPixelId=738718761834602"
+    # AllPay credentials loaded from .env.prod via deploy script
 ]
 confirm_changeset = true
 image_repositories = []
@@ -39,6 +40,7 @@ parameter_overrides = [
     "SenderEmail=yalla@yallabalagan.org",
     "GA4Id=G-DEVDEVDEV",
     "FBPixelId=000000000"
+    # AllPay credentials loaded from .env.dev via deploy script
 ]
 confirm_changeset = false  # Быстрее для dev
 image_repositories = []
