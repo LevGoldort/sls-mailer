@@ -131,17 +131,43 @@ class DynamoDBClient:
     # ===== Orders =====
     def put_order(self, order_item: Dict):
         """Создает заказ"""
-        return self.orders_table.put_item(Item=order_item)
+        print(f"[DEBUG] put_order called for order_id: {order_item.get('order_id')}")
+        print(f"[DEBUG] Table name: {self.orders_table_name}")
+        print(f"[DEBUG] Order item PK: {order_item.get('PK')}, SK: {order_item.get('SK')}")
+        print(f"[DEBUG] Order item keys: {list(order_item.keys())}")
+
+        try:
+            response = self.orders_table.put_item(Item=order_item)
+            print(f"[DEBUG] put_item response: {response}")
+            print(f"[DEBUG] Successfully saved order {order_item.get('order_id')} to DynamoDB")
+            return response
+        except Exception as e:
+            print(f"[ERROR] Failed to save order {order_item.get('order_id')}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def get_order(self, order_id: str) -> Optional[Dict]:
         """Получает заказ по ID"""
+        print(f"[DEBUG] get_order called for order_id: {order_id}")
+        print(f"[DEBUG] Table name: {self.orders_table_name}")
+        print(f"[DEBUG] Looking for PK: ORDER#{order_id}, SK: METADATA")
+
         response = self.orders_table.get_item(
             Key={
                 'PK': f'ORDER#{order_id}',
                 'SK': 'METADATA'
             }
         )
-        return response.get('Item')
+
+        item = response.get('Item')
+        if item:
+            print(f"[DEBUG] ✓ Order {order_id} found in DynamoDB")
+        else:
+            print(f"[DEBUG] ✗ Order {order_id} NOT FOUND in DynamoDB")
+            print(f"[DEBUG] Response: {response}")
+
+        return item
 
     def get_orders_by_event(self, event_id: str, limit: int = 100) -> List[Dict]:
         """Получает все заказы для события"""

@@ -450,7 +450,9 @@ Resources:
             - Effect: Allow
               Action:
                 - lambda:InvokeFunction
-              Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-site-regenerator-${Environment}'
+              Resource:
+                - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-site-regenerator-${Environment}'
+                - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-email-sender-${Environment}'
 
   # Site Regenerator
   SiteRegeneratorFunction:

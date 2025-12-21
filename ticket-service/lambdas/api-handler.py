@@ -1334,7 +1334,19 @@ def create_order(request_event: Dict) -> Dict:
         # Это будет сделано в webhook handler при получении статуса 'completed'
 
         # Сохраняем заказ со статусом pending
-        db.put_order(order.to_dynamodb_item())
+        print(f"[DEBUG] About to save order {order.order_id} to DynamoDB")
+        order_dynamodb_item = order.to_dynamodb_item()
+        print(f"[DEBUG] Order DynamoDB item: PK={order_dynamodb_item.get('PK')}, SK={order_dynamodb_item.get('SK')}")
+        db.put_order(order_dynamodb_item)
+        print(f"[DEBUG] Order {order.order_id} saved successfully")
+
+        # Verify the order was saved by reading it back
+        print(f"[DEBUG] Verifying order {order.order_id} was saved...")
+        saved_order = db.get_order(order.order_id)
+        if saved_order:
+            print(f"[DEBUG] ✓ Order {order.order_id} verified in DynamoDB")
+        else:
+            print(f"[ERROR] ✗ Order {order.order_id} NOT FOUND after save!")
 
         # Generate payment URL via payment provider
         payment_provider = get_payment_provider()
@@ -2223,6 +2235,17 @@ def handle_allpay_webhook(event: Dict) -> Dict:
 
                     if order_seats:  # Если есть места в заказе
                         print(f"Validating seat availability for order {order_id}: seats {order_seats}")
+
+                        # CRITICAL: Release seat reservations for this order's seats BEFORE conflict check
+                        # Payment confirmed, so reservations are no longer needed
+                        print(f"Releasing seat reservations for order {order_id}")
+                        for seat_id in order_seats:
+                            try:
+                                db.release_seat(order.event_id, seat_id)
+                                print(f"Released reservation for seat {seat_id}")
+                            except Exception as e:
+                                # Continue even if reservation doesn't exist or delete fails
+                                print(f"Warning: Could not release reservation for seat {seat_id}: {str(e)}")
 
                         # Получаем уже проданные места (исключая текущий заказ)
                         # NOTE: Only check COMPLETED orders. Pending orders are handled via reservations.

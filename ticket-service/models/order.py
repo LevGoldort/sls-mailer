@@ -50,6 +50,7 @@ class QRCode:
     code: str
     ticket_type: str
     s3_url: Optional[str] = None
+    seat_id: Optional[str] = None  # NEW: "13-15" (row-seat) for seated events
     scanned: bool = False
     scanned_at: Optional[str] = None
 
@@ -136,7 +137,7 @@ class Order:
     def generate_qr_codes(self, generate_images: bool = True):
         """
         Генерирует QR коды для всех билетов в заказе
-        
+
         Args:
             generate_images: Если True, генерирует QR изображения и загружает в S3
         """
@@ -144,9 +145,16 @@ class Order:
         index = 1
 
         for ticket in self.tickets:
+            # Get purchased seats for this ticket type (if seated event)
+            purchased_seats = ticket.purchased_seats if ticket.purchased_seats else []
+            seat_index = 0
+
             for _ in range(int(ticket.quantity)):
                 code = self.generate_ticket_code(self.event_id, index)
-                
+
+                # Assign seat if available
+                seat_id = purchased_seats[seat_index] if seat_index < len(purchased_seats) else None
+
                 # Generate QR image if requested
                 s3_url = None
                 if generate_images:
@@ -156,14 +164,16 @@ class Order:
                     except Exception as e:
                         print(f"Warning: Failed to generate QR image for {code}: {str(e)}")
                         # Continue without image - code is still valid
-                
+
                 qr = QRCode(
                     code=code,
                     ticket_type=ticket.type_id,
-                    s3_url=s3_url
+                    s3_url=s3_url,
+                    seat_id=seat_id  # NEW: Assign seat to QR code
                 )
                 self.qr_codes.append(qr)
                 index += 1
+                seat_index += 1
 
     def to_dynamodb_item(self) -> Dict:
         """Конвертирует в формат DynamoDB"""

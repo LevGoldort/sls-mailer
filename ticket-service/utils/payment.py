@@ -625,7 +625,44 @@ def parse_webhook_payload(body: str) -> Dict:
     try:
         data = json.loads(body)
 
-        # Check if this is a Mock webhook (has 'order_id' field directly)
+        # Check if this is AllPay webhook (has 'sign' field for signature)
+        # AllPay API webhooks have: order_id, status (int), sign, card_mask, card_brand, etc.
+        if 'sign' in data or 'card_mask' in data or 'card_brand' in data:
+            # AllPay webhook format (API mode)
+            if 'status' not in data:
+                raise ValueError("Missing 'status' field in AllPay webhook")
+
+            if 'order_id' not in data:
+                raise ValueError("Missing 'order_id' field in AllPay webhook")
+
+            # Map AllPay fields to ticket-service expected format
+            normalized = {
+                'order_id': data['order_id'],  # AllPay API returns order_id directly
+                'status': 'completed' if data['status'] == 1 else 'failed',
+                'transaction_id': data.get('receipt', ''),
+
+                # AllPay metadata (for logging)
+                'amount': data.get('amount', 0),
+                'client_name': data.get('client_name', ''),
+                'client_email': data.get('client_email', ''),
+                'card_mask': data.get('card_mask', ''),
+                'card_brand': data.get('card_brand', ''),
+            }
+
+            return normalized
+
+        # Check for legacy AllPay webhook format (with add_field)
+        if 'add_field' in data:
+            # AllPay legacy webhook format
+            normalized = {
+                'order_id': data['add_field'],  # We pass order_id via add_field
+                'status': 'completed' if data['status'] == 1 else 'failed',
+                'transaction_id': data.get('receipt', ''),
+            }
+
+            return normalized
+
+        # Mock webhook format (has order_id but no AllPay-specific fields)
         if 'order_id' in data:
             # Mock webhook format
             if 'status' not in data:
@@ -639,28 +676,8 @@ def parse_webhook_payload(body: str) -> Dict:
 
             return normalized
 
-        # AllPay webhook format
-        if 'status' not in data:
-            raise ValueError("Missing 'status' field in AllPay webhook")
-
-        if 'add_field' not in data:
-            raise ValueError("Missing 'add_field' field - order_id not passed")
-
-        # Map AllPay fields to ticket-service expected format
-        normalized = {
-            'order_id': data['add_field'],  # We pass order_id via add_field
-            'status': 'completed' if data['status'] == 1 else 'failed',
-            'transaction_id': data.get('receipt', ''),
-
-            # AllPay metadata (for logging)
-            'amount': data.get('amount', 0),
-            'client_name': data.get('client_name', ''),
-            'client_email': data.get('client_email', ''),
-            'card_mask': data.get('card_mask', ''),
-            'card_brand': data.get('card_brand', ''),
-        }
-
-        return normalized
+        # Unknown webhook format
+        raise ValueError("Unknown webhook format - missing required fields")
 
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON payload: {str(e)}")
