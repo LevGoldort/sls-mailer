@@ -284,7 +284,7 @@ class AllPayProvider(PaymentProvider):
         for ticket in tickets:
             items.append({
                 "name": ticket.type_name,
-                "quantity": ticket.quantity,
+                "qty": ticket.quantity,  # AllPay API requires "qty" field as integer
                 "price": f"{ticket.price_per_ticket:.2f}",
                 "vat": "Y"  # All prices include VAT in Israel
             })
@@ -296,13 +296,17 @@ class AllPayProvider(PaymentProvider):
             "items": items,
             "currency": "ILS",
             "notifications_url": self.notifications_url,
-            "client_name": customer_name,
             "client_email": email,
-            "client_phone": "",  # Optional, not collected currently
+            # Note: client_phone omitted (not collected currently, avoid empty strings)
             "expire": expire_timestamp,
-            "success_url": f"{self.frontend_url}/processing.html?order_id={order_id}",
-            "backlink_url": self.frontend_url
+            "lang": "EN"  # Payment form language
+            # Note: success_url and backlink_url removed - S3 URLs cause "Invalid domain" error
+            # AllPay will use their default success page. User will be notified via webhook.
         }
+
+        # Only include client_name if provided (AllPay requires non-empty name)
+        if customer_name and customer_name.strip():
+            request_body["client_name"] = customer_name.strip()
 
         # Generate signature
         signature = self._generate_request_signature(request_body)
@@ -310,6 +314,7 @@ class AllPayProvider(PaymentProvider):
 
         print(f"Creating AllPay API payment for order {order_id}, expires at {expire_timestamp}")
         print(f"Items: {len(items)} ticket types, total amount: {amount} {currency}")
+        print(f"AllPay request body: {json.dumps(request_body, ensure_ascii=False)}")
 
         try:
             response = requests.post(
@@ -374,7 +379,7 @@ class AllPayProvider(PaymentProvider):
                 amount=amount,
                 currency=currency,
                 email=email,
-                customer_name=customer_name or "",
+                customer_name=customer_name,
                 tickets=tickets,
                 expire_timestamp=expire_timestamp
             )
@@ -451,7 +456,7 @@ class AllPayProvider(PaymentProvider):
             for key in sorted_keys:
                 value = params_copy[key]
 
-                # Handle arrays (e.g., items field)
+                # Handle arrays (e.g., items field) - only for requests, not webhooks
                 if isinstance(value, list):
                     for item in value:
                         if isinstance(item, dict):
@@ -463,21 +468,32 @@ class AllPayProvider(PaymentProvider):
                         else:
                             chunks.append(str(item).strip())
                 else:
+                    # For webhooks, AllPay sends items as JSON string - use as-is
                     chunks.append(str(value).strip())
 
-            # Build base string: value1:value2:value3:...:secret
-            base_string = ':'.join(chunks) + ':' + self.webhook_secret
+            # Build base string: value1:value2:value3:...:api_key
+            # NOTE: AllPay uses API key for webhook signatures, not webhook secret
+            secret_to_use = self.api_key if self.api_key else self.webhook_secret
+            base_string = ':'.join(chunks) + ':' + secret_to_use
+
+            print(f"[WEBHOOK VERIFY] Sorted keys: {sorted_keys}")
+            print(f"[WEBHOOK VERIFY] Values: {chunks}")
+            print(f"[WEBHOOK VERIFY] Using secret type: {'API_KEY' if self.api_key else 'WEBHOOK_SECRET'}")
+            print(f"[WEBHOOK VERIFY] Base string length: {len(base_string)}")
 
             # Calculate SHA256 hash
             calculated_signature = hashlib.sha256(base_string.encode('utf-8')).hexdigest()
+
+            print(f"[WEBHOOK VERIFY] Calculated signature: {calculated_signature}")
+            print(f"[WEBHOOK VERIFY] Received signature: {request_signature}")
 
             # Compare signatures
             is_valid = hmac.compare_digest(calculated_signature, request_signature)
 
             if not is_valid:
-                print(f"Signature verification FAILED")
-                print(f"Calculated: {calculated_signature}")
-                print(f"Received: {request_signature}")
+                print(f"[WEBHOOK VERIFY] Signature verification FAILED")
+            else:
+                print(f"[WEBHOOK VERIFY] Signature verification PASSED")
 
             return is_valid
 

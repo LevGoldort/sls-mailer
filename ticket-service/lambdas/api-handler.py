@@ -267,8 +267,8 @@ def get_purchased_seats(event_id: str) -> Dict:
         for order in orders:
             payment_status = order.get('payment', {}).get('status', '')
 
-            # Only include completed and pending orders (pending = reserved)
-            if payment_status not in ['completed', 'pending']:
+            # Only include completed orders (pending orders use seat reservations with TTL)
+            if payment_status != 'completed':
                 continue
 
             for ticket in order.get('tickets', []):
@@ -355,10 +355,16 @@ def get_seat_availability(event_id: str) -> Dict:
         purchased_seats_data = get_purchased_seats_dict(event_id)
         purchased_seat_ids = list(purchased_seats_data.keys())
 
-        # Get reserved seats
+        # Get reserved seats (filter out expired reservations)
+        import time
+        current_time = int(time.time())
+
         reservations = db.get_seat_reservations(event_id)
-        reserved_seats = [{'seat_id': r['seat_id'], 'session_id': r['session_id'], 'expires_at': r['expires_at']} for r in reservations]
-        reserved_seat_ids = [r['seat_id'] for r in reservations]
+        # Filter: only return reservations that haven't expired yet
+        active_reservations = [r for r in reservations if r.get('expires_at', 0) > current_time]
+
+        reserved_seats = [{'seat_id': r['seat_id'], 'session_id': r['session_id'], 'expires_at': r['expires_at']} for r in active_reservations]
+        reserved_seat_ids = [r['seat_id'] for r in active_reservations]
 
         return success_response({
             'event_id': event_id,
@@ -561,12 +567,15 @@ def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
     """
     Helper function: Returns {seat_id: {ticket_type_id, order_id, status}}
     for all purchased seats in an event
+
+    NOTE: Only returns COMPLETED purchases. Pending orders are handled via seat reservations.
     """
     orders = db.get_orders_by_event(event_id)
     purchased = {}
 
     for order in orders:
-        if order.get('payment', {}).get('status') in ['completed', 'pending']:
+        # Only count seats as purchased if payment is completed
+        if order.get('payment', {}).get('status') == 'completed':
             for ticket in order.get('tickets', []):
                 for seat_id in ticket.get('purchased_seats', []):
                     purchased[seat_id] = {
@@ -579,12 +588,17 @@ def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
 
 
 def get_purchased_seats_set(event_id: str) -> set:
-    """Helper function: Returns set of all purchased seat IDs for an event"""
+    """
+    Helper function: Returns set of all purchased seat IDs for an event
+
+    NOTE: Only returns COMPLETED purchases. Pending orders are handled via seat reservations.
+    """
     orders = db.get_orders_by_event(event_id)
     purchased = set()
 
     for order in orders:
-        if order.get('payment', {}).get('status') in ['completed', 'pending']:
+        # Only count seats as purchased if payment is completed
+        if order.get('payment', {}).get('status') == 'completed':
             for ticket in order.get('tickets', []):
                 purchased.update(ticket.get('purchased_seats', []))
 
@@ -649,10 +663,10 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
             deleted_type_ids = old_type_ids - new_type_ids
 
             if deleted_type_ids:
-                # Check if deleted types have sales
+                # Check if deleted types have sales (only completed payments count)
                 orders = db.get_orders_by_event(event_id)
                 for order in orders:
-                    if order.get('payment', {}).get('status') in ['completed', 'pending']:
+                    if order.get('payment', {}).get('status') == 'completed':
                         for ticket in order.get('tickets', []):
                             if ticket['type_id'] in deleted_type_ids:
                                 # Find ticket type name
@@ -2211,20 +2225,26 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                         print(f"Validating seat availability for order {order_id}: seats {order_seats}")
 
                         # Получаем уже проданные места (исключая текущий заказ)
+                        # NOTE: Only check COMPLETED orders. Pending orders are handled via reservations.
                         existing_purchased = set()
                         all_orders = db.get_orders_by_event(order.event_id)
                         for other_order in all_orders:
-                            # Пропускаем текущий заказ и неоплаченные
+                            # Пропускаем текущий заказ
                             if other_order.get('order_id') == order_id:
                                 continue
-                            if other_order.get('payment', {}).get('status') not in ['completed', 'pending']:
+                            # Только завершенные оплаты считаются купленными
+                            if other_order.get('payment', {}).get('status') != 'completed':
                                 continue
 
                             for ticket in other_order.get('tickets', []):
                                 existing_purchased.update(ticket.get('purchased_seats', []))
 
                         # ✅ ТАКЖЕ проверяем активные резервации (TTL не истек)
-                        active_reservations = db.get_seat_reservations(order.event_id)
+                        import time
+                        current_time = int(time.time())
+                        all_reservations = db.get_seat_reservations(order.event_id)
+                        # Filter: only check reservations that haven't expired
+                        active_reservations = [r for r in all_reservations if r.get('expires_at', 0) > current_time]
                         reserved_seats = {r['seat_id'] for r in active_reservations}
 
                         # Объединяем проданные и зарезервированные места

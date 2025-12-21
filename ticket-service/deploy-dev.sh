@@ -26,6 +26,7 @@ sam deploy \
   --config-env dev \
   --parameter-overrides \
     "Environment=dev" \
+    "PaymentMode=${PAYMENT_MODE}" \
     "SenderEmail=${SENDER_EMAIL}" \
     "AllPayLogin=${ALLPAY_LOGIN}" \
     "AllPayWebhookSecret=${ALLPAY_WEBHOOK_SECRET}" \

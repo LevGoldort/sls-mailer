@@ -10,12 +10,32 @@
 .seat-picker-wrapper {
     position: relative;
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     background: #ffffff;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+}
+
+.seat-picker-sidebar {
+    flex-shrink: 0;
+    width: 320px;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.seat-picker-main {
+    flex: 1;
+    position: relative;
+    min-width: 0;
 }
 
 .seat-map-container {
@@ -195,11 +215,11 @@
 
 .seat-legend {
     display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
+    flex-direction: column;
+    gap: 12px;
     padding: 20px;
-    background: #ffffff;
-    border-top: 1px solid #dee2e6;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
 }
 
 .legend-item {
@@ -239,32 +259,59 @@
 
 .seat-summary {
     padding: 20px;
-    background: #f8f9fa;
-    border-top: 1px solid #dee2e6;
+    background: transparent;
+    flex: 1;
+    color: #e0e0e0;
 }
 
-.summary-title {
-    font-size: 18px;
+.summary-header {
+    font-size: 16px;
     font-weight: 700;
-    color: #212529;
-    margin: 0 0 12px 0;
+    color: #e0e0e0;
+    margin: 0 0 16px 0;
 }
 
 .summary-content {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
 }
 
-.summary-item {
+.summary-content p,
+.summary-content div,
+.summary-content span {
+    color: #e0e0e0;
+}
+
+.summary-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 14px;
-    color: #495057;
+    color: #e0e0e0;
+}
+
+.summary-value {
+    font-weight: 700;
+    color: #e0e0e0;
+}
+
+.summary-value.highlight {
+    color: #6eb6ff;
 }
 
 .summary-item-label {
+    font-weight: 500;
+}
+
+.selected-seats-details {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.selected-seats-details > div {
+    color: #e0e0e0;
     font-weight: 500;
 }
 
@@ -502,6 +549,17 @@
    ============================================ */
 
 @media (max-width: 768px) {
+    .seat-picker-wrapper {
+        flex-direction: column;
+    }
+
+    .seat-picker-sidebar {
+        width: 100%;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+
     .seat-picker-controls {
         top: 8px;
         right: 8px;
@@ -516,7 +574,7 @@
 
     .seat-legend {
         padding: 16px;
-        gap: 12px;
+        gap: 10px;
     }
 
     .legend-item {
@@ -532,11 +590,11 @@
         padding: 16px;
     }
 
-    .summary-title {
-        font-size: 16px;
+    .summary-header {
+        font-size: 15px;
     }
 
-    .summary-item {
+    .summary-row {
         font-size: 13px;
     }
 

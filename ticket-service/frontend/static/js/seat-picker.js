@@ -97,12 +97,18 @@ class SeatPicker {
                 this.fetchAvailability()
             ]);
 
+            // Filter reserved seats to exclude current session's reservations
+            const reservedSeatsDetails = availabilityData.reserved_seats_details || [];
+            const reservedByOthers = reservedSeatsDetails
+                .filter(r => r.session_id !== this.sessionId)
+                .map(r => r.seat_id);
+
             this.seatingData = {
                 map: this.normalizeSeatingMap(seatingMapData.seating_map),
                 venueType: seatingMapData.venue_type,
                 allocation: availabilityData.seat_allocation || {},
                 purchased: availabilityData.purchased_seats || [],
-                reserved: availabilityData.reserved_seats || []
+                reserved: reservedByOthers  // Only seats reserved by OTHER sessions
             };
 
             this.render();
@@ -184,9 +190,26 @@ class SeatPicker {
         const wrapper = document.createElement('div');
         wrapper.className = 'seat-picker-wrapper';
 
+        // Create sidebar (left side)
+        const sidebar = document.createElement('div');
+        sidebar.className = 'seat-picker-sidebar';
+
+        // Add legend to sidebar
+        sidebar.appendChild(this.createLegend());
+
+        // Add summary to sidebar
+        const summary = this.createSummary();
+        sidebar.appendChild(summary);
+
+        wrapper.appendChild(sidebar);
+
+        // Create main area (right side)
+        const main = document.createElement('div');
+        main.className = 'seat-picker-main';
+
         // Add controls
         if (this.options.enableZoom) {
-            wrapper.appendChild(this.createControls());
+            main.appendChild(this.createControls());
         }
 
         // Add seat map
@@ -196,21 +219,16 @@ class SeatPicker {
 
         const svg = this.renderSeatingMap();
         mapContainer.appendChild(svg);
-        wrapper.appendChild(mapContainer);
+        main.appendChild(mapContainer);
 
-        // Add legend
-        wrapper.appendChild(this.createLegend());
-
-        // Add summary
-        const summary = this.createSummary();
-        wrapper.appendChild(summary);
-
-        // Add timer placeholder
+        // Add timer placeholder (inside map container, positioned absolutely)
         const timerDiv = document.createElement('div');
         timerDiv.id = 'reservation-timer';
         timerDiv.className = 'reservation-timer';
-        wrapper.appendChild(timerDiv);
+        timerDiv.style.display = 'none';  // Hidden by default
+        mapContainer.appendChild(timerDiv);
 
+        wrapper.appendChild(main);
         this.container.appendChild(wrapper);
 
         // Setup zoom/pan if enabled
@@ -358,6 +376,7 @@ class SeatPicker {
         }
 
         // Seat label - use calculated display number from venue config
+        // Only show label for selected seats to reduce visual clutter
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', x + seatWidth / 2);
         text.setAttribute('y', y + seatHeight / 2 + 4);
@@ -365,7 +384,16 @@ class SeatPicker {
         text.setAttribute('font-size', '12');
         text.setAttribute('class', 'seat-label');
         text.setAttribute('pointer-events', 'none');
-        text.textContent = displayNumber;  // Use display number from config
+        text.setAttribute('fill', 'white');  // White text for selected seats
+
+        // Only show number if seat is selected
+        if (status === 'selected') {
+            text.textContent = displayNumber;
+            text.style.display = 'block';
+        } else {
+            text.textContent = displayNumber;
+            text.style.display = 'none';  // Hide for non-selected seats
+        }
 
         seatGroup.appendChild(rect);
         seatGroup.appendChild(text);
@@ -540,9 +568,11 @@ class SeatPicker {
                     <span>Итого:</span>
                     <span class="summary-value summary-item-value highlight">${totalPrice}₪</span>
                 </div>
-                <div class="summary-row">
-                    <span>Места:</span>
-                    <span class="summary-value">${this.formatSeatList(this.selectedSeats)}</span>
+                <div style="margin-top: 8px;">
+                    <div style="font-size: 13px; margin-bottom: 6px; opacity: 0.9;">Места:</div>
+                    <div class="selected-seats-details">
+                        ${this.formatSeatListDetailed(this.selectedSeats)}
+                    </div>
                 </div>
                 ` : ''}
             </div>
@@ -578,9 +608,11 @@ class SeatPicker {
                         <span>Итого:</span>
                         <span class="summary-value summary-item-value highlight">${totalPrice}₪</span>
                     </div>
-                    <div class="summary-row">
-                        <span>Места:</span>
-                        <span class="summary-value">${this.formatSeatList(this.selectedSeats)}</span>
+                    <div style="margin-top: 8px;">
+                        <div style="font-size: 13px; margin-bottom: 6px; opacity: 0.9;">Места:</div>
+                        <div class="selected-seats-details">
+                            ${this.formatSeatListDetailed(this.selectedSeats)}
+                        </div>
                     </div>
                     ` : ''}
                 </div>
@@ -590,8 +622,31 @@ class SeatPicker {
 
     formatSeatList(seats) {
         if (seats.length === 0) return '';
-        if (seats.length <= 5) return seats.join(', ');
-        return `${seats.slice(0, 5).join(', ')} и ещё ${seats.length - 5}`;
+
+        // Convert internal seat IDs to display format
+        const formattedSeats = seats.map(seatId => {
+            const [rowId, seatIndex] = seatId.split('-');
+            const displayRow = parseInt(rowId) + 1;  // Rows are 1-indexed for display
+            const displaySeat = this.getSeatDisplayNumber(rowId, seatIndex);
+            return `${displayRow}-${displaySeat}`;
+        });
+
+        if (formattedSeats.length <= 5) {
+            return formattedSeats.join(', ');
+        }
+        return `${formattedSeats.slice(0, 5).join(', ')} и ещё ${formattedSeats.length - 5}`;
+    }
+
+    formatSeatListDetailed(seats) {
+        if (seats.length === 0) return '';
+
+        // Convert internal seat IDs to detailed format
+        return seats.map(seatId => {
+            const [rowId, seatIndex] = seatId.split('-');
+            const displayRow = parseInt(rowId) + 1;  // Rows are 1-indexed for display
+            const displaySeat = this.getSeatDisplayNumber(rowId, seatIndex);
+            return `<div style="font-size: 13px; padding: 3px 0;">Ряд ${displayRow}, место ${displaySeat}</div>`;
+        }).join('');
     }
 
     attachEventListeners() {
@@ -634,6 +689,7 @@ class SeatPicker {
 
         // Toggle selection
         const rect = seatElement.querySelector('rect');
+        const text = seatElement.querySelector('text');
         const ticketTypeId = seatElement.getAttribute('data-ticket-type');
         const color = this.ticketTypeColors[ticketTypeId] || '#10b981';
 
@@ -645,6 +701,8 @@ class SeatPicker {
             rect.setAttribute('fill', color);
             rect.setAttribute('stroke', this.darkenColor(color, 20));
             rect.setAttribute('stroke-width', '1');
+            // Hide seat number when deselected
+            if (text) text.style.display = 'none';
         } else {
             // Select
             this.selectedSeats.push(seatId);
@@ -653,6 +711,8 @@ class SeatPicker {
             rect.setAttribute('fill', '#9333ea');  // Purple for selected
             rect.setAttribute('stroke', '#7c3aed');  // Darker purple
             rect.setAttribute('stroke-width', '2');
+            // Show seat number when selected
+            if (text) text.style.display = 'block';
         }
 
         this.updateSummary();
@@ -836,12 +896,37 @@ class SeatPicker {
     }
 
     zoomIn() {
-        this.scale = Math.min(this.scale * 1.2, 3);
-        this.updateTransform();
+        const newScale = Math.min(this.scale * 1.2, 3);
+        this.zoomToCenter(newScale);
     }
 
     zoomOut() {
-        this.scale = Math.max(this.scale / 1.2, 0.5);
+        const newScale = Math.max(this.scale / 1.2, 0.5);
+        this.zoomToCenter(newScale);
+    }
+
+    zoomToCenter(newScale) {
+        // Get container dimensions
+        const container = this.container.querySelector('.seat-map-container');
+        if (!container) {
+            this.scale = newScale;
+            this.updateTransform();
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        // Calculate the point in the content space that's currently at the center
+        const contentX = (centerX - this.translateX) / this.scale;
+        const contentY = (centerY - this.translateY) / this.scale;
+
+        // Calculate new translation to keep that point at the center
+        this.translateX = centerX - contentX * newScale;
+        this.translateY = centerY - contentY * newScale;
+        this.scale = newScale;
+
         this.updateTransform();
     }
 
@@ -870,9 +955,15 @@ class SeatPicker {
         try {
             const availabilityData = await this.fetchAvailability();
 
+            // Filter reserved seats to exclude current session's reservations
+            const reservedSeatsDetails = availabilityData.reserved_seats_details || [];
+            const reservedByOthers = reservedSeatsDetails
+                .filter(r => r.session_id !== this.sessionId)
+                .map(r => r.seat_id);
+
             // Check if data actually changed
             const purchasedChanged = JSON.stringify(this.seatingData.purchased) !== JSON.stringify(availabilityData.purchased_seats || []);
-            const reservedChanged = JSON.stringify(this.seatingData.reserved) !== JSON.stringify(availabilityData.reserved_seats || []);
+            const reservedChanged = JSON.stringify(this.seatingData.reserved) !== JSON.stringify(reservedByOthers);
 
             if (!purchasedChanged && !reservedChanged) {
                 return; // No changes, skip update
@@ -880,7 +971,7 @@ class SeatPicker {
 
             // Update data
             this.seatingData.purchased = availabilityData.purchased_seats || [];
-            this.seatingData.reserved = availabilityData.reserved_seats || [];
+            this.seatingData.reserved = reservedByOthers;  // Only seats reserved by OTHER sessions
 
             // Update only seats that changed status
             this.container.querySelectorAll('[data-seat-id]').forEach(seatElement => {
@@ -892,6 +983,7 @@ class SeatPicker {
                 if (newStatus !== oldStatus) {
                     // Status changed, update element
                     const rect = seatElement.querySelector('rect');
+                    const text = seatElement.querySelector('text');
                     const ticketTypeId = seatElement.getAttribute('data-ticket-type');
                     const color = this.ticketTypeColors[ticketTypeId] || '#10b981';
 
@@ -904,18 +996,26 @@ class SeatPicker {
                         rect.setAttribute('fill', color);
                         rect.setAttribute('stroke', this.darkenColor(color, 20));
                         rect.setAttribute('stroke-width', '1');
+                        // Hide number for available seats
+                        if (text) text.style.display = 'none';
                     } else if (newStatus === 'selected') {
                         rect.setAttribute('fill', '#9333ea');  // Purple for selected
                         rect.setAttribute('stroke', '#7c3aed');  // Darker purple
                         rect.setAttribute('stroke-width', '2');
+                        // Show number for selected seats
+                        if (text) text.style.display = 'block';
                     } else if (newStatus === 'sold') {
                         rect.setAttribute('fill', '#6c757d');
                         rect.setAttribute('stroke', '#5a6268');
                         rect.setAttribute('stroke-width', '1');
+                        // Hide number for sold seats
+                        if (text) text.style.display = 'none';
                     } else if (newStatus === 'reserved') {
                         rect.setAttribute('fill', '#ffc107');
                         rect.setAttribute('stroke', '#e0a800');
                         rect.setAttribute('stroke-width', '1');
+                        // Hide number for reserved seats
+                        if (text) text.style.display = 'none';
                     }
 
                     // Update aria-label

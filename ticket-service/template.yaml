@@ -53,6 +53,13 @@ Parameters:
     MaxValue: 60
     Description: Payment expiration timeout in minutes
 
+  # Payment Mode
+  PaymentMode:
+    Type: String
+    Default: mock
+    AllowedValues: ["production", "mock"]
+    Description: Payment provider mode - production (AllPay) or mock (testing)
+
   # SES Email
   SenderEmail:
     Type: String
@@ -87,7 +94,7 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
-        PAYMENT_MODE: !If [IsProd, production, mock]
+        PAYMENT_MODE: !Ref PaymentMode
         EMAIL_SENDER_LAMBDA: !Sub yallabalagan-email-sender-${Environment}
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable

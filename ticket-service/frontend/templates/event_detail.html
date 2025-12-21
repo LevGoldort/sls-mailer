@@ -661,54 +661,63 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Proceed to checkout
-function proceedToCheckout() {
+async function proceedToCheckout() {
     if (!seatPicker || selectedSeats.length === 0) {
         alert('Пожалуйста, выберите места');
         return;
     }
 
-    // Get seat allocation from event data
-    const seatAllocation = EVENT_DATA.seat_allocation;
+    try {
+        // Reserve seats before proceeding to checkout
+        await seatPicker.reserveSeats();
 
-    // Group seats by ticket type
-    const seatsByType = {};
-    selectedSeats.forEach(seatId => {
-        const ticketTypeId = seatAllocation[seatId];
-        if (!seatsByType[ticketTypeId]) {
-            seatsByType[ticketTypeId] = [];
+        // Get seat allocation from event data
+        const seatAllocation = EVENT_DATA.seat_allocation;
+
+        // Group seats by ticket type
+        const seatsByType = {};
+        selectedSeats.forEach(seatId => {
+            const ticketTypeId = seatAllocation[seatId];
+            if (!seatsByType[ticketTypeId]) {
+                seatsByType[ticketTypeId] = [];
+            }
+            seatsByType[ticketTypeId].push(seatId);
+        });
+
+        // Create tickets array with seats
+        const tickets = Object.keys(seatsByType).map(typeId => ({
+            type_id: typeId,
+            quantity: seatsByType[typeId].length,
+            purchased_seats: seatsByType[typeId]
+        }));
+
+        // Get session ID from seat picker
+        const sessionId = seatPicker.sessionId;
+
+        // Store in sessionStorage
+        const orderData = {
+            event_id: EVENT_ID,
+            tickets: tickets,
+            purchased_seats: selectedSeats,
+            session_id: sessionId,
+            is_seated: true,
+            seating_map_config: seatPicker.options.seatingMapConfig  // Include numbering config
+        };
+
+        // Add coupon if applied
+        if (appliedCoupon) {
+            orderData.coupon_code = appliedCoupon.coupon.coupon_code;
         }
-        seatsByType[ticketTypeId].push(seatId);
-    });
 
-    // Create tickets array with seats
-    const tickets = Object.keys(seatsByType).map(typeId => ({
-        type_id: typeId,
-        quantity: seatsByType[typeId].length,
-        purchased_seats: seatsByType[typeId]
-    }));
+        console.log('Proceeding to checkout with order data:', orderData);
+        sessionStorage.setItem('orderData', JSON.stringify(orderData));
 
-    // Get session ID from seat picker
-    const sessionId = seatPicker.sessionId;
-
-    // Store in sessionStorage
-    const orderData = {
-        event_id: EVENT_ID,
-        tickets: tickets,
-        purchased_seats: selectedSeats,
-        session_id: sessionId,
-        is_seated: true
-    };
-
-    // Add coupon if applied
-    if (appliedCoupon) {
-        orderData.coupon_code = appliedCoupon.coupon.coupon_code;
+        // Navigate to checkout
+        window.location.href = '/checkout.html?seated=true';
+    } catch (error) {
+        console.error('Failed to proceed to checkout:', error);
+        // Error notification is already shown by seatPicker.reserveSeats()
     }
-
-    console.log('Proceeding to checkout with order data:', orderData);
-    sessionStorage.setItem('orderData', JSON.stringify(orderData));
-
-    // Navigate to checkout
-    window.location.href = '/checkout.html?seated=true';
 }
 {% endif %}
 </script>
