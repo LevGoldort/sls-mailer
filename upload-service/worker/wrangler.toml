@@ -1,0 +1,30 @@
+name = "file-upload-api"
+main = "src/index.js"
+compatibility_date = "2025-12-22"
+workers_dev = true
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "FILE_STORAGE"
+bucket_name = "video-uploads"
+
+# KV namespace binding for metadata
+[[kv_namespaces]]
+binding = "FILE_METADATA"
+id = "17bb09101ec54e07a4fda615cb1e7de8"
+
+# Environment variables (non-secret)
+[vars]
+PART_SIZE = "104857600"  # 100MB в байтах
+MAX_FILE_SIZE = "536870912000"  # 500GB лимит
+PRESIGNED_URL_EXPIRY = "900"  # 15 минут
+DOWNLOAD_URL_EXPIRY = "3600"  # 1 час
+
+# Secrets (устанавливаются через wrangler secret put):
+# - UPLOAD_PASSWORD
+# - DOWNLOAD_PASSWORD
+# - ADMIN_KEY
+# - TOKEN_SECRET
+# - R2_ACCESS_KEY_ID
+# - R2_SECRET_ACCESS_KEY
+# - R2_ENDPOINT

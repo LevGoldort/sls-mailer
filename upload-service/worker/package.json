@@ -1,0 +1,22 @@
+{
+  "name": "file-upload-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for large file uploads to R2",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:prod": "wrangler deploy --env production"
+  },
+  "keywords": ["cloudflare", "workers", "r2", "file-upload"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.478.0",
+    "@aws-sdk/s3-request-presigner": "^3.478.0",
+    "itty-router": "^4.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
