@@ -9,6 +9,7 @@ class MultipartUploader {
 		this.partSize = options.partSize || 100 * 1024 * 1024; // 100MB default
 		this.concurrency = options.concurrency || 3; // Параллельность загрузки
 		this.maxRetries = options.maxRetries || 3;
+		this.storage = options.storage || null; // UploadStorage instance
 
 		// State
 		this.uploadState = null;
@@ -18,9 +19,24 @@ class MultipartUploader {
 	}
 
 	/**
+	 * Проверить возможность возобновления загрузки
+	 */
+	async canResumeUpload(fileId) {
+		try {
+			const response = await fetch(`${this.apiBaseUrl}/api/resume-upload?fileId=${fileId}`);
+			if (!response.ok) return null;
+			const data = await response.json();
+			return data.success ? data : null;
+		} catch (error) {
+			console.error('Resume check error:', error);
+			return null;
+		}
+	}
+
+	/**
 	 * Загрузить файл
 	 */
-	async uploadFile(file, password, callbacks = {}) {
+	async uploadFile(file, password, callbacks = {}, resumeData = null) {
 		this.aborted = false;
 		this.startTime = Date.now();
 		this.uploadedBytes = 0;
@@ -28,22 +44,78 @@ class MultipartUploader {
 		const { onProgress, onSpeedUpdate, onError } = callbacks;
 
 		try {
-			// Шаг 1: Инициализация multipart upload
-			const initData = await this.initiateUpload(file, password);
+			let initData;
+			let alreadyUploadedParts = [];
+
+			// Проверка - resume или новая загрузка
+			if (resumeData && resumeData.fileId) {
+				// RESUME LOGIC
+				console.log('Resuming upload:', resumeData.fileId);
+				console.log('Resume data received:', resumeData);
+				console.log('uploadedPartsData:', resumeData.uploadedPartsData);
+
+				// Проверить что файл совпадает
+				if (file.size !== resumeData.fileSize || file.name !== resumeData.filename) {
+					throw new Error('Файл не совпадает с сохраненной загрузкой');
+				}
+
+				// Использовать существующий upload session
+				initData = {
+					fileId: resumeData.fileId,
+					uploadId: resumeData.uploadId,
+					totalParts: resumeData.totalParts,
+					partSize: resumeData.partSize,
+				};
+
+				alreadyUploadedParts = resumeData.uploadedPartsData || [];
+				console.log('Already uploaded parts:', alreadyUploadedParts);
+
+				// Рассчитать уже загруженные байты
+				this.uploadedBytes = alreadyUploadedParts.reduce((sum, part) => {
+					const partNumber = part.PartNumber;
+					const start = (partNumber - 1) * resumeData.partSize;
+					const end = Math.min(start + resumeData.partSize, file.size);
+					return sum + (end - start);
+				}, 0);
+
+				console.log(
+					`Resuming: ${alreadyUploadedParts.length}/${resumeData.totalParts} parts already uploaded (${formatBytes(this.uploadedBytes)})`
+				);
+			} else {
+				// NEW UPLOAD
+				initData = await this.initiateUpload(file, password);
+
+				// Сохранить в IndexedDB
+				if (this.storage) {
+					await this.storage.saveUpload({
+						fileId: initData.fileId,
+						uploadId: initData.uploadId,
+						filename: file.name,
+						fileSize: file.size,
+						contentType: file.type || 'application/octet-stream',
+						partSize: initData.partSize,
+						totalParts: initData.totalParts,
+						uploadedPartsData: [],
+						status: 'in-progress',
+					});
+				}
+			}
+
 			this.uploadState = initData;
 
 			if (onProgress) {
+				const completedParts = alreadyUploadedParts.length;
 				onProgress({
-					percentage: 0,
-					currentPart: 0,
+					percentage: (completedParts / initData.totalParts) * 100,
+					currentPart: completedParts,
 					totalParts: initData.totalParts,
-					uploadedBytes: 0,
+					uploadedBytes: this.uploadedBytes,
 					totalBytes: file.size,
 				});
 			}
 
-			// Шаг 2: Загрузка частей
-			const uploadedParts = await this.uploadParts(file, initData, {
+			// Шаг 2: Загрузка оставшихся частей
+			const newUploadedParts = await this.uploadParts(file, initData, {
 				onProgress: (progress) => {
 					if (onProgress) onProgress(progress);
 					if (onSpeedUpdate) {
@@ -53,19 +125,29 @@ class MultipartUploader {
 						onSpeedUpdate(speed, remaining);
 					}
 				},
-			});
+			}, alreadyUploadedParts);
 
 			// Проверка отмены
 			if (this.aborted) {
 				throw new Error('Загрузка отменена пользователем');
 			}
 
+			// Объединить старые и новые части
+			const allParts = [...alreadyUploadedParts, ...newUploadedParts].sort(
+				(a, b) => a.PartNumber - b.PartNumber
+			);
+
 			// Шаг 3: Финализация
 			const result = await this.completeUpload(
 				initData.fileId,
 				initData.uploadId,
-				uploadedParts
+				allParts
 			);
+
+			// Пометить как завершенную в IndexedDB
+			if (this.storage) {
+				await this.storage.markCompleted(initData.fileId);
+			}
 
 			return result;
 		} catch (error) {
@@ -113,22 +195,31 @@ class MultipartUploader {
 	/**
 	 * Загрузка всех частей файла
 	 */
-	async uploadParts(file, initData, callbacks = {}) {
+	async uploadParts(file, initData, callbacks = {}, alreadyUploadedParts = []) {
 		const { fileId, uploadId, totalParts, partSize } = initData;
 		const { onProgress } = callbacks;
 
 		const uploadedParts = [];
 		const queue = [];
 
-		// Создаем очередь частей
+		// Получить номера уже загруженных частей
+		const alreadyUploadedNumbers = alreadyUploadedParts.map((p) => p.PartNumber);
+
+		// Создаем очередь частей, исключая уже загруженные
 		for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
-			queue.push(partNumber);
+			if (!alreadyUploadedNumbers.includes(partNumber)) {
+				queue.push(partNumber);
+			}
 		}
+
+		console.log(
+			`Uploading ${queue.length} remaining parts (${alreadyUploadedParts.length} already done)`
+		);
 
 		// Загрузка с ограниченной параллельностью
 		const workers = [];
 		for (let i = 0; i < this.concurrency; i++) {
-			workers.push(this.uploadWorker(file, fileId, uploadId, partSize, queue, uploadedParts, onProgress, totalParts));
+			workers.push(this.uploadWorker(file, fileId, uploadId, partSize, queue, uploadedParts, onProgress, totalParts, alreadyUploadedParts));
 		}
 
 		await Promise.all(workers);
@@ -142,7 +233,7 @@ class MultipartUploader {
 	/**
 	 * Worker для параллельной загрузки частей
 	 */
-	async uploadWorker(file, fileId, uploadId, partSize, queue, uploadedParts, onProgress, totalParts) {
+	async uploadWorker(file, fileId, uploadId, partSize, queue, uploadedParts, onProgress, totalParts, alreadyUploadedParts = []) {
 		while (queue.length > 0) {
 			if (this.aborted) break;
 
@@ -165,11 +256,45 @@ class MultipartUploader {
 			uploadedParts.push(part);
 			this.uploadedBytes += chunk.size;
 
+			// Сообщить backend о загруженной части
+			try {
+				await fetch(`${this.apiBaseUrl}/api/part-uploaded`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						fileId,
+						uploadId,
+						partNumber: part.PartNumber,
+						etag: part.ETag,
+					}),
+				});
+			} catch (error) {
+				console.error('Failed to notify backend about uploaded part:', error);
+				// Не прерываем загрузку из-за ошибки уведомления
+			}
+
+			// Сохранить прогресс в IndexedDB
+			if (this.storage) {
+				try {
+					const existingData = await this.storage.getUpload(fileId);
+					if (existingData) {
+						const updatedPartsData = [...existingData.uploadedPartsData, part];
+						await this.storage.updateProgress(fileId, updatedPartsData);
+					}
+				} catch (error) {
+					console.error('Failed to save progress to IndexedDB:', error);
+					// Не прерываем загрузку из-за ошибки IndexedDB
+				}
+			}
+
 			// Обновить прогресс
 			if (onProgress) {
+				const totalUploadedParts = alreadyUploadedParts.length + uploadedParts.length;
 				onProgress({
-					percentage: (uploadedParts.length / totalParts) * 100,
-					currentPart: uploadedParts.length,
+					percentage: (totalUploadedParts / totalParts) * 100,
+					currentPart: totalUploadedParts,
 					totalParts,
 					uploadedBytes: this.uploadedBytes,
 					totalBytes: file.size,

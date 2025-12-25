@@ -41,6 +41,11 @@ export async function handleGetPresignedUrl(request, env) {
 			);
 		}
 
+		// Продлить TTL метаданных чтобы они не истекли во время длительной загрузки
+		await env.FILE_METADATA.put(fileId, metadataStr, {
+			expirationTtl: 172800, // 48 hours
+		});
+
 		// Генерация presigned URL
 		const r2Client = createR2Client(env);
 		const bucketName = env.FILE_STORAGE.name || 'video-uploads';

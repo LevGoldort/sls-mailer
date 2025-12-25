@@ -155,6 +155,36 @@
             </div>
         </main>
 
+        <!-- Resume Upload Modal -->
+        <div id="resume-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>🔄 Найдена незавершенная загрузка</h3>
+                <p>Вы можете продолжить с того места, где остановились.</p>
+                <div class="resume-stats">
+                    <div class="stat">
+                        <span class="stat-label">Файл:</span>
+                        <span id="resume-filename"></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Размер:</span>
+                        <span id="resume-filesize"></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Загружено:</span>
+                        <span id="resume-progress"></span>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button id="resume-continue-btn" class="btn btn-primary">
+                        Продолжить загрузку
+                    </button>
+                    <button id="resume-cancel-btn" class="btn btn-secondary">
+                        Отменить и начать новую
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <footer>
             <p>
                 <a href="admin.html">Админ-панель</a>
@@ -163,6 +193,7 @@
         </footer>
     </div>
 
+    <script src="js/upload-storage.js"></script>
     <script src="js/uploader.js"></script>
     <script src="js/upload-page.js"></script>
 </body>

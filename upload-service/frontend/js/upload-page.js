@@ -37,13 +37,24 @@ const retryBtn = document.getElementById('retry-btn');
 // State
 let uploader = null;
 let currentFile = null;
+let uploadStorage = null;
+let pendingResumeData = null;
 
 // Инициализация
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+	// Инициализация storage
+	uploadStorage = new UploadStorage();
+	await uploadStorage.init();
+
+	// Uploader с storage
 	uploader = new MultipartUploader(API_BASE_URL, {
 		concurrency: 3,
 		maxRetries: 3,
+		storage: uploadStorage,
 	});
+
+	// Проверка незавершенных загрузок
+	await checkForResumeUploads();
 
 	// Event listeners
 	fileInput.addEventListener('change', handleFileSelect);
@@ -53,6 +64,85 @@ document.addEventListener('DOMContentLoaded', () => {
 	uploadAnotherBtn.addEventListener('click', resetForm);
 	retryBtn.addEventListener('click', resetForm);
 });
+
+/**
+ * Проверка незавершенных загрузок при загрузке страницы
+ */
+async function checkForResumeUploads() {
+	try {
+		const inProgressUploads = await uploadStorage.getInProgressUploads();
+
+		if (inProgressUploads.length > 0) {
+			// Взять последнюю незавершенную загрузку
+			const latest = inProgressUploads.sort((a, b) => b.timestamp - a.timestamp)[0];
+
+			// Проверить с backend что загрузка еще активна
+			const resumeInfo = await uploader.canResumeUpload(latest.fileId);
+
+			if (resumeInfo && resumeInfo.success) {
+				showResumeModal(resumeInfo);
+				pendingResumeData = resumeInfo;
+			} else {
+				// Истекло - удалить из IndexedDB
+				await uploadStorage.deleteUpload(latest.fileId);
+			}
+		}
+
+		// Очистка старых записей (>7 дней)
+		await uploadStorage.clearOldUploads(7);
+	} catch (error) {
+		console.error('Resume check error:', error);
+	}
+}
+
+/**
+ * Показать modal для возобновления загрузки
+ */
+function showResumeModal(resumeInfo) {
+	const modal = document.getElementById('resume-modal');
+	const percentDone = Math.round(
+		(resumeInfo.completedParts / resumeInfo.totalParts) * 100
+	);
+
+	document.getElementById('resume-filename').textContent = resumeInfo.filename;
+	document.getElementById('resume-filesize').textContent = formatBytes(resumeInfo.fileSize);
+	document.getElementById('resume-progress').textContent =
+		`${resumeInfo.completedParts} из ${resumeInfo.totalParts} частей (${percentDone}%)`;
+
+	modal.style.display = 'flex';
+
+	document.getElementById('resume-continue-btn').onclick = handleResumeContinue;
+	document.getElementById('resume-cancel-btn').onclick = handleResumeCancel;
+}
+
+/**
+ * Продолжить загрузку
+ */
+async function handleResumeContinue() {
+	document.getElementById('resume-modal').style.display = 'none';
+	// Попросить пользователя выбрать тот же файл
+	fileInput.click();
+}
+
+/**
+ * Отменить и начать новую загрузку
+ */
+async function handleResumeCancel() {
+	document.getElementById('resume-modal').style.display = 'none';
+
+	if (pendingResumeData) {
+		try {
+			// Отменить загрузку на бэкенде
+			await uploader.abortUpload(pendingResumeData.fileId, pendingResumeData.uploadId);
+		} catch (error) {
+			console.error('Abort error:', error);
+		}
+
+		// Удалить из IndexedDB
+		await uploadStorage.deleteUpload(pendingResumeData.fileId);
+		pendingResumeData = null;
+	}
+}
 
 /**
  * Обработка выбора файла
@@ -66,6 +156,34 @@ function handleFileSelect(e) {
 	}
 
 	currentFile = file;
+
+	// Если есть pending resume - проверить совпадение
+	if (pendingResumeData) {
+		if (
+			file.size === pendingResumeData.fileSize &&
+			file.name === pendingResumeData.filename
+		) {
+			fileInfo.innerHTML = `
+				<strong>✅ ${file.name}</strong><br>
+				<span style="color: #28a745;">Файл совпадает - загрузка будет продолжена</span><br>
+				Прогресс: ${pendingResumeData.completedParts}/${pendingResumeData.totalParts} частей<br>
+				Размер: ${formatBytes(file.size)}
+			`;
+			return;
+		} else {
+			// Не совпадает - отменить resume
+			pendingResumeData = null;
+			fileInfo.innerHTML = `
+				<strong>${file.name}</strong><br>
+				<span style="color: #dc3545;">Файл не совпадает с незавершенной загрузкой - начнется новая загрузка</span><br>
+				Размер: ${formatBytes(file.size)}<br>
+				Тип: ${file.type || 'неизвестен'}
+			`;
+			return;
+		}
+	}
+
+	// Обычное отображение
 	fileInfo.innerHTML = `
 		<strong>${file.name}</strong><br>
 		Размер: ${formatBytes(file.size)}<br>
@@ -87,7 +205,8 @@ async function handleUploadSubmit(e) {
 		return;
 	}
 
-	if (!password) {
+	// При resume пароль не нужен (уже есть fileId/uploadId)
+	if (!password && !pendingResumeData) {
 		showError('Введите пароль');
 		return;
 	}
@@ -96,13 +215,21 @@ async function handleUploadSubmit(e) {
 	showProgress();
 
 	try {
-		const result = await uploader.uploadFile(file, password, {
-			onProgress: updateProgress,
-			onSpeedUpdate: updateSpeed,
-			onError: (error) => {
-				console.error('Upload error:', error);
+		const result = await uploader.uploadFile(
+			file,
+			password,
+			{
+				onProgress: updateProgress,
+				onSpeedUpdate: updateSpeed,
+				onError: (error) => {
+					console.error('Upload error:', error);
+				},
 			},
-		});
+			pendingResumeData // Передать resume data
+		);
+
+		// Сбросить pending resume
+		pendingResumeData = null;
 
 		// Показать результат
 		showResult(result);

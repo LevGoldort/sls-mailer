@@ -16,7 +16,8 @@ NC='\033[0m' # No Color
 WORKER_DIR="worker"
 FRONTEND_DIR="frontend"
 S3_BUCKET_DEV="yallabalagan-upload-service"
-S3_BUCKET_PROD="yallabalagan-upload-service-prod"
+S3_BUCKET_PROD="yallabalagan-upload-service-production"
+AWS_PROFILE_PROD="prod"
 
 # Функции для вывода
 print_header() {
@@ -75,10 +76,10 @@ deploy_frontend_prod() {
     cd "$FRONTEND_DIR"
 
     print_info "Syncing to s3://$S3_BUCKET_PROD..."
-    aws s3 sync . s3://$S3_BUCKET_PROD
+    aws s3 sync . s3://$S3_BUCKET_PROD --profile "$AWS_PROFILE_PROD"
 
     print_success "Frontend deployed to PROD!"
-    print_info "URL: http://$S3_BUCKET_PROD.s3-website.eu-north-1.amazonaws.com/upload.html"
+    print_info "URL: https://upload.yallabalagan.org"
     echo ""
 
     cd ..
@@ -192,7 +193,7 @@ main() {
     fi
 
     if [ "$DEPLOY_FRONTEND_PROD" = true ]; then
-        echo -e "${GREEN}Frontend PROD:${NC} http://$S3_BUCKET_PROD.s3-website.eu-north-1.amazonaws.com/upload.html"
+        echo -e "${GREEN}Frontend PROD:${NC} https://upload.yallabalagan.org"
     fi
 
     echo ""

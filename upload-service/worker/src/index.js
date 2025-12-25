@@ -9,6 +9,8 @@ import { handleGetPresignedUrl } from './handlers/get-presigned-url.js';
 import { handleCompleteUpload } from './handlers/complete-upload.js';
 import { handleDownload } from './handlers/download.js';
 import { handleAbortUpload } from './handlers/abort-upload.js';
+import { handleResumeUpload } from './handlers/resume-upload.js';
+import { handlePartUploaded } from './handlers/part-uploaded.js';
 import { handleAdminList, handleAdminDelete } from './handlers/admin.js';
 import { handleOptions, errorResponse } from './lib/cors.js';
 
@@ -21,8 +23,10 @@ router.options('*', handleOptions);
 // Upload endpoints
 router.post('/api/initiate-upload', handleInitiateUpload);
 router.post('/api/get-presigned-url', handleGetPresignedUrl);
+router.post('/api/part-uploaded', handlePartUploaded);
 router.post('/api/complete-upload', handleCompleteUpload);
 router.post('/api/abort-upload', handleAbortUpload);
+router.get('/api/resume-upload', handleResumeUpload);
 
 // Download endpoint
 router.get('/api/download/:fileId', handleDownload);
