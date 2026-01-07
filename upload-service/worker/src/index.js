@@ -41,6 +41,7 @@ router.get('/health', () => {
 		JSON.stringify({
 			status: 'healthy',
 			service: 'file-upload-api',
+			version: '2.0.0-kv-optimized', // Оптимизация KV: ~97% меньше операций put()
 			timestamp: new Date().toISOString(),
 		}),
 		{

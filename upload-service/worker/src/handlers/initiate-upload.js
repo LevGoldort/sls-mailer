@@ -51,6 +51,7 @@ export async function handleInitiateUpload(request, env) {
 		});
 
 		// Сохранение метаданных в KV (TTL 48 часов = 172800 сек)
+		// ОПТИМИЗАЦИЯ: Не храним uploadedParts в KV, они хранятся в R2
 		const metadata = {
 			uploadId,
 			filename,
@@ -59,7 +60,6 @@ export async function handleInitiateUpload(request, env) {
 			partSize,
 			totalParts,
 			status: 'in-progress',
-			uploadedParts: [],
 			createdAt: new Date().toISOString(),
 		};
 

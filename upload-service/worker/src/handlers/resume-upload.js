@@ -1,9 +1,11 @@
 /**
  * Handler: GET /api/resume-upload?fileId={fileId}
  * Получить информацию о незавершенной загрузке для возобновления
+ * ОПТИМИЗАЦИЯ: Получаем список частей из R2, а не из KV
  */
 
 import { jsonResponse, errorResponse } from '../lib/cors.js';
+import { createR2Client, listUploadedParts } from '../lib/r2-client.js';
 
 export async function handleResumeUpload(request, env) {
 	try {
@@ -39,11 +41,20 @@ export async function handleResumeUpload(request, env) {
 			return errorResponse('Загрузка уже завершена', 400);
 		}
 
-		// Получить список загруженных частей из metadata (не из R2!)
-		// Части сохраняются в metadata через /api/part-uploaded endpoint
-		const uploadedPartsData = metadata.uploadedParts || [];
+		// ОПТИМИЗАЦИЯ: Получить список загруженных частей напрямую из R2
+		// Это позволяет не хранить части в KV, экономя операции put()
+		const r2Client = createR2Client(env);
+		const bucketName = env.FILE_STORAGE.name || 'video-uploads';
+		const key = `uploads/${fileId}`;
 
-		console.log('[Resume] Uploaded parts from metadata:', {
+		const uploadedPartsData = await listUploadedParts(
+			r2Client,
+			bucketName,
+			key,
+			metadata.uploadId
+		);
+
+		console.log('[Resume] Uploaded parts from R2:', {
 			fileId,
 			partsCount: uploadedPartsData.length,
 			totalParts: metadata.totalParts,
@@ -65,7 +76,8 @@ export async function handleResumeUpload(request, env) {
 			remainingCount: remainingParts.length,
 		});
 
-		// Продлить TTL метаданных (refresh на 48 часов)
+		// Продлить TTL метаданных только при resume (не при каждой части)
+		// Это одна операция put() вместо сотен
 		await env.FILE_METADATA.put(fileId, metadataStr, {
 			expirationTtl: 172800, // 48 hours
 		});

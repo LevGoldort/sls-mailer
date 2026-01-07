@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # 🚀 Deploy Script для Upload Service
@@ -43,6 +44,9 @@ deploy_worker() {
     print_header "Deploying Cloudflare Worker"
 
     cd "$WORKER_DIR"
+
+    print_info "Installing dependencies..."
+    npm install
 
     print_info "Running npm run deploy..."
     npm run deploy

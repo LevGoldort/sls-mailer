@@ -41,10 +41,8 @@ export async function handleGetPresignedUrl(request, env) {
 			);
 		}
 
-		// Продлить TTL метаданных чтобы они не истекли во время длительной загрузки
-		await env.FILE_METADATA.put(fileId, metadataStr, {
-			expirationTtl: 172800, // 48 hours
-		});
+		// ОПТИМИЗАЦИЯ: Убрали put() здесь, чтобы сократить количество записей в KV.
+		// TTL будет продлеваться при фактической загрузке части в part-uploaded handler.
 
 		// Генерация presigned URL
 		const r2Client = createR2Client(env);

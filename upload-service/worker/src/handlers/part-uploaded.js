@@ -28,34 +28,29 @@ export async function handlePartUploaded(request, env) {
 			return errorResponse('Некорректный ID загрузки', 400);
 		}
 
-		// Добавить часть в uploadedParts если еще нет
-		if (!metadata.uploadedParts) {
-			metadata.uploadedParts = [];
-		}
+		// ОПТИМИЗАЦИЯ: Не сохраняем список частей в KV!
+		// Список частей хранится в R2 и получается через listUploadedParts() при resume.
+		// Это экономит сотни операций put() в KV.
 
-		// Проверить что эта часть еще не добавлена
-		const exists = metadata.uploadedParts.some((p) => p.PartNumber === partNumber);
-		if (!exists) {
-			metadata.uploadedParts.push({
-				PartNumber: partNumber,
-				ETag: etag,
-			});
+		// Продлеваем TTL только каждые 20 частей или на последней части
+		// Это предотвращает истечение срока действия метаданных при длительной загрузке
+		const shouldRefreshTTL =
+			partNumber % 20 === 0 || // каждые 20 частей
+			partNumber === metadata.totalParts; // последняя часть
 
-			// Сортировать по номеру части
-			metadata.uploadedParts.sort((a, b) => a.PartNumber - b.PartNumber);
-
-			// Обновить metadata в KV с продлением TTL
-			await env.FILE_METADATA.put(fileId, JSON.stringify(metadata), {
+		if (shouldRefreshTTL) {
+			await env.FILE_METADATA.put(fileId, metadataStr, {
 				expirationTtl: 172800, // 48 hours
 			});
-
-			console.log(`Part ${partNumber} uploaded for ${fileId} (${metadata.uploadedParts.length}/${metadata.totalParts})`);
+			console.log(`[TTL REFRESH] Part ${partNumber}/${metadata.totalParts} - fileId: ${fileId}`);
 		}
+
+		console.log(`[PART OK] Part ${partNumber}/${metadata.totalParts} uploaded - fileId: ${fileId}`);
 
 		return jsonResponse(
 			{
 				success: true,
-				uploadedParts: metadata.uploadedParts.length,
+				partNumber,
 				totalParts: metadata.totalParts,
 			},
 			200
