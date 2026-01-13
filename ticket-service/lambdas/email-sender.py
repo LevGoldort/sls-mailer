@@ -58,7 +58,7 @@ def load_email_template() -> str:
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <p><strong>📅 Дата и время:</strong> {{ event_date_formatted }}</p>
             <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
-            <p><strong>🎫 Количество билетов:</strong> {{ total_tickets }}</p>
+            <p><strong>🎫 Билеты:</strong> {% for ticket in order.tickets %}{{ ticket.quantity }}x {{ ticket.type_name }}{% if ticket.purchased_seats %} ({% for seat_id in ticket.purchased_seats %}{% set seat_parts = seat_id.split('-') %}Ряд {{ seat_parts[0] }}, Место {{ seat_parts[1] }}{% if not loop.last %}; {% endif %}{% endfor %}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
             <p><strong>💰 Сумма:</strong> {{ order.total_amount }} {{ order.currency }}</p>
             <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
         </div>
@@ -75,6 +75,10 @@ def load_email_template() -> str:
                     <div style="display: table-cell; vertical-align: top; width: 60%;">
                         <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #667eea;">{{ event.title }}</p>
                         <p style="margin: 0 0 6px 0; font-size: 14px; color: #333;">🎫 {{ qr['ticket_type_name'] }}</p>
+                        {% if qr['seat_id'] %}
+                        {% set seat_parts = qr['seat_id'].split('-') %}
+                        <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #667eea;">💺 Ряд {{ seat_parts[0] }}, Место {{ seat_parts[1] }}</p>
+                        {% endif %}
                         <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">📍 <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a></p>
                         {% if location_address %}
                         <p style="margin: 0; font-size: 12px; color: #999;">{{ location_address }}</p>

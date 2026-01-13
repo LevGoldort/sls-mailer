@@ -18,11 +18,47 @@ Parameters:
     Default: ""
     Description: Telegram Bot Token for admin bot (optional for dev)
 
+  # All-Pay Login
+  AllPayLogin:
+    Type: String
+    NoEcho: true
+    Description: AllPay login username for API and refunds
+    Default: ""
+
   # All-Pay Webhook Secret
   AllPayWebhookSecret:
     Type: String
     NoEcho: true
     Description: All-Pay webhook secret for payment verification
+
+  # All-Pay API Key
+  AllPayApiKey:
+    Type: String
+    NoEcho: true
+    Description: AllPay API key for request signatures
+    Default: ""
+
+  # All-Pay Use API Flag
+  AllPayUseApi:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Feature flag - use API instead of payment links
+
+  # Payment Expiration Minutes
+  PaymentExpireMinutes:
+    Type: Number
+    Default: 10
+    MinValue: 5
+    MaxValue: 60
+    Description: Payment expiration timeout in minutes
+
+  # Payment Mode
+  PaymentMode:
+    Type: String
+    Default: mock
+    AllowedValues: ["production", "mock"]
+    Description: Payment provider mode - production (AllPay) or mock (testing)
 
   # SES Email
   SenderEmail:
@@ -41,6 +77,15 @@ Parameters:
     Default: "738718761834602"
     Description: Facebook Pixel ID
 
+  AdminApiKeys:
+    Type: String
+    NoEcho: true
+    Default: "test,test2"
+    Description: Comma-separated list of admin API keys
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
 Globals:
   Function:
     Runtime: python3.12
@@ -49,9 +94,13 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
+        PAYMENT_MODE: !Ref PaymentMode
+        EMAIL_SENDER_LAMBDA: !If [IsProd, yallabalagan-email-sender, !Sub yallabalagan-email-sender-${Environment}]
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
+        COUPONS_TABLE: !Ref CouponsTable
+        SEAT_RESERVATIONS_TABLE: !Ref SeatReservationsTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -63,7 +112,7 @@ Resources:
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub yallabalagan-events-${Environment}
+      TableName: !If [IsProd, yallabalagan-events, !Sub yallabalagan-events-${Environment}]
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -75,6 +124,8 @@ Resources:
         - AttributeName: GSI1SK
           AttributeType: S
         - AttributeName: date
+          AttributeType: S
+        - AttributeName: slug
           AttributeType: S
       KeySchema:
         - AttributeName: PK
@@ -98,6 +149,12 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -107,7 +164,7 @@ Resources:
   LocationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub yallabalagan-locations-${Environment}
+      TableName: !If [IsProd, yallabalagan-locations, !Sub yallabalagan-locations-${Environment}]
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -137,7 +194,7 @@ Resources:
   OrdersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub yallabalagan-orders-${Environment}
+      TableName: !If [IsProd, yallabalagan-orders, !Sub yallabalagan-orders-${Environment}]
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -178,6 +235,75 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  CouponsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !If [IsProd, yallabalagan-coupons, !Sub yallabalagan-coupons-${Environment}]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: valid_until
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: valid_until
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  SeatReservationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !If [IsProd, yallabalagan-seat-reservations, !Sub yallabalagan-seat-reservations-${Environment}]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: seat_id
+          AttributeType: S
+        - AttributeName: expires_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+        - AttributeName: seat_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ExpirationIndex
+          KeySchema:
+            - AttributeName: event_id
+              KeyType: HASH
+            - AttributeName: expires_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   ##############################################################################
   # S3 Buckets
   ##############################################################################
@@ -185,7 +311,7 @@ Resources:
   MediaBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub yallabalagan-ticket-media-${Environment}
+      BucketName: !If [IsProd, yallabalagan-ticket-media, !Sub yallabalagan-ticket-media-${Environment}]
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -218,12 +344,12 @@ Resources:
             Effect: Allow
             Principal: '*'
             Action: s3:GetObject
-            Resource: !Sub ${MediaBucket.Arn}/public/*
+            Resource: !Sub ${MediaBucket.Arn}/*
 
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub yallabalagan-tickets-frontend-${Environment}
+      BucketName: !If [IsProd, yallabalagan-tickets-frontend, !Sub yallabalagan-tickets-frontend-${Environment}]
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -253,7 +379,7 @@ Resources:
   AdminBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub yallabalagan-ticket-admin-${Environment}
+      BucketName: !If [IsProd, yallabalagan-ticket-admin, !Sub yallabalagan-ticket-admin-${Environment}]
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -287,13 +413,18 @@ Resources:
   TicketApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub yallabalagan-ticket-api-${Environment}
+      FunctionName: !If [IsProd, yallabalagan-ticket-api, !Sub yallabalagan-ticket-api-${Environment}]
       CodeUri: .
       Handler: lambdas/api-handler.lambda_handler
       Description: Main API handler for ticket service
       Environment:
         Variables:
+          ALLPAY_LOGIN: !Ref AllPayLogin
           ALLPAY_WEBHOOK_SECRET: !Ref AllPayWebhookSecret
+          ALLPAY_API_KEY: !Ref AllPayApiKey
+          ALLPAY_USE_API: !Ref AllPayUseApi
+          PAYMENT_EXPIRE_MINUTES: !Ref PaymentExpireMinutes
+          ADMIN_API_KEYS: !Ref AdminApiKeys
       Events:
         ApiEvent:
           Type: HttpApi
@@ -308,14 +439,26 @@ Resources:
             TableName: !Ref LocationsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref OrdersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CouponsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SeatReservationsTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !GetAtt SiteRegeneratorFunction.Arn
+                - !GetAtt EmailSenderFunction.Arn
 
   # Site Regenerator
   SiteRegeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub yallabalagan-site-regenerator-${Environment}
+      FunctionName: !If [IsProd, yallabalagan-site-regenerator, !Sub yallabalagan-site-regenerator-${Environment}]
       CodeUri: .
       Handler: lambdas/site-regenerator.lambda_handler
       Description: Generates static site from DynamoDB data
@@ -347,7 +490,7 @@ Resources:
   EmailSenderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub yallabalagan-email-sender-${Environment}
+      FunctionName: !If [IsProd, yallabalagan-email-sender, !Sub yallabalagan-email-sender-${Environment}]
       CodeUri: .
       Handler: lambdas/email-sender.lambda_handler
       Description: Sends ticket confirmation emails
@@ -360,7 +503,7 @@ Resources:
             TableName: !Ref EventsTable
         - DynamoDBReadPolicy:
             TableName: !Ref LocationsTable
-        - DynamoDBReadPolicy:
+        - DynamoDBCrudPolicy:
             TableName: !Ref OrdersTable
         - SESCrudPolicy:
             IdentityName: !Ref SenderEmail
@@ -369,7 +512,7 @@ Resources:
   EventStatusUpdaterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub yallabalagan-event-status-updater-${Environment}
+      FunctionName: !If [IsProd, yallabalagan-event-status-updater, !Sub yallabalagan-event-status-updater-${Environment}]
       CodeUri: .
       Handler: lambdas/event-status-updater.lambda_handler
       Description: Updates event status based on date/time
@@ -386,7 +529,7 @@ Resources:
   PendingOrdersCleanerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub yallabalagan-pending-orders-cleaner-${Environment}
+      FunctionName: !If [IsProd, yallabalagan-pending-orders-cleaner, !Sub yallabalagan-pending-orders-cleaner-${Environment}]
       CodeUri: .
       Handler: lambdas/pending-orders-cleaner.lambda_handler
       Description: Cleans up expired pending orders
@@ -408,7 +551,7 @@ Resources:
   SiteTemplatesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: !Sub yallabalagan-site-templates-${Environment}
+      LayerName: !If [IsProd, yallabalagan-site-templates, !Sub yallabalagan-site-templates-${Environment}]
       Description: Jinja2 templates for site generation
       ContentUri: frontend/
       CompatibleRuntimes:
@@ -466,40 +609,46 @@ Outputs:
     Description: API Gateway endpoint URL
     Value: !Sub https://${TicketApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
-      Name: !Sub ${Environment}-TicketApiUrl
+      Name: !If [IsProd, TicketApiUrl, !Sub ${Environment}-TicketApiUrl]
 
   FrontendUrl:
     Description: Frontend S3 website URL
     Value: !GetAtt FrontendBucket.WebsiteURL
     Export:
-      Name: !Sub ${Environment}-FrontendUrl
+      Name: !If [IsProd, FrontendUrl, !Sub ${Environment}-FrontendUrl]
 
   AdminUrl:
     Description: Admin S3 website URL
     Value: !GetAtt AdminBucket.WebsiteURL
     Export:
-      Name: !Sub ${Environment}-AdminUrl
+      Name: !If [IsProd, AdminUrl, !Sub ${Environment}-AdminUrl]
 
   EventsTableName:
     Description: DynamoDB Events Table Name
     Value: !Ref EventsTable
     Export:
-      Name: !Sub ${Environment}-EventsTable
+      Name: !If [IsProd, EventsTable, !Sub ${Environment}-EventsTable]
 
   LocationsTableName:
     Description: DynamoDB Locations Table Name
     Value: !Ref LocationsTable
     Export:
-      Name: !Sub ${Environment}-LocationsTable
+      Name: !If [IsProd, LocationsTable, !Sub ${Environment}-LocationsTable]
 
   OrdersTableName:
     Description: DynamoDB Orders Table Name
     Value: !Ref OrdersTable
     Export:
-      Name: !Sub ${Environment}-OrdersTable
+      Name: !If [IsProd, OrdersTable, !Sub ${Environment}-OrdersTable]
 
   MediaBucketName:
     Description: Media S3 Bucket Name
     Value: !Ref MediaBucket
     Export:
-      Name: !Sub ${Environment}-MediaBucket
+      Name: !If [IsProd, MediaBucket, !Sub ${Environment}-MediaBucket]
+
+  SeatReservationsTableName:
+    Description: DynamoDB Seat Reservations Table Name
+    Value: !Ref SeatReservationsTable
+    Export:
+      Name: !If [IsProd, SeatReservationsTable, !Sub ${Environment}-SeatReservationsTable]

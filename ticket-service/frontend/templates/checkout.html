@@ -74,6 +74,14 @@
                         <span id="summary-subtotal"></span>
                     </div>
 
+                    <!-- Selected Seats (for seated venues) -->
+                    <div id="selected-seats-section" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 0.5rem;">
+                        <h4 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem;">Выбранные места:</h4>
+                        <div id="selected-seats-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            <!-- Seats will be populated by JS -->
+                        </div>
+                    </div>
+
                     <div class="summary-row" id="coupon-row" style="display: none; color: var(--success, #059669);">
                         <span>Купон (<span id="summary-coupon-code"></span>)</span>
                         <span id="summary-discount"></span>
@@ -113,6 +121,33 @@
             </a>
         </div>
     </div>
+
+    <!-- Payment iframe container (hidden initially) -->
+    <div id="payment-container" style="display: none; max-width: 900px; margin: 2rem auto;">
+        <div class="checkout-card">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">
+                Оплата заказа
+            </h2>
+            <p style="color: var(--gray-600); margin-bottom: 1.5rem;">
+                Заполните данные карты для завершения покупки. Все данные защищены и передаются по защищенному соединению.
+            </p>
+            <iframe
+                id="allpay-payment-iframe"
+                allow="payment *"
+                style="width: 100%; height: 600px; border: 1px solid var(--gray-200); border-radius: 0.5rem; margin-bottom: 1rem;">
+            </iframe>
+            <button
+                id="complete-payment-btn"
+                onclick="processPayment()"
+                class="btn btn-primary btn-large"
+                style="width: 100%;">
+                Оплатить
+            </button>
+            <p style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1rem;">
+                🔒 Защищенная оплата через All-Pay
+            </p>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -123,12 +158,34 @@
 }
 </style>
 
+<!-- AllPay Hosted Fields Library -->
+<script src="https://allpay.to/js/allpay-hf.js"></script>
+
 <script>
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
-const eventId = urlParams.get('event_id');
-const ticketTypeId = urlParams.get('ticket_type');
-const couponCode = urlParams.get('coupon');
+const isSeatedCheckout = urlParams.get('seated') === 'true';
+
+// AllPay Hosted Fields instance
+let AllpayInstance = null;
+
+// Check for sessionStorage data (seated venues)
+let orderDataFromSession = null;
+if (isSeatedCheckout) {
+    const storedData = sessionStorage.getItem('orderData');
+    if (storedData) {
+        try {
+            orderDataFromSession = JSON.parse(storedData);
+        } catch (e) {
+            console.error('Failed to parse orderData from sessionStorage:', e);
+        }
+    }
+}
+
+// Fallback to URL parameters (unseated venues)
+const eventId = orderDataFromSession ? orderDataFromSession.event_id : urlParams.get('event_id');
+const ticketTypeId = !orderDataFromSession ? urlParams.get('ticket_type') : null;
+const couponCode = orderDataFromSession?.coupon_code || urlParams.get('coupon');
 
 // API Configuration
 const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
@@ -160,7 +217,9 @@ function formatTime(dateStr) {
 
 // Load event and ticket data
 async function loadCheckoutData() {
-    if (!eventId || !ticketTypeId) {
+    // For seated venues, we need event_id and sessionStorage data
+    // For unseated venues, we need event_id and ticket_type
+    if (!eventId || (!orderDataFromSession && !ticketTypeId)) {
         showError('Неверные параметры. Пожалуйста, выберите событие и тип билета.');
         return;
     }
@@ -192,18 +251,33 @@ async function loadCheckoutData() {
             }
         }
 
-        // Find ticket type
-        ticketTypeData = eventData.ticket_types.find(t => t.id === ticketTypeId);
-        if (!ticketTypeData) {
-            throw new Error('Тип билета не найден');
-        }
+        // Handle ticket data differently for seated vs unseated
+        if (orderDataFromSession) {
+            // Seated venue: use data from sessionStorage
+            // Calculate total price from all selected tickets
+            ticketPrice = 0;
+            orderDataFromSession.tickets.forEach(ticket => {
+                const type = eventData.ticket_types.find(t => t.id === ticket.type_id);
+                if (type) {
+                    ticketPrice += type.price * ticket.quantity;
+                }
+            });
+            // For summary display, use first ticket type
+            ticketTypeData = eventData.ticket_types.find(t => t.id === orderDataFromSession.tickets[0].type_id);
+        } else {
+            // Unseated venue: use single ticket type from URL
+            ticketTypeData = eventData.ticket_types.find(t => t.id === ticketTypeId);
+            if (!ticketTypeData) {
+                throw new Error('Тип билета не найден');
+            }
 
-        if (ticketTypeData.available === 0) {
-            throw new Error('К сожалению, билеты этого типа проданы');
-        }
+            if (ticketTypeData.available === 0) {
+                throw new Error('К сожалению, билеты этого типа проданы');
+            }
 
-        // Set ticket price
-        ticketPrice = ticketTypeData.price;
+            // Set ticket price
+            ticketPrice = ticketTypeData.price;
+        }
 
         // Validate and apply coupon if provided
         if (couponCode) {
@@ -245,8 +319,8 @@ function renderCheckout() {
             </div>
         </div>
 
-        <!-- Ticket Selection -->
-        <div style="margin-top: 1.5rem;">
+        <!-- Ticket Selection (only for unseated venues) -->
+        <div style="margin-top: 1.5rem; ${orderDataFromSession ? 'display: none;' : ''}">
             <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Тип билета</h3>
             <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -267,7 +341,7 @@ function renderCheckout() {
                 </div>
 
                 <!-- Quantity Selector -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" id="quantity-selector" style="margin-bottom: 0;">
                     <label class="form-label">Количество билетов</label>
                     <select id="quantity" class="form-select" onchange="updateTotal()">
                         ${Array.from({length: Math.min(ticketTypeData.available, 10)}, (_, i) => i + 1)
@@ -291,11 +365,114 @@ function renderCheckout() {
     document.getElementById('back-link').href = `/events/${backSlug}.html`;
 
     // Update summary
-    document.getElementById('summary-ticket-name').textContent = ticketTypeData.name;
+    if (orderDataFromSession) {
+        // Seated venue: show all tickets
+        const totalTickets = orderDataFromSession.tickets.reduce((sum, t) => sum + t.quantity, 0);
+        document.getElementById('summary-ticket-name').textContent = 'Билеты';
+        document.getElementById('summary-quantity').textContent = totalTickets;
+
+        // Display selected seats in summary section
+        if (orderDataFromSession.purchased_seats && orderDataFromSession.purchased_seats.length > 0) {
+            displaySelectedSeats(orderDataFromSession.purchased_seats);
+        }
+    } else {
+        // Unseated venue: show single ticket type
+        document.getElementById('summary-ticket-name').textContent = ticketTypeData.name;
+    }
     updateTotal();
 
     // Fire analytics on page load (begin checkout)
     fireInitiateCheckout();
+}
+
+// Calculate seat display number based on venue configuration
+// Same logic as seat-picker.js getSeatDisplayNumber()
+function getSeatDisplayNumber(rowId, seatId, seatingMapConfig) {
+    if (!seatingMapConfig) {
+        // Fallback to simple 1-indexed if config is missing
+        return parseInt(seatId) + 1;
+    }
+
+    const fullSeatId = `${rowId}-${seatId}`;
+
+    // Check custom numbers first
+    if (seatingMapConfig.custom_numbers && seatingMapConfig.custom_numbers[fullSeatId]) {
+        return seatingMapConfig.custom_numbers[fullSeatId].seat;
+    }
+
+    // Calculate based on numbering direction
+    const seatIndex = parseInt(seatId);
+    const numberingDirection = seatingMapConfig.numbering_direction || 'left-to-right';
+    const seatsPerRow = seatingMapConfig.seats_per_row || 20;
+
+    if (numberingDirection === 'right-to-left') {
+        return seatsPerRow - seatIndex;
+    } else {
+        return seatIndex + 1;  // 1-indexed
+    }
+}
+
+// Display selected seats (summary section - compact badges)
+function displaySelectedSeats(seats) {
+    const section = document.getElementById('selected-seats-section');
+    const list = document.getElementById('selected-seats-list');
+
+    section.style.display = 'block';
+    list.innerHTML = '';
+
+    const seatingMapConfig = orderDataFromSession?.seating_map_config;
+
+    seats.forEach(seatId => {
+        const [row, seat] = seatId.split('-');
+        const badge = document.createElement('span');
+        badge.style.cssText = 'padding: 0.375rem 0.75rem; background: var(--primary); color: white; border-radius: 1rem; font-size: 0.875rem; font-weight: 500;';
+        const displaySeatNumber = getSeatDisplayNumber(row, seat, seatingMapConfig);
+        badge.textContent = `Ряд ${parseInt(row) + 1}, Место ${displaySeatNumber}`;
+        list.appendChild(badge);
+    });
+}
+
+// Display checkout seats info (detailed breakdown by ticket type)
+function displayCheckoutSeats(orderData) {
+    const container = document.getElementById('checkout-seats-info');
+    if (!container) return;
+
+    const seatingMapConfig = orderData.seating_map_config;
+
+    // Group seats by ticket type
+    const seatsByType = {};
+    orderData.tickets.forEach(ticket => {
+        const ticketType = eventData.ticket_types.find(t => t.id === ticket.type_id);
+        if (ticketType && ticket.purchased_seats) {
+            seatsByType[ticket.type_id] = {
+                name: ticketType.name,
+                price: ticketType.price,
+                seats: ticket.purchased_seats
+            };
+        }
+    });
+
+    let html = '<div style="margin-top: 0.5rem;">';
+    html += '<label class="form-label" style="margin-bottom: 0.5rem;">Выбранные места:</label>';
+
+    Object.values(seatsByType).forEach(typeInfo => {
+        html += `<div style="margin-bottom: 0.75rem;">`;
+        html += `<div style="font-weight: 500; margin-bottom: 0.25rem;">${typeInfo.name} (${typeInfo.price}₪)</div>`;
+        html += `<div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">`;
+
+        typeInfo.seats.forEach(seatId => {
+            const [row, seat] = seatId.split('-');
+            const displaySeatNumber = getSeatDisplayNumber(row, seat, seatingMapConfig);
+            html += `<span style="padding: 0.25rem 0.625rem; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 0.375rem; font-size: 0.875rem;">`;
+            html += `Ряд ${parseInt(row) + 1}, Место ${displaySeatNumber}`;
+            html += `</span>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 // Validate coupon
@@ -334,12 +511,20 @@ async function validateCoupon(code) {
 
 // Update total
 function updateTotal() {
-    const quantity = parseInt(document.getElementById('quantity').value);
+    let quantity, subtotal;
+
+    if (orderDataFromSession) {
+        // Seated venue: quantity is total from sessionStorage
+        quantity = orderDataFromSession.tickets.reduce((sum, t) => sum + t.quantity, 0);
+        subtotal = ticketPrice; // ticketPrice already calculated as total
+    } else {
+        // Unseated venue: get quantity from selector
+        quantity = parseInt(document.getElementById('quantity').value);
+        subtotal = ticketPrice * quantity;
+    }
 
     // Update summary
     document.getElementById('summary-quantity').textContent = quantity;
-
-    let subtotal = ticketPrice * quantity;
     document.getElementById('summary-subtotal').textContent = subtotal + '₪';
 
     // Apply coupon discount
@@ -435,30 +620,48 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
     submitButton.disabled = true;
     submitButton.textContent = 'Обработка...';
 
-    // Open payment window IMMEDIATELY (before any async operations)
-    // This preserves the user gesture and prevents popup blocking
-    const paymentWindow = window.open('about:blank', '_blank');
-
     try {
         const formData = new FormData(this);
-        const quantity = parseInt(document.getElementById('quantity').value);
 
-        const data = {
-            event_id: eventId,
-            customer: {
-                name: formData.get('customer_name'),
-                email: formData.get('customer_email'),
-                phone: formData.get('customer_phone')
-            },
-            tickets: [{
-                type_id: ticketTypeId,
-                quantity: quantity
-            }]
-        };
+        let data;
+        if (orderDataFromSession) {
+            // Seated venue: use data from sessionStorage
+            data = {
+                event_id: eventId,
+                customer: {
+                    name: formData.get('customer_name'),
+                    email: formData.get('customer_email'),
+                    phone: formData.get('customer_phone')
+                },
+                tickets: orderDataFromSession.tickets // Already includes purchased_seats
+            };
+
+            // Add session_id if available
+            if (orderDataFromSession.session_id) {
+                data.session_id = orderDataFromSession.session_id;
+            }
+        } else {
+            // Unseated venue: traditional flow
+            const quantity = parseInt(document.getElementById('quantity').value);
+            data = {
+                event_id: eventId,
+                customer: {
+                    name: formData.get('customer_name'),
+                    email: formData.get('customer_email'),
+                    phone: formData.get('customer_phone')
+                },
+                tickets: [{
+                    type_id: ticketTypeId,
+                    quantity: quantity
+                }]
+            };
+        }
 
         // Add coupon if applied
         if (appliedCoupon) {
             data.coupon_code = appliedCoupon.coupon.coupon_code;
+        } else if (orderDataFromSession?.coupon_code) {
+            data.coupon_code = orderDataFromSession.coupon_code;
         }
 
         const response = await fetch(`${API_URL}/api/orders`, {
@@ -499,38 +702,66 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 
             // Redirect to payment or success page
             if (result.payment_url) {
-                // Redirect the already-opened window to payment URL
-                if (paymentWindow && paymentWindow !== window) {
-                    paymentWindow.location.href = result.payment_url;
-                    // Redirect current window to processing page
-                    window.location.href = '/processing.html?order_id=' + result.order_id;
-                } else {
-                    // Fallback: if new window didn't open, redirect current window
-                    window.location.href = result.payment_url;
-                }
+                // Hide checkout form
+                document.getElementById('checkout-content').style.display = 'none';
+
+                // Show payment iframe container
+                const paymentContainer = document.getElementById('payment-container');
+                paymentContainer.style.display = 'block';
+
+                // Scroll to top
+                window.scrollTo(0, 0);
+
+                // Set iframe src to payment URL
+                document.getElementById('allpay-payment-iframe').src = result.payment_url;
+
+                // Initialize AllPay Hosted Fields
+                AllpayInstance = new AllpayPayment({
+                    iframeId: 'allpay-payment-iframe',
+                    onSuccess: function() {
+                        // Payment successful - redirect to confirmation
+                        console.log('Payment success callback triggered');
+                        window.location.href = '/processing.html?order_id=' + result.order_id;
+                    },
+                    onError: function(error_n, error_msg) {
+                        // Payment failed - show error
+                        console.error('Payment error:', error_n, error_msg);
+                        alert('Ошибка оплаты: ' + error_msg + ' (код: ' + error_n + ')');
+
+                        // Re-enable submit button and show checkout form again
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Перейти к оплате';
+                        document.getElementById('checkout-content').style.display = 'block';
+                        paymentContainer.style.display = 'none';
+                    }
+                });
             } else {
-                // Free order (100% discount) - close payment window and redirect to processing page
-                if (paymentWindow && paymentWindow !== window) {
-                    paymentWindow.close();
-                }
-                window.location.href = '/processing.html?order_id=' + result.order_id;
+                // No payment needed (free tickets) - go directly to confirmation
+                window.location.href = '/orders/' + result.order_id + '.html';
             }
         } else {
-            // Close the blank payment window on error
-            paymentWindow.close();
             alert('Ошибка при создании заказа: ' + (result.error || 'Неизвестная ошибка'));
             submitButton.disabled = false;
             submitButton.textContent = 'Перейти к оплате';
         }
     } catch (error) {
-        // Close the blank payment window on error
-        paymentWindow.close();
         console.error('Error:', error);
         alert('Произошла ошибка при обработке заказа. Пожалуйста, попробуйте снова.');
         submitButton.disabled = false;
         submitButton.textContent = 'Перейти к оплате';
     }
 });
+
+// Payment button click handler
+function processPayment() {
+    if (AllpayInstance) {
+        const paymentBtn = document.getElementById('complete-payment-btn');
+        paymentBtn.disabled = true;
+        paymentBtn.textContent = 'Обработка...';
+
+        AllpayInstance.pay();
+    }
+}
 
 // Load data on page load
 loadCheckoutData();

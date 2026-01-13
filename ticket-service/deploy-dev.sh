@@ -26,11 +26,35 @@ sam deploy \
   --config-env dev \
   --parameter-overrides \
     "Environment=dev" \
+    "PaymentMode=${PAYMENT_MODE}" \
+    "SenderEmail=${SENDER_EMAIL}" \
+    "AllPayLogin=${ALLPAY_LOGIN}" \
     "AllPayWebhookSecret=${ALLPAY_WEBHOOK_SECRET}" \
-    "SenderEmail=${SENDER_EMAIL}"
+    "AllPayApiKey=${ALLPAY_API_KEY}" \
+    "AllPayUseApi=${ALLPAY_USE_API}" \
+    "PaymentExpireMinutes=${PAYMENT_EXPIRE_MINUTES}"
+
+echo ""
+echo "Syncing admin files to S3..."
+aws s3 sync admin/ s3://yallabalagan-ticket-admin-dev/ \
+  --exclude "*.md" \
+  --exclude ".DS_Store" \
+  --delete
+
+echo ""
+echo "Syncing frontend files to S3..."
+aws s3 sync frontend/ s3://yallabalagan-tickets-frontend-dev/ \
+  --exclude "*.md" \
+  --exclude ".DS_Store" \
+  --delete
 
 echo ""
 echo "✅ Deployment complete!"
+echo ""
+echo "URLs:"
+echo "  Admin:    http://yallabalagan-ticket-admin-dev.s3-website.eu-north-1.amazonaws.com"
+echo "  Frontend: http://yallabalagan-tickets-frontend-dev.s3-website.eu-north-1.amazonaws.com"
+echo "  API:      https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev"
 echo ""
 echo "Get stack outputs:"
 echo "aws cloudformation describe-stacks --stack-name yallabalagan-ticket-service-dev --query 'Stacks[0].Outputs' --region eu-north-1"

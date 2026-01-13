@@ -1,6 +1,10 @@
 // shared.js - Shared utilities and API methods for Ticket Admin
 
-const API_BASE_URL = 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+// Auto-detect environment based on hostname
+const isDev = window.location.hostname.includes('-dev');
+const API_BASE_URL = isDev
+    ? 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev'
+    : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 
 // ===== API Helper =====
 async function apiCall(endpoint, method = 'GET', body = null) {

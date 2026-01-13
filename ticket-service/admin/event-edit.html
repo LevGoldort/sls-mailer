@@ -246,6 +246,273 @@
             padding: 40px;
             color: #999;
         }
+
+        /* Seat Allocation Modal Styles */
+        .allocation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .allocation-modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 1400px;
+            margin: 20px auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+
+        .allocation-modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .allocation-modal-header h2 {
+            color: #667eea;
+            margin: 0;
+        }
+
+        .allocation-close-btn {
+            background: none;
+            border: none;
+            font-size: 32px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .allocation-close-btn:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .allocation-editor-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            padding: 20px 30px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .allocation-sidebar {
+            border-right: 1px solid #eee;
+            padding-right: 20px;
+            overflow-y: auto;
+        }
+
+        .allocation-sidebar h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .allocation-main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .allocation-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-btn {
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .toolbar-btn:hover:not(:disabled) {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .toolbar-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .toolbar-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .allocation-canvas-viewport {
+            flex: 1;
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+            min-height: 400px;
+        }
+
+        .allocation-help-text {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f0f7ff;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .allocation-modal-footer {
+            padding: 20px 30px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+
+        /* Ticket Type Palette Cards */
+        .ticket-type-card {
+            background: #f9f9f9;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .ticket-type-card.active {
+            border-color: #667eea;
+            background: #f0f5ff;
+        }
+
+        .ticket-type-card:hover {
+            border-color: #999;
+        }
+
+        .tt-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .tt-color-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .tt-radio-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tt-color-indicator {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+
+        .tt-radio {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .tt-color-preview {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            cursor: pointer;
+        }
+
+        .tt-color-picker {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .tt-info {
+            flex: 1;
+        }
+
+        .tt-name-display {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .tt-price-display {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .tt-counter {
+            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .tt-counter .allocated-count {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .tt-counter .total-count {
+            font-weight: bold;
+        }
+
+        .tt-progress {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .tt-progress-bar {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s;
+        }
+
+        .allocation-legend h4 {
+            font-size: 14px;
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -316,8 +583,31 @@
 
             <div class="form-section">
                 <h2>Типы билетов</h2>
+
+                <!-- Sales warning banner -->
+                <div id="sales-warning" class="help-text" style="display: none; background: #fff3cd; padding: 15px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #ffc107;">
+                    <strong>⚠️ У этого события есть проданные билеты</strong><br>
+                    <span id="sales-details"></span>
+                </div>
+
                 <div id="ticket-types-container" class="ticket-types"></div>
-                <button type="button" class="btn btn-secondary" onclick="addTicketType()">+ Добавить тип билета</button>
+                <button type="button" class="btn btn-secondary" onclick="addTicketType()" id="add-ticket-type-btn">+ Добавить тип билета</button>
+
+                <!-- Seat allocation section - shown only for seated venues -->
+                <div id="seat-allocation-section" style="display: none; margin-top: 20px;">
+                    <button type="button" class="btn btn-primary" onclick="openSeatAllocationModal()" id="distribute-seats-btn">
+                        🎫 Распределить места по билетам
+                    </button>
+                    <div id="allocation-summary" class="help-text" style="display: none; margin-top: 10px;">
+                        <!-- Summary text will be inserted here -->
+                    </div>
+                    <button type="button" class="btn" onclick="clearAllAllocations()" id="clear-allocation-btn" style="display: none; margin-top: 10px;">
+                        Очистить распределение
+                    </button>
+                    <div id="allocation-lock-warning" class="help-text" style="display: none; margin-top: 10px; color: #f44336;">
+                        ⚠️ Типы билетов заблокированы после распределения мест. Очистите распределение для редактирования.
+                    </div>
+                </div>
             </div>
 
             <div class="form-actions">
@@ -335,14 +625,103 @@
         </div>
     </div>
 
+    <!-- Seat Allocation Modal -->
+    <div id="seat-allocation-modal" class="allocation-modal" style="display: none;">
+        <div class="allocation-modal-content">
+            <div class="allocation-modal-header">
+                <h2>Распределение мест по типам билетов</h2>
+                <button class="allocation-close-btn" onclick="closeSeatAllocationModal()">&times;</button>
+            </div>
+
+            <div class="allocation-editor-container">
+                <!-- Left panel: Ticket types palette -->
+                <div class="allocation-sidebar">
+                    <h3>Типы билетов</h3>
+                    <div id="ticket-type-palette">
+                        <!-- Ticket type cards will be inserted here -->
+                    </div>
+
+                    <div class="allocation-legend" style="margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 8px;">
+                        <h4 style="margin-bottom: 12px; font-size: 0.95rem; font-weight: 600;">Обозначения мест:</h4>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="display: inline-block; width: 24px; height: 24px; background: #e0e0e0; border: 1px solid #999; border-radius: 50%;"></span>
+                                <span style="font-size: 0.9rem;">Доступно для распределения</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="display: inline-block; width: 24px; height: 24px; background: #4CAF50; border: 1px solid #333; border-radius: 50%;"></span>
+                                <span style="font-size: 0.9rem;">Распределено (можно изменить)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="display: inline-block; width: 24px; height: 24px; background: #4CAF50; border: 3px solid #dc2626; border-radius: 50%; opacity: 0.7; position: relative;">
+                                    <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px;">🔒</span>
+                                </span>
+                                <span style="font-size: 0.9rem;"><strong>🔒 Продано</strong> (заблокировано, нельзя изменить)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="display: inline-block; width: 24px; height: 24px; background: #999; border: 1px solid #666; border-radius: 50%; opacity: 0.5;"></span>
+                                <span style="font-size: 0.9rem;">Отключено в конфигурации зала</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right panel: Seating map -->
+                <div class="allocation-main">
+                    <div class="allocation-toolbar">
+                        <button onclick="seatAllocator.zoomIn()" class="toolbar-btn" title="Увеличить">🔍 +</button>
+                        <button onclick="seatAllocator.zoomOut()" class="toolbar-btn" title="Уменьшить">🔍 -</button>
+                        <button onclick="seatAllocator.resetZoom()" class="toolbar-btn" title="Сбросить масштаб">↺ Сброс</button>
+                        <button id="select-row-mode" onclick="toggleRowSelectionMode()" class="toolbar-btn" title="Режим выбора всего ряда">
+                            📏 Режим ряда
+                        </button>
+                        <button onclick="seatAllocator.undo()" class="toolbar-btn" id="undo-alloc-btn" title="Отменить">↶ Отменить</button>
+                        <button onclick="seatAllocator.redo()" class="toolbar-btn" id="redo-alloc-btn" title="Повторить">↷ Повторить</button>
+                    </div>
+
+                    <div id="allocation-canvas-container" class="allocation-canvas-viewport">
+                        <svg id="allocation-canvas"></svg>
+                    </div>
+
+                    <div class="allocation-help-text">
+                        💡 <strong>Клик:</strong> назначить/снять тип билета<br>
+                        💡 <strong>Режим ряда:</strong> назначить весь ряд одним кликом
+                    </div>
+                </div>
+            </div>
+
+            <div class="allocation-modal-footer">
+                <button class="btn" onclick="closeSeatAllocationModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveSeatAllocation()">
+                    Сохранить распределение
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="shared.js?v=1764370571"></script>
     <script src="shared-image-upload.js"></script>
+    <script src="seating-allocation-editor.js"></script>
     <script>
         let eventId = null;
         let ticketTypeCounter = 0;
         let imageUrls = [];
         let locations = []; // Store locations for capacity validation
         let slugManuallyEdited = false;
+
+        // Seat allocation variables
+        let currentVenueMap = null;  // Venue map configuration from location
+        let seatAllocationData = null;  // {"0-5": "tt-xxx", ...}
+        let seatAllocationColors = null;  // {"tt-xxx": "#4CAF50", ...}
+        let isAllocationDone = false;  // Lock ticket types after allocation
+        let seatAllocator = null;  // SeatingAllocationEditor instance
+
+        // Sales tracking variables
+        let orders = [];
+        let totalSoldTickets = 0;
+        let hasSalesWithSeats = false;
+        let hasSalesWithoutSeats = false;
+        let soldTicketsByType = {};  // {ticket_type_id: count}
 
         function slugify(value) {
             if (!value) return '';
@@ -480,10 +859,31 @@
                     console.log('Loaded existing images:', imageUrls);
                 }
 
-                // Add ticket types
+                // Load location data FIRST to determine if seated venue (affects ticket type rendering)
+                if (event.location_id) {
+                    try {
+                        const locationData = await API.getLocation(event.location_id);
+                        const location = locationData.location;
+                        if (location.venue_config?.venue_type === 'seated' && location.venue_config?.seating_map) {
+                            currentVenueMap = location.venue_config.seating_map;
+                            document.getElementById('seat-allocation-section').style.display = 'block';
+                        }
+                    } catch (error) {
+                        console.error('Error fetching location:', error);
+                    }
+                }
+
+                // Add ticket types (now currentVenueMap is set correctly)
                 event.ticket_types.forEach(tt => {
                     addTicketType(tt);
                 });
+
+                // Load seat allocation if exists
+                if (event.seat_allocation && Object.keys(event.seat_allocation).length > 0) {
+                    seatAllocationData = event.seat_allocation;
+                    isAllocationDone = true;
+                    // Will trigger lockTicketTypes and updateAllocationSummary in init() override
+                }
 
                 // Load orders for this event
                 loadOrders(id);
@@ -501,6 +901,9 @@
             div.className = 'ticket-type-item';
             div.dataset.id = id;
 
+            // Check if current location is a seated venue
+            const isSeatedVenue = currentVenueMap !== null;
+
             div.innerHTML = `
                 <div class="ticket-type-header">
                     <h3>Тип билета</h3>
@@ -516,10 +919,10 @@
                         <input type="number" class="tt-price" value="${data?.price || ''}" required min="0">
                     </div>
                 </div>
-                <div class="form-row">
+                <div class="form-row tt-quantity-fields" style="${isSeatedVenue ? 'display: none;' : ''}">
                     <div class="form-group">
                         <label>Всего билетов *</label>
-                        <input type="number" class="tt-total" value="${data?.total || ''}" required min="1">
+                        <input type="number" class="tt-total" value="${data?.total || ''}" ${isSeatedVenue ? '' : 'required'} min="1">
                     </div>
                     <div class="form-group">
                         <label>Доступно</label>
@@ -527,12 +930,53 @@
                         <div class="help-text">Оставьте пустым для новых событий</div>
                     </div>
                 </div>
+                ${isSeatedVenue ? `
+                <div class="form-row tt-allocated-display">
+                    <div class="form-group">
+                        <label>Всего билетов</label>
+                        <input type="number" class="tt-total" value="${data?.total || 0}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                        <div class="help-text">Определяется распределением мест на карте</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Доступно</label>
+                        <input type="number" class="tt-available" value="${data?.available || data?.total || 0}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                        <div class="help-text">Обновляется при продаже билетов</div>
+                    </div>
+                </div>
+                ` : ''}
             `;
 
             container.appendChild(div);
+
+            // Disable delete button if ticket type has sales
+            const deleteBtn = div.querySelector('.btn-danger');
+            if (checkTicketTypeHasSales(id)) {
+                deleteBtn.disabled = true;
+                deleteBtn.title = 'Невозможно удалить - есть продажи';
+                deleteBtn.style.opacity = '0.5';
+                deleteBtn.style.cursor = 'not-allowed';
+            }
+
+            // Add price editing note
+            const priceInput = div.querySelector('.tt-price');
+            if (priceInput && !priceInput.nextElementSibling?.classList.contains('help-text')) {
+                const helpText = document.createElement('div');
+                helpText.className = 'help-text';
+                helpText.style.marginTop = '0.5rem';
+                helpText.style.fontSize = '0.875rem';
+                helpText.style.color = '#6b7280';
+                helpText.textContent = '💡 Изменение цены влияет только на новые покупки. Купленные билеты сохраняют оригинальную цену.';
+                priceInput.parentElement.appendChild(helpText);
+            }
         }
 
         function removeTicketType(id) {
+            // Check if this ticket type has any sales
+            if (checkTicketTypeHasSales(id)) {
+                alert('Невозможно удалить тип билета с проданными билетами.\n\nЕсли нужно прекратить продажи, установите количество доступных билетов в 0 или измените статус события.');
+                return;
+            }
+
             const item = document.querySelector(`[data-id="${id}"]`);
             if (item) {
                 item.remove();
@@ -602,6 +1046,11 @@
                     eventData.slug = '';
                 }
 
+                // Add seat allocation if exists
+                if (seatAllocationData && Object.keys(seatAllocationData).length > 0) {
+                    eventData.seat_allocation = seatAllocationData;
+                }
+
                 // Create or update
                 if (eventId) {
                     await API.updateEvent(eventId, eventData);
@@ -626,10 +1075,37 @@
         async function loadOrders(eventId) {
             try {
                 const data = await API.getOrdersByEvent(eventId);
-                const orders = data.orders || [];
+                orders = data.orders || [];
 
                 // Sort orders by created_at (newest first)
                 orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                // Analyze sales
+                totalSoldTickets = 0;
+                hasSalesWithSeats = false;
+                hasSalesWithoutSeats = false;
+                soldTicketsByType = {};
+
+                orders.forEach(order => {
+                    if (order.payment.status === 'completed' || order.payment.status === 'pending') {
+                        order.tickets.forEach(ticket => {
+                            totalSoldTickets += ticket.quantity;
+
+                            // Track sales by type
+                            soldTicketsByType[ticket.type_id] =
+                                (soldTicketsByType[ticket.type_id] || 0) + ticket.quantity;
+
+                            if (ticket.purchased_seats && ticket.purchased_seats.length > 0) {
+                                hasSalesWithSeats = true;
+                            } else {
+                                hasSalesWithoutSeats = true;
+                            }
+                        });
+                    }
+                });
+
+                // Show sales warning if needed
+                showSalesWarning();
 
                 displayOrders(orders);
 
@@ -640,6 +1116,29 @@
                 document.getElementById('orders-container').innerHTML =
                     '<div class="empty-orders">Ошибка загрузки заказов</div>';
             }
+        }
+
+        function showSalesWarning() {
+            if (totalSoldTickets > 0) {
+                const warningDiv = document.getElementById('sales-warning');
+                const detailsSpan = document.getElementById('sales-details');
+
+                let details = `Продано билетов: ${totalSoldTickets}`;
+
+                if (currentVenueMap && hasSalesWithoutSeats) {
+                    details += `<br><span style="color: #dc2626;">❌ Внимание: Некоторые заказы не содержат информацию о конкретных местах. Редактирование распределения мест может привести к конфликтам.</span>`;
+                }
+
+                detailsSpan.innerHTML = details;
+                warningDiv.style.display = 'block';
+            } else {
+                document.getElementById('sales-warning').style.display = 'none';
+            }
+        }
+
+        function checkTicketTypeHasSales(ticketTypeId) {
+            if (!soldTicketsByType) return false;
+            return (soldTicketsByType[ticketTypeId] || 0) > 0;
         }
 
         function displayOrders(orders) {
@@ -688,6 +1187,417 @@
 
             container.innerHTML = html;
         }
+
+        // ===== SEAT ALLOCATION FUNCTIONS =====
+
+        /**
+         * Initialize location change listener
+         */
+        function initLocationListener() {
+            const locationSelect = document.getElementById('location_id');
+            if (!locationSelect) return;
+
+            locationSelect.addEventListener('change', async (e) => {
+                const locationId = e.target.value;
+                const seatSection = document.getElementById('seat-allocation-section');
+
+                if (!locationId) {
+                    seatSection.style.display = 'none';
+                    currentVenueMap = null;
+                    toggleTicketTypeQuantityFields(false);
+                    return;
+                }
+
+                try {
+                    // Fetch location to check if it's a seated venue
+                    const data = await API.getLocation(locationId);
+                    const location = data.location;
+
+                    if (location.venue_config?.venue_type === 'seated' && location.venue_config?.seating_map) {
+                        // Show seat allocation section
+                        seatSection.style.display = 'block';
+                        currentVenueMap = location.venue_config.seating_map;
+                        toggleTicketTypeQuantityFields(true);
+                    } else {
+                        seatSection.style.display = 'none';
+                        currentVenueMap = null;
+                        toggleTicketTypeQuantityFields(false);
+                    }
+                } catch (error) {
+                    console.error('Error fetching location:', error);
+                }
+            });
+        }
+
+        /**
+         * Toggle ticket type quantity fields visibility
+         */
+        function toggleTicketTypeQuantityFields(isSeatedVenue) {
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                const quantityFields = item.querySelector('.tt-quantity-fields');
+                const allocatedDisplay = item.querySelector('.tt-allocated-display');
+
+                if (isSeatedVenue) {
+                    // Hide editable fields, show readonly fields
+                    if (quantityFields) quantityFields.style.display = 'none';
+                    if (!allocatedDisplay) {
+                        // Create allocated display if it doesn't exist
+                        const total = item.querySelector('.tt-total').value || 0;
+                        const available = item.querySelector('.tt-available').value || total;
+
+                        const displayHTML = `
+                            <div class="form-row tt-allocated-display">
+                                <div class="form-group">
+                                    <label>Всего билетов</label>
+                                    <input type="number" class="tt-total" value="${total}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                                    <div class="help-text">Определяется распределением мест на карте</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Доступно</label>
+                                    <input type="number" class="tt-available" value="${available}" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                                    <div class="help-text">Обновляется при продаже билетов</div>
+                                </div>
+                            </div>
+                        `;
+                        item.querySelector('.form-row').insertAdjacentHTML('afterend', displayHTML);
+                    } else {
+                        allocatedDisplay.style.display = '';
+                    }
+                } else {
+                    // Show editable fields, hide readonly fields
+                    if (quantityFields) {
+                        quantityFields.style.display = '';
+                        // Make total required
+                        const totalInput = quantityFields.querySelector('.tt-total');
+                        if (totalInput) totalInput.required = true;
+                    }
+                    if (allocatedDisplay) allocatedDisplay.style.display = 'none';
+                }
+            });
+        }
+
+        /**
+         * Open seat allocation modal
+         */
+        function openSeatAllocationModal() {
+            // Collect current ticket types
+            const ticketTypes = [];
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                const id = item.dataset.id;
+                const name = item.querySelector('.tt-name').value;
+                const price = parseFloat(item.querySelector('.tt-price').value);
+                // For seated venues, total might be 0 initially - that's OK
+                const totalValue = item.querySelector('.tt-total').value;
+                const total = totalValue ? parseInt(totalValue) : 999999; // Large number as placeholder
+
+                if (name && price >= 0) {
+                    ticketTypes.push({ id, name, price, total });
+                }
+            });
+
+            if (ticketTypes.length === 0) {
+                alert('Добавьте хотя бы один тип билета перед распределением мест');
+                return;
+            }
+
+            if (!currentVenueMap) {
+                alert('Выберите локацию с залом для распределения мест');
+                return;
+            }
+
+            // Initialize editor
+            seatAllocator = new SeatingAllocationEditor();
+            seatAllocator.loadConfig(
+                currentVenueMap,
+                ticketTypes,
+                seatAllocationData,
+                seatAllocationColors,
+                eventId  // Pass event ID for fetching purchased seats
+            );
+
+            // Render ticket type palette
+            renderTicketTypePalette(ticketTypes);
+
+            // Show modal
+            document.getElementById('seat-allocation-modal').style.display = 'flex';
+        }
+
+        /**
+         * Close seat allocation modal
+         */
+        function closeSeatAllocationModal() {
+            document.getElementById('seat-allocation-modal').style.display = 'none';
+        }
+
+        /**
+         * Render ticket type palette
+         */
+        function renderTicketTypePalette(ticketTypes) {
+            const palette = document.getElementById('ticket-type-palette');
+            palette.innerHTML = '';
+
+            ticketTypes.forEach((tt, index) => {
+                const color = seatAllocator.ticketTypeColors[tt.id];
+                const isActive = seatAllocator.activeTicketTypeId === tt.id;
+                const allocated = seatAllocator.getAllocationCount(tt.id);
+
+                // Don't show 999999 placeholder or 0 - show dash instead
+                const totalDisplay = (tt.total >= 999999 || tt.total === 0) ? '—' : tt.total;
+                const progress = (tt.total >= 999999 || tt.total === 0) ? 0 : (allocated / tt.total) * 100;
+
+                const card = document.createElement('div');
+                card.className = `ticket-type-card ${isActive ? 'active' : ''}`;
+                card.onclick = () => selectTicketType(tt.id);
+
+                card.innerHTML = `
+                    <div class="tt-card-header">
+                        <div class="tt-color-selector">
+                            <div class="tt-radio-wrapper">
+                                <div class="tt-color-indicator" style="background-color: ${color}"></div>
+                                <input type="radio" name="active-tt" value="${tt.id}" ${isActive ? 'checked' : ''} class="tt-radio">
+                            </div>
+                            <input type="color" value="${color}" onchange="changeTicketTypeColor('${tt.id}', this.value)" class="tt-color-picker" onclick="event.stopPropagation()" title="Изменить цвет">
+                        </div>
+                        <div class="tt-info">
+                            <div class="tt-name-display">${tt.name}</div>
+                            <div class="tt-price-display">${tt.price} ₪</div>
+                        </div>
+                    </div>
+                    <div class="tt-counter">
+                        <span class="allocated-count" data-tt-id="${tt.id}">${allocated}</span> / <span class="total-count">${totalDisplay}</span>
+                    </div>
+                    <div class="tt-progress">
+                        <div class="tt-progress-bar" data-tt-id="${tt.id}" style="width: ${progress}%" style="background-color: ${color}"></div>
+                    </div>
+                `;
+
+                palette.appendChild(card);
+            });
+        }
+
+        /**
+         * Select a ticket type
+         */
+        function selectTicketType(ticketTypeId) {
+            seatAllocator.setActiveTicketType(ticketTypeId);
+
+            // Update UI
+            document.querySelectorAll('.ticket-type-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+
+            // Update radio button
+            document.querySelectorAll('.tt-radio').forEach(radio => {
+                radio.checked = radio.value === ticketTypeId;
+            });
+        }
+
+        /**
+         * Change ticket type color
+         */
+        function changeTicketTypeColor(ticketTypeId, color) {
+            seatAllocator.setTicketTypeColor(ticketTypeId, color);
+
+            // Update color indicator in the palette
+            const card = document.querySelector(`[data-tt-id="${ticketTypeId}"]`);
+            if (card) {
+                const indicator = card.closest('.ticket-type-card').querySelector('.tt-color-indicator');
+                if (indicator) {
+                    indicator.style.backgroundColor = color;
+                }
+            }
+        }
+
+        /**
+         * Update allocation counters (called by SeatingAllocationEditor)
+         */
+        function updateAllocationCounters() {
+            document.querySelectorAll('.allocated-count').forEach(span => {
+                const ttId = span.dataset.ttId;
+                const count = seatAllocator.getAllocationCount(ttId);
+                span.textContent = count;
+
+                // Update progress bar
+                const progressBar = document.querySelector(`.tt-progress-bar[data-tt-id="${ttId}"]`);
+                if (progressBar) {
+                    const total = seatAllocator.ticketTypes.find(tt => tt.id === ttId).total;
+                    const progress = (count / total) * 100;
+                    progressBar.style.width = `${progress}%`;
+                }
+            });
+        }
+
+        /**
+         * Toggle row selection mode
+         */
+        function toggleRowSelectionMode() {
+            seatAllocator.rowSelectionMode = !seatAllocator.rowSelectionMode;
+            const btn = document.getElementById('select-row-mode');
+            if (seatAllocator.rowSelectionMode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        }
+
+        /**
+         * Save seat allocation
+         */
+        function saveSeatAllocation() {
+            const allocation = seatAllocator.exportAllocation();
+
+            // Count allocations per ticket type
+            const counts = {};
+            for (const [seatId, ttId] of Object.entries(allocation.seatAllocation)) {
+                counts[ttId] = (counts[ttId] || 0) + 1;
+            }
+
+            // Auto-update ticket type totals in the form
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                const ttId = item.dataset.id;
+                const count = counts[ttId] || 0;
+
+                // Update ALL .tt-total inputs (there might be 2 for seated venues - hidden and readonly)
+                item.querySelectorAll('.tt-total').forEach(input => {
+                    input.value = count;
+                });
+
+                // Also update available (for new events)
+                if (!eventId) {
+                    item.querySelectorAll('.tt-available').forEach(input => {
+                        input.value = count;
+                    });
+                }
+            });
+
+            seatAllocationData = allocation.seatAllocation;
+            seatAllocationColors = allocation.ticketTypeColors;
+            isAllocationDone = Object.keys(seatAllocationData).length > 0;
+
+            if (isAllocationDone) {
+                lockTicketTypes();
+            }
+
+            updateAllocationSummary();
+            closeSeatAllocationModal();
+            showToast('Распределение мест сохранено', 'success');
+        }
+
+        /**
+         * Lock ticket types after allocation
+         */
+        function lockTicketTypes() {
+            // Disable add ticket type button
+            const addBtn = document.getElementById('add-ticket-type-btn');
+            if (addBtn) addBtn.disabled = true;
+
+            // Disable delete buttons
+            document.querySelectorAll('.ticket-type-item .btn-danger').forEach(btn => {
+                btn.disabled = true;
+            });
+
+            // Disable name inputs
+            document.querySelectorAll('.tt-name').forEach(input => {
+                input.disabled = true;
+            });
+
+            // Show warning and clear button
+            document.getElementById('allocation-lock-warning').style.display = 'block';
+            document.getElementById('clear-allocation-btn').style.display = 'inline-block';
+        }
+
+        /**
+         * Unlock ticket types
+         */
+        function unlockTicketTypes() {
+            // Enable add ticket type button
+            const addBtn = document.getElementById('add-ticket-type-btn');
+            if (addBtn) addBtn.disabled = false;
+
+            // Enable delete buttons
+            document.querySelectorAll('.ticket-type-item .btn-danger').forEach(btn => {
+                btn.disabled = false;
+            });
+
+            // Enable name inputs
+            document.querySelectorAll('.tt-name').forEach(input => {
+                input.disabled = false;
+            });
+
+            // Hide warning and clear button
+            document.getElementById('allocation-lock-warning').style.display = 'none';
+            document.getElementById('clear-allocation-btn').style.display = 'none';
+        }
+
+        /**
+         * Clear all allocations
+         */
+        function clearAllAllocations() {
+            if (!confirm('Очистить все распределение мест? Это разблокирует редактирование типов билетов.')) {
+                return;
+            }
+
+            seatAllocationData = null;
+            seatAllocationColors = null;
+            isAllocationDone = false;
+            unlockTicketTypes();
+
+            document.getElementById('allocation-summary').style.display = 'none';
+            showToast('Распределение очищено', 'success');
+        }
+
+        /**
+         * Update allocation summary
+         */
+        function updateAllocationSummary() {
+            const summary = document.getElementById('allocation-summary');
+            if (!seatAllocationData || Object.keys(seatAllocationData).length === 0) {
+                summary.style.display = 'none';
+                return;
+            }
+
+            const totalAllocated = Object.keys(seatAllocationData).length;
+            const totalSeats = currentVenueMap ? (currentVenueMap.rows * currentVenueMap.seats_per_row - (currentVenueMap.disabled_seats?.length || 0)) : 0;
+
+            summary.textContent = `✓ Распределено: ${totalAllocated} из ${totalSeats} мест`;
+            summary.style.display = 'block';
+        }
+
+        // ===== MODIFY EXISTING FUNCTIONS =====
+
+        // Override addTicketType to check lock
+        const originalAddTicketType = addTicketType;
+        addTicketType = function(data = null) {
+            if (isAllocationDone && !data) {
+                alert('Типы билетов заблокированы после распределения. Очистите распределение для добавления новых типов.');
+                return;
+            }
+            return originalAddTicketType(data);
+        };
+
+        // Override removeTicketType to check lock
+        const originalRemoveTicketType = removeTicketType;
+        removeTicketType = function(id) {
+            if (isAllocationDone) {
+                alert('Типы билетов заблокированы после распределения. Очистите распределение для удаления типов.');
+                return;
+            }
+            return originalRemoveTicketType(id);
+        };
+
+        // Call initLocationListener at the end of init
+        const originalInit = init;
+        init = async function() {
+            await originalInit();
+            initLocationListener();
+
+            // Load allocation if editing existing event with allocation
+            if (eventId && seatAllocationData) {
+                lockTicketTypes();
+                updateAllocationSummary();
+            }
+        };
 
         init();
     </script>

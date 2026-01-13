@@ -316,8 +316,44 @@
             padding: 15px 20px;
             background: #f5f5f5;
             border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-header h3 {
             font-weight: 600;
             color: #333;
+            margin: 0;
+        }
+
+        .preview-mode-toggle {
+            display: flex;
+            gap: 5px;
+            background: white;
+            border-radius: 6px;
+            padding: 3px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .preview-mode-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .preview-mode-btn.active {
+            background: #e535ab;
+            color: white;
+        }
+
+        .preview-mode-btn:hover:not(.active) {
+            background: #f0f0f0;
         }
 
         .preview-iframe-wrapper {
@@ -328,12 +364,48 @@
             overflow: auto;
         }
 
+        .preview-iframe-wrapper.both-mode {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .preview-device {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .preview-device-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
         .preview-iframe-wrapper iframe {
             width: 100%;
             min-height: 500px;
             border: none;
             background: white;
             border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .preview-iframe-wrapper.mobile-mode iframe,
+        .preview-iframe-wrapper.both-mode .mobile-preview iframe {
+            width: 375px;
+            max-width: 100%;
+        }
+
+        .preview-iframe-wrapper.desktop-mode iframe {
+            width: 100%;
+        }
+
+        .preview-iframe-wrapper.both-mode .desktop-preview iframe {
+            width: 600px;
+            max-width: 100%;
         }
 
         .preview-placeholder {
@@ -341,6 +413,17 @@
             text-align: center;
             color: #999;
             font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .preview-iframe-wrapper.both-mode {
+                flex-direction: column;
+            }
+
+            .preview-iframe-wrapper.both-mode .desktop-preview iframe,
+            .preview-iframe-wrapper.both-mode .mobile-preview iframe {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -459,8 +542,15 @@
             </div>
 
             <div class="preview-column">
-                <div class="preview-header">Email Preview</div>
-                <div class="preview-iframe-wrapper">
+                <div class="preview-header">
+                    <h3>Email Preview</h3>
+                    <div class="preview-mode-toggle">
+                        <button class="preview-mode-btn active" data-mode="desktop" onclick="setPreviewMode('desktop')">Desktop</button>
+                        <button class="preview-mode-btn" data-mode="mobile" onclick="setPreviewMode('mobile')">Mobile</button>
+                        <button class="preview-mode-btn" data-mode="both" onclick="setPreviewMode('both')">Both</button>
+                    </div>
+                </div>
+                <div class="preview-iframe-wrapper" id="preview-wrapper">
                     <div class="preview-placeholder" id="preview-placeholder">
                         Start typing in the HTML Body field to see a preview...
                     </div>
@@ -478,6 +568,7 @@
         let allTags = [];
         let selectedIncludeTags = [];
         let selectedExcludeTags = [];
+        let currentPreviewMode = 'desktop';
 
         // Load available tags
         async function loadTags() {
@@ -760,19 +851,73 @@
             return div.innerHTML;
         }
 
+        // Set preview mode (desktop/mobile/both)
+        function setPreviewMode(mode) {
+            currentPreviewMode = mode;
+
+            // Update active button
+            document.querySelectorAll('.preview-mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
+            });
+
+            // Update preview
+            updateEmailPreview();
+        }
+
         // Update email preview
         function updateEmailPreview() {
             const htmlBody = document.getElementById('html_body').value.trim();
-            const iframe = document.getElementById('email-preview-iframe');
+            const wrapper = document.getElementById('preview-wrapper');
             const placeholder = document.getElementById('preview-placeholder');
 
-            if (htmlBody) {
-                iframe.style.display = 'block';
-                placeholder.style.display = 'none';
+            if (!htmlBody) {
+                wrapper.innerHTML = '<div class="preview-placeholder">Start typing in the HTML Body field to see a preview...</div>';
+                return;
+            }
+
+            // Clear wrapper
+            wrapper.innerHTML = '';
+
+            // Remove old mode classes
+            wrapper.classList.remove('desktop-mode', 'mobile-mode', 'both-mode');
+
+            if (currentPreviewMode === 'desktop') {
+                wrapper.classList.add('desktop-mode');
+                const iframe = document.createElement('iframe');
+                iframe.sandbox = 'allow-same-origin';
                 iframe.srcdoc = htmlBody;
-            } else {
-                iframe.style.display = 'none';
-                placeholder.style.display = 'block';
+                wrapper.appendChild(iframe);
+            }
+            else if (currentPreviewMode === 'mobile') {
+                wrapper.classList.add('mobile-mode');
+                const iframe = document.createElement('iframe');
+                iframe.sandbox = 'allow-same-origin';
+                iframe.srcdoc = htmlBody;
+                wrapper.appendChild(iframe);
+            }
+            else if (currentPreviewMode === 'both') {
+                wrapper.classList.add('both-mode');
+
+                // Desktop preview
+                const desktopDiv = document.createElement('div');
+                desktopDiv.className = 'preview-device desktop-preview';
+                desktopDiv.innerHTML = `
+                    <div class="preview-device-label">Desktop</div>
+                    <iframe sandbox="allow-same-origin"></iframe>
+                `;
+                desktopDiv.querySelector('iframe').srcdoc = htmlBody;
+
+                // Mobile preview
+                const mobileDiv = document.createElement('div');
+                mobileDiv.className = 'preview-device mobile-preview';
+                mobileDiv.innerHTML = `
+                    <div class="preview-device-label">Mobile (375px)</div>
+                    <iframe sandbox="allow-same-origin"></iframe>
+                `;
+                mobileDiv.querySelector('iframe').srcdoc = htmlBody;
+
+                wrapper.appendChild(desktopDiv);
+                wrapper.appendChild(mobileDiv);
             }
         }
 

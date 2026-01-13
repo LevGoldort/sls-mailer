@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка файлов - Yallabalagan</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Упячка стайл заголовок -->
+        <div class="upyachka-header">
+            <div class="upyachka-line">
+                <span class="crazy-text rainbow">СЛАВА</span>
+                <span class="crazy-text blink" style="color: #ff00ff; font-size: 2.5em;">РОБОТАМ!</span>
+                <span class="crazy-text spin" style="color: #00ff00;">🤖</span>
+            </div>
+            <div class="upyachka-line">
+                <span class="crazy-text shake" style="color: #ff0000; font-family: 'Comic Sans MS', cursive;">В ЖОПУ</span>
+                <span class="crazy-text" style="color: #ffff00; text-shadow: 2px 2px #ff00ff;">ДРАЙВ</span>
+                <span class="crazy-text wave" style="color: #00ffff; font-weight: 900;">ЯНДЕКС ДИСК</span>
+                <span class="crazy-text" style="color: #ff69b4; font-style: italic;">ВИТРАНСФЕР</span>
+                <span class="crazy-text rotate" style="color: #ffa500;">И ДИСКЕТЫ!</span>
+                <span style="font-size: 2em;">💾💿📀</span>
+            </div>
+            <div class="upyachka-line">
+                <span class="crazy-text pulse" style="color: #00ff00; font-size: 2em; font-weight: bold;">ПРОСТО</span>
+                <span class="crazy-text rainbow" style="font-size: 2.2em;">ЗАГРУЗИ</span>
+                <span class="crazy-text blink" style="color: #ff0000; font-size: 2em;">ФАЙЛ</span>
+                <span class="crazy-text" style="color: #ffff00; font-size: 1.8em;">НА</span>
+                <span class="crazy-text rainbow mega" style="font-size: 3em; font-weight: 900;">ЯЛЛАДИСК</span>
+                <span class="crazy-text spin">🚀</span>
+            </div>
+        </div>
+
+        <header>
+            <h1>📤 Загрузка файлов</h1>
+            <p class="subtitle">Сервис для обмена большими файлами</p>
+        </header>
+
+        <main>
+            <!-- Upload Form -->
+            <div id="upload-section" class="section">
+                <form id="upload-form">
+                    <div class="form-group">
+                        <label for="password">
+                            🔒 Пароль для загрузки:
+                            <span class="hint">Используйте пароль, полученный от администратора</span>
+                        </label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Введите пароль"
+                            required
+                            autocomplete="off"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="file-input">
+                            📁 Выберите файл:
+                            <span class="hint">Поддерживаются файлы до 500GB</span>
+                        </label>
+                        <input
+                            type="file"
+                            id="file-input"
+                            name="file"
+                            required
+                        >
+                        <div id="file-info" class="file-info"></div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" id="upload-btn" class="btn btn-primary">
+                            Загрузить файл
+                        </button>
+                        <button type="button" id="cancel-btn" class="btn btn-secondary" style="display: none;">
+                            Отменить загрузку
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progress-section" class="section" style="display: none;">
+                <h2>Загрузка файла...</h2>
+
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="progress-percentage">0%</span>
+                        <span id="progress-parts">Часть 0 из 0</span>
+                    </div>
+                </div>
+
+                <div id="upload-stats" class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Скорость:</span>
+                        <span id="upload-speed">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Осталось времени:</span>
+                        <span id="time-remaining">Расчет...</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Загружено:</span>
+                        <span id="uploaded-size">0 MB</span>
+                    </div>
+                </div>
+
+                <p id="status-message" class="status-message"></p>
+            </div>
+
+            <!-- Result Section -->
+            <div id="result-section" class="section success-section" style="display: none;">
+                <h2>✅ Загрузка завершена!</h2>
+
+                <div class="result-info">
+                    <p class="success-text">
+                        Файл <strong id="result-filename"></strong> успешно загружен
+                    </p>
+                </div>
+
+                <div class="download-link-container">
+                    <label for="download-url">Ссылка для скачивания:</label>
+                    <div class="input-with-button">
+                        <input
+                            type="text"
+                            id="download-url"
+                            readonly
+                            class="download-url-input"
+                        >
+                        <button id="copy-btn" class="btn btn-copy">
+                            📋 Копировать
+                        </button>
+                    </div>
+                    <p class="hint">Отправьте эту ссылку получателю файла</p>
+                </div>
+
+                <button id="upload-another-btn" class="btn btn-primary">
+                    Загрузить другой файл
+                </button>
+            </div>
+
+            <!-- Error Section -->
+            <div id="error-section" class="section error-section" style="display: none;">
+                <h2>❌ Ошибка загрузки</h2>
+                <p id="error-message" class="error-message"></p>
+                <button id="retry-btn" class="btn btn-primary">
+                    Попробовать снова
+                </button>
+            </div>
+        </main>
+
+        <!-- Resume Upload Modal -->
+        <div id="resume-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>🔄 Найдена незавершенная загрузка</h3>
+                <p>Вы можете продолжить с того места, где остановились.</p>
+                <div class="resume-stats">
+                    <div class="stat">
+                        <span class="stat-label">Файл:</span>
+                        <span id="resume-filename"></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Размер:</span>
+                        <span id="resume-filesize"></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Загружено:</span>
+                        <span id="resume-progress"></span>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button id="resume-continue-btn" class="btn btn-primary">
+                        Продолжить загрузку
+                    </button>
+                    <button id="resume-cancel-btn" class="btn btn-secondary">
+                        Отменить и начать новую
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                <a href="admin.html">Админ-панель</a>
+                | Проблемы с загрузкой? Обратитесь к администратору
+            </p>
+        </footer>
+    </div>
+
+    <script src="js/upload-storage.js"></script>
+    <script src="js/uploader.js"></script>
+    <script src="js/upload-page.js"></script>
+</body>
+</html>

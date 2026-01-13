@@ -13,6 +13,7 @@
 {% block canonical_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="/static/css/seat-picker.css">
 <!-- Schema.org Event Markup -->
 <script type="application/ld+json">
 {
@@ -102,11 +103,16 @@
         <!-- Tickets Section -->
         {% if event.status != 'sold_out' and event.status != 'cancelled' %}
         <div class="tickets-section">
+            {% if not event.seat_allocation %}
             <h2 class="tickets-title">Выберите билеты</h2>
+            {% endif %}
 
-            <div class="ticket-types" id="ticket-types">
+            <div class="ticket-types" id="ticket-types" {% if event.seat_allocation %}style="display: none;"{% endif %}>
                 {% for ticket in event.ticket_types %}
-                <div class="ticket-type {% if ticket.available == 0 %}sold-out{% endif %}" data-ticket-id="{{ ticket.id }}" data-original-price="{{ ticket.price }}">
+                <div class="ticket-type {% if ticket.available == 0 %}sold-out{% endif %}"
+                     data-ticket-id="{{ ticket.id }}"
+                     data-original-price="{{ ticket.price }}"
+                     data-available="{{ ticket.available }}">
                     <div class="ticket-info">
                         <h3>{{ ticket.name }}</h3>
                         {% if ticket.description %}
@@ -136,17 +142,40 @@
                                 <span class="discounted-price" style="color: var(--primary); font-weight: 700; font-size: 1.25rem;"></span><span class="ticket-currency">₪</span>
                             </div>
                         </div>
-                        {% if ticket.available > 0 %}
-                        <a href="/checkout.html?event_id={{ event.event_id }}&ticket_type={{ ticket.id }}"
-                           class="btn btn-primary ticket-buy-btn"
-                           style="margin-top: 0.5rem; padding: 0.5rem 1.5rem; font-size: 0.9375rem;">
-                            Купить
-                        </a>
+
+                        {% if ticket.available > 0 and not event.seat_allocation %}
+                            <!-- For unseated events: direct buy button -->
+                            <a href="/checkout.html?event_id={{ event.event_id }}&ticket_type={{ ticket.id }}"
+                               class="btn btn-primary ticket-buy-btn"
+                               style="margin-top: 0.5rem; padding: 0.5rem 1.5rem; font-size: 0.9375rem;">
+                                Купить
+                            </a>
                         {% endif %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
+
+            <!-- Seat Picker Section (only for seated venues) -->
+            {% if event.seat_allocation %}
+            <div id="seat-selection">
+                <h2 class="tickets-title">Выберите места</h2>
+                <div id="seat-picker-container"></div>
+            </div>
+
+            <!-- Proceed to Checkout Button (only for seated venues) -->
+            <div id="checkout-button-container" style="text-align: center; margin-top: 2rem;">
+                <button id="proceed-to-checkout"
+                        class="btn btn-primary btn-large"
+                        disabled
+                        style="padding: 1rem 2rem; font-size: 1.125rem;">
+                    Перейти к оформлению заказа
+                </button>
+                <p id="checkout-status" style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;">
+                    Выберите места для продолжения
+                </p>
+            </div>
+            {% endif %}
 
             <!-- Coupon Button -->
             <div style="text-align: center; margin-top: 1.5rem;">
@@ -307,10 +336,12 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="/static/js/seat-picker.js"></script>
 <script>
 // API Configuration
 const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 const EVENT_ID = '{{ event.event_id }}';
+const EVENT_DATA = {{ event | tojson | safe }};
 
 // Fire ViewContent event on page load
 if (typeof fbq !== 'undefined') {
@@ -546,5 +577,148 @@ function showCouponMessage(message, type) {
         messageDiv.style.borderRadius = '0.375rem';
     }
 }
+
+// ============================================
+// Seated Venue Logic
+// ============================================
+{% if event.seat_allocation %}
+// State for seated venue
+let seatPicker = null;
+let selectedSeats = [];
+
+// Initialize seat picker immediately on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initSeatPicker();
+});
+
+// Initialize seat picker
+async function initSeatPicker() {
+    try {
+        // Prepare ticket types data
+        const ticketTypes = EVENT_DATA.ticket_types.map(tt => ({
+            id: tt.id,
+            name: tt.name,
+            price: tt.price
+        }));
+
+        // Fetch seating map configuration to get numbering settings
+        let seatingMapConfig = null;
+        try {
+            const response = await fetch(`${API_URL}/api/events/${EVENT_ID}/seating-map`);
+            if (response.ok) {
+                const data = await response.json();
+                seatingMapConfig = data.seating_map;
+            }
+        } catch (error) {
+            console.warn('Could not load seating map config, using defaults:', error);
+        }
+
+        seatPicker = new SeatPicker(
+            'seat-picker-container',
+            EVENT_ID,
+            ticketTypes,
+            {
+                apiUrl: API_URL,
+                seatAllocation: EVENT_DATA.seat_allocation,
+                seatingMapConfig: seatingMapConfig,  // Pass numbering config
+                onSelectionChange: handleSeatSelectionChange,
+                onReservationExpired: handleReservationExpired
+            }
+        );
+    } catch (error) {
+        console.error('Error creating seat picker:', error);
+        alert('Ошибка при создании выбора мест. Пожалуйста, обновите страницу.');
+    }
+}
+
+// Handle seat selection change
+function handleSeatSelectionChange(seats) {
+    selectedSeats = seats;
+    const checkoutBtn = document.getElementById('proceed-to-checkout');
+    const statusText = document.getElementById('checkout-status');
+
+    if (seats.length > 0) {
+        checkoutBtn.disabled = false;
+        statusText.textContent = `Выбрано мест: ${seats.length}`;
+    } else {
+        checkoutBtn.disabled = true;
+        statusText.textContent = 'Выберите места для продолжения';
+    }
+}
+
+// Handle reservation expired
+function handleReservationExpired() {
+    alert('Время резервации истекло. Пожалуйста, выберите места заново.');
+    window.location.reload();
+}
+
+// Proceed to checkout button handler
+document.addEventListener('DOMContentLoaded', function() {
+    const checkoutBtn = document.getElementById('proceed-to-checkout');
+    if (checkoutBtn) {
+        checkoutBtn.addEventListener('click', proceedToCheckout);
+    }
+});
+
+// Proceed to checkout
+async function proceedToCheckout() {
+    if (!seatPicker || selectedSeats.length === 0) {
+        alert('Пожалуйста, выберите места');
+        return;
+    }
+
+    try {
+        // Reserve seats before proceeding to checkout
+        await seatPicker.reserveSeats();
+
+        // Get seat allocation from event data
+        const seatAllocation = EVENT_DATA.seat_allocation;
+
+        // Group seats by ticket type
+        const seatsByType = {};
+        selectedSeats.forEach(seatId => {
+            const ticketTypeId = seatAllocation[seatId];
+            if (!seatsByType[ticketTypeId]) {
+                seatsByType[ticketTypeId] = [];
+            }
+            seatsByType[ticketTypeId].push(seatId);
+        });
+
+        // Create tickets array with seats
+        const tickets = Object.keys(seatsByType).map(typeId => ({
+            type_id: typeId,
+            quantity: seatsByType[typeId].length,
+            purchased_seats: seatsByType[typeId]
+        }));
+
+        // Get session ID from seat picker
+        const sessionId = seatPicker.sessionId;
+
+        // Store in sessionStorage
+        const orderData = {
+            event_id: EVENT_ID,
+            tickets: tickets,
+            purchased_seats: selectedSeats,
+            session_id: sessionId,
+            is_seated: true,
+            seating_map_config: seatPicker.options.seatingMapConfig  // Include numbering config
+        };
+
+        // Add coupon if applied
+        if (appliedCoupon) {
+            orderData.coupon_code = appliedCoupon.coupon.coupon_code;
+        }
+
+        console.log('Proceeding to checkout with order data:', orderData);
+        sessionStorage.setItem('orderData', JSON.stringify(orderData));
+
+        // Navigate to checkout
+        window.location.href = '/checkout.html?seated=true';
+    } catch (error) {
+        console.error('Failed to proceed to checkout:', error);
+        // Error notification is already shown by seatPicker.reserveSeats()
+    }
+}
+{% endif %}
 </script>
 {% endblock %}

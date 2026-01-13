@@ -68,6 +68,40 @@ class Contact:
 
 
 @dataclass
+class SeatingMapConfig:
+    """Конфигурация карты мест для зала"""
+    rows: int
+    seats_per_row: int
+    disabled_seats: List[str] = field(default_factory=list)
+    custom_numbers: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    numbering_direction: str = "left-to-right"
+
+    def to_dict(self):
+        return {
+            'rows': self.rows,
+            'seats_per_row': self.seats_per_row,
+            'disabled_seats': self.disabled_seats,
+            'custom_numbers': self.custom_numbers,
+            'numbering_direction': self.numbering_direction
+        }
+
+
+@dataclass
+class VenueConfig:
+    """Конфигурация типа локации"""
+    venue_type: str = "standing"  # "seated" | "standing"
+    seating_map: Optional[SeatingMapConfig] = None
+
+    def to_dict(self):
+        result = {
+            'venue_type': self.venue_type
+        }
+        if self.seating_map:
+            result['seating_map'] = self.seating_map.to_dict()
+        return result
+
+
+@dataclass
 class Location:
     """Модель локации/заведения"""
     location_id: str
@@ -82,6 +116,7 @@ class Location:
     parkings: List[Parking] = field(default_factory=list)
     amenities: List[str] = field(default_factory=list)
     contact: Contact = field(default_factory=Contact)
+    venue_config: VenueConfig = field(default_factory=VenueConfig)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -118,6 +153,7 @@ class Location:
             "parkings": [p.to_dict() for p in self.parkings],
             "amenities": self.amenities,
             "contact": self.contact.to_dict(),
+            "venue_config": self.venue_config.to_dict(),
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }
@@ -144,6 +180,23 @@ class Location:
 
         contact = Contact(**item.get("contact", {}))
 
+        # Parse venue_config
+        venue_config_data = item.get("venue_config", {"venue_type": "standing"})
+        seating_map = None
+        if venue_config_data.get("seating_map"):
+            sm = venue_config_data["seating_map"]
+            seating_map = SeatingMapConfig(
+                rows=sm["rows"],
+                seats_per_row=sm["seats_per_row"],
+                disabled_seats=sm.get("disabled_seats", []),
+                custom_numbers=sm.get("custom_numbers", {}),
+                numbering_direction=sm.get("numbering_direction", "left-to-right")
+            )
+        venue_config = VenueConfig(
+            venue_type=venue_config_data.get("venue_type", "standing"),
+            seating_map=seating_map
+        )
+
         return cls(
             location_id=item["location_id"],
             name=item["name"],
@@ -157,6 +210,7 @@ class Location:
             parkings=parkings,
             amenities=item.get("amenities", []),
             contact=contact,
+            venue_config=venue_config,
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )

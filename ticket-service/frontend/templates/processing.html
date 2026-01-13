@@ -51,7 +51,7 @@
 
 <script>
 // Configuration
-const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+const API_URL = 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev';
 const POLL_INTERVAL = 3000; // 3 seconds
 const MAX_POLLS = 60; // 3 minutes total
 let pollCount = 0;
@@ -140,7 +140,17 @@ function showSuccess(order) {
         </div>
         <div class="detail-row">
             <strong>Билеты:</strong>
-            <span>${order.tickets.map(t => `${t.quantity}x ${t.type_name}`).join(', ')}</span>
+            <span>${order.tickets.map(t => {
+                let result = `${t.quantity}x ${t.type_name}`;
+                if (t.purchased_seats && t.purchased_seats.length > 0) {
+                    const seats = t.purchased_seats.map(s => {
+                        const [row, seat] = s.split('-');
+                        return `Ряд ${row}, Место ${seat}`;
+                    }).join('; ');
+                    result += ` (${seats})`;
+                }
+                return result;
+            }).join(', ')}</span>
         </div>
     `;
     document.getElementById('order-details').innerHTML = detailsHtml;
@@ -150,16 +160,24 @@ function showSuccess(order) {
         const qrHtml = `
             <h3>Ваши билеты:</h3>
             <div class="qr-grid">
-                ${order.qr_codes.map((qr, index) => `
-                    <div class="qr-item">
-                        ${qr.s3_url
-                            ? `<img src="${qr.s3_url}" alt="QR Code ${qr.code}" class="qr-image">`
-                            : `<div class="qr-placeholder">📱</div>`
-                        }
-                        <p>Билет #${index + 1}</p>
-                        <p class="qr-code">${qr.code}</p>
-                    </div>
-                `).join('')}
+                ${order.qr_codes.map((qr, index) => {
+                    let seatInfo = '';
+                    if (qr.seat_id) {
+                        const [row, seat] = qr.seat_id.split('-');
+                        seatInfo = `<p style="font-weight: 600; color: var(--primary);">Ряд ${row}, Место ${seat}</p>`;
+                    }
+                    return `
+                        <div class="qr-item">
+                            ${qr.s3_url
+                                ? `<img src="${qr.s3_url}" alt="QR Code ${qr.code}" class="qr-image">`
+                                : `<div class="qr-placeholder">📱</div>`
+                            }
+                            <p>Билет #${index + 1}</p>
+                            ${seatInfo}
+                            <p class="qr-code">${qr.code}</p>
+                        </div>
+                    `;
+                }).join('')}
             </div>
         `;
         document.getElementById('qr-codes').innerHTML = qrHtml;
