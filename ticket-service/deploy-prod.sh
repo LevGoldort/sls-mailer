@@ -8,7 +8,8 @@
 #   1. Build Lambda packages with SAM
 #   2. Update Lambda function code directly via AWS API
 #   3. Update Lambda environment variables
-#   4. Sync admin and frontend files to S3
+#   4. Update SiteTemplatesLayer (Jinja2 templates for site-regenerator)
+#   5. Sync admin and frontend files to S3
 #
 # What this script does NOT do:
 #   - Does NOT create or modify CloudFormation stack
@@ -38,7 +39,7 @@ echo "⚠️  WARNING: This will update Lambda functions in PRODUCTION!"
 echo ""
 echo "Lambda functions to be updated:"
 echo "  - yallabalagan-ticket-api"
-echo "  - yallabalagan-site-regenerator"
+echo "  - yallabalagan-site-regenerator (+ SiteTemplatesLayer with Jinja2 templates)"
 echo "  - yallabalagan-email-sender"
 echo "  - yallabalagan-event-status-updater"
 echo ""
@@ -143,9 +144,48 @@ rm -f /tmp/ticket-api-env.json
 
 echo "   ✓ Environment variables updated"
 
+# Update SiteTemplatesLayer
+echo ""
+echo "📦 Updating SiteTemplatesLayer..."
+
+# Create layer zip (templates/ and static/ at root level)
+cd frontend
+zip -r -q ../site-templates-layer.zip templates static
+cd ..
+
+# Publish new layer version
+LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
+    --layer-name yallabalagan-site-templates \
+    --description "Jinja2 templates for site generation" \
+    --zip-file fileb://site-templates-layer.zip \
+    --compatible-runtimes python3.12 \
+    --region eu-north-1 \
+    --profile prod \
+    --query 'LayerVersionArn' \
+    --output text)
+
+rm -f site-templates-layer.zip
+echo "   ✓ Published new layer version: $LAYER_VERSION_ARN"
+
 # Update SiteRegeneratorFunction
 if [ -d ".aws-sam/build/SiteRegeneratorFunction" ]; then
     update_lambda "yallabalagan-site-regenerator" ".aws-sam/build/SiteRegeneratorFunction" "lambdas/site-regenerator.lambda_handler"
+
+    # Update Lambda to use new Layer version
+    echo "   ⚙️  Attaching new layer version..."
+    aws lambda update-function-configuration \
+        --function-name yallabalagan-site-regenerator \
+        --layers "$LAYER_VERSION_ARN" \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+
+    aws lambda wait function-updated \
+        --function-name yallabalagan-site-regenerator \
+        --region eu-north-1 \
+        --profile prod
+
+    echo "   ✓ Layer attached"
 
     echo "   ⚙️  Updating environment variables..."
     cat > /tmp/site-regen-env.json <<EOF
