@@ -1414,6 +1414,7 @@ def create_order(request_event: Dict) -> Dict:
             # ПЛАТНЫЙ ЗАКАЗ - существующая логика
             # НЕ генерируем QR коды и НЕ уменьшаем билеты до успешной оплаты!
             # Это будет сделано в webhook handler при получении статуса 'completed'
+            pass
 
         # Сохраняем заказ со статусом pending
         print(f"[DEBUG] About to save order {order.order_id} to DynamoDB")
@@ -1447,12 +1448,12 @@ def create_order(request_event: Dict) -> Dict:
             print(f"Failed to create payment URL: {str(e)}")
             payment_url = f"/processing.html?order_id={order.order_id}"  # Fallback
 
-            return success_response({
-                'message': 'Order created successfully',
-                'order_id': order.order_id,
-                'order': order.to_dynamodb_item(),
-                'payment_url': payment_url
-            }, status_code=201)
+        return success_response({
+            'message': 'Order created successfully',
+            'order_id': order.order_id,
+            'order': order.to_dynamodb_item(),
+            'payment_url': payment_url
+        }, status_code=201)
 
     except json.JSONDecodeError:
         return error_response(400, "Invalid JSON")

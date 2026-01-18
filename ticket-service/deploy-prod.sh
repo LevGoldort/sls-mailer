@@ -1,7 +1,26 @@
 #!/bin/bash
-# Deploy ticket-service to Production environment
+# Deploy ticket-service to Production - Lambda Updates Only
+#
+# This script updates ONLY Lambda functions on prod without using CloudFormation.
+# Existing infrastructure (DynamoDB tables, S3 buckets, API Gateway) remains unchanged.
+#
+# What this script does:
+#   1. Build Lambda packages with SAM
+#   2. Update Lambda function code directly via AWS API
+#   3. Update Lambda environment variables
+#   4. Sync admin and frontend files to S3
+#
+# What this script does NOT do:
+#   - Does NOT create or modify CloudFormation stack
+#   - Does NOT touch DynamoDB tables
+#   - Does NOT modify S3 buckets
+#   - Does NOT change API Gateway configuration
 
 set -e  # Exit on error
+
+# Get script directory and change to it
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Load .env.prod
 if [ ! -f ../.env.prod ]; then
@@ -11,53 +30,253 @@ fi
 
 export $(cat ../.env.prod | grep -v '^#' | grep -v '^$' | xargs)
 
-echo "=== Deploying Ticket Service to PRODUCTION ==="
-echo "Stack: yallabalagan-ticket-service-prod"
+echo "=== Deploying Ticket Service to PRODUCTION (Lambda Updates Only) ==="
+echo "Stack: NO CloudFormation stack (direct Lambda updates)"
 echo "Region: eu-north-1"
 echo ""
-echo "⚠️  WARNING: This will deploy to PRODUCTION!"
+echo "⚠️  WARNING: This will update Lambda functions in PRODUCTION!"
+echo ""
+echo "Lambda functions to be updated:"
+echo "  - yallabalagan-ticket-api"
+echo "  - yallabalagan-site-regenerator"
+echo "  - yallabalagan-email-sender"
+echo "  - yallabalagan-event-status-updater"
+echo ""
+echo "Existing infrastructure (DynamoDB, S3 buckets, API Gateway) will NOT be touched."
+echo ""
 echo "Press Ctrl+C to cancel, or Enter to continue..."
 read
 
 # Build
-echo "Building SAM application..."
+echo ""
+echo "📦 Building SAM application..."
 sam build
 
-# Deploy
-echo "Deploying to AWS..."
-sam deploy \
-  --config-env default \
-  --parameter-overrides \
-    "Environment=prod" \
-    "PaymentMode=${PAYMENT_MODE}" \
-    "SenderEmail=${SENDER_EMAIL}" \
-    "AllPayLogin=${ALLPAY_LOGIN}" \
-    "AllPayWebhookSecret=${ALLPAY_WEBHOOK_SECRET}" \
-    "AllPayApiKey=${ALLPAY_API_KEY}" \
-    "AllPayUseApi=${ALLPAY_USE_API}" \
-    "PaymentExpireMinutes=${PAYMENT_EXPIRE_MINUTES}" \
-    "AdminApiKeys=${ADMIN_API_KEYS}"
+if [ ! -d ".aws-sam/build" ]; then
+    echo "❌ Build failed - .aws-sam/build directory not found"
+    exit 1
+fi
+
+echo "✅ Build complete"
+
+# Helper function to update Lambda
+update_lambda() {
+    local function_name=$1
+    local build_dir=$2
+    local handler=$3
+
+    echo ""
+    echo "🚀 Updating Lambda: $function_name..."
+
+    # Create zip package
+    cd "$build_dir"
+    zip -r -q "../../${function_name}.zip" .
+    cd ../..
+
+    local zip_file="${function_name}.zip"
+
+    if [ ! -f "$zip_file" ]; then
+        echo "❌ Package not found: $zip_file"
+        return 1
+    fi
+
+    # Update function code
+    aws lambda update-function-code \
+        --function-name "$function_name" \
+        --zip-file "fileb://$zip_file" \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+
+    echo "   ✓ Code updated"
+
+    # Wait for update to complete
+    aws lambda wait function-updated \
+        --function-name "$function_name" \
+        --region eu-north-1 \
+        --profile prod
+
+    echo "   ✓ Update complete"
+
+    # Cleanup
+    rm -f "$zip_file"
+}
+
+# Update TicketApiFunction
+update_lambda "yallabalagan-ticket-api" ".aws-sam/build/TicketApiFunction" "lambdas/api-handler.lambda_handler"
+
+# Update environment variables for ticket-api
+echo "   ⚙️  Updating environment variables..."
+cat > /tmp/ticket-api-env.json <<EOF
+{
+  "Variables": {
+    "ALLPAY_LOGIN": "${ALLPAY_LOGIN}",
+    "ALLPAY_WEBHOOK_SECRET": "${ALLPAY_WEBHOOK_SECRET}",
+    "ALLPAY_API_KEY": "${ALLPAY_API_KEY}",
+    "ALLPAY_USE_API": "${ALLPAY_USE_API}",
+    "PAYMENT_EXPIRE_MINUTES": "${PAYMENT_EXPIRE_MINUTES}",
+    "ADMIN_API_KEYS": "${ADMIN_API_KEYS}",
+    "API_URL": "${API_URL}",
+    "FRONTEND_URL": "${FRONTEND_URL}",
+    "ENVIRONMENT": "prod",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "yallabalagan-ticket-media",
+    "FRONTEND_BUCKET": "yallabalagan-tickets-frontend"
+  }
+}
+EOF
+
+aws lambda update-function-configuration \
+    --function-name yallabalagan-ticket-api \
+    --environment file:///tmp/ticket-api-env.json \
+    --region eu-north-1 \
+    --profile prod \
+    --no-cli-pager > /dev/null
+
+rm -f /tmp/ticket-api-env.json
+
+echo "   ✓ Environment variables updated"
+
+# Update SiteRegeneratorFunction
+if [ -d ".aws-sam/build/SiteRegeneratorFunction" ]; then
+    update_lambda "yallabalagan-site-regenerator" ".aws-sam/build/SiteRegeneratorFunction" "lambdas/site-regenerator.lambda_handler"
+
+    echo "   ⚙️  Updating environment variables..."
+    cat > /tmp/site-regen-env.json <<EOF
+{
+  "Variables": {
+    "API_URL": "${API_URL}",
+    "S3_BUCKET": "${S3_BUCKET}",
+    "GA4_ID": "${GA4_ID}",
+    "FB_PIXEL_ID": "${FB_PIXEL_ID}",
+    "ENVIRONMENT": "prod",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "yallabalagan-ticket-media",
+    "FRONTEND_BUCKET": "yallabalagan-tickets-frontend"
+  }
+}
+EOF
+    aws lambda update-function-configuration \
+        --function-name yallabalagan-site-regenerator \
+        --environment file:///tmp/site-regen-env.json \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+    rm -f /tmp/site-regen-env.json
+
+    echo "   ✓ Environment variables updated"
+fi
+
+# Update EmailSenderFunction
+if [ -d ".aws-sam/build/EmailSenderFunction" ]; then
+    update_lambda "yallabalagan-email-sender" ".aws-sam/build/EmailSenderFunction" "lambdas/email-sender.lambda_handler"
+
+    echo "   ⚙️  Updating environment variables..."
+    cat > /tmp/email-sender-env.json <<EOF
+{
+  "Variables": {
+    "SENDER_EMAIL": "${SENDER_EMAIL}",
+    "ENVIRONMENT": "prod",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "yallabalagan-ticket-media",
+    "FRONTEND_BUCKET": "yallabalagan-tickets-frontend"
+  }
+}
+EOF
+    aws lambda update-function-configuration \
+        --function-name yallabalagan-email-sender \
+        --environment file:///tmp/email-sender-env.json \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+    rm -f /tmp/email-sender-env.json
+
+    echo "   ✓ Environment variables updated"
+fi
+
+# Update EventStatusUpdaterFunction
+if [ -d ".aws-sam/build/EventStatusUpdaterFunction" ]; then
+    update_lambda "yallabalagan-event-status-updater" ".aws-sam/build/EventStatusUpdaterFunction" "lambdas/event-status-updater.lambda_handler"
+
+    echo "   ⚙️  Updating environment variables..."
+    cat > /tmp/event-updater-env.json <<EOF
+{
+  "Variables": {
+    "ENVIRONMENT": "prod",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "yallabalagan-ticket-media",
+    "FRONTEND_BUCKET": "yallabalagan-tickets-frontend"
+  }
+}
+EOF
+    aws lambda update-function-configuration \
+        --function-name yallabalagan-event-status-updater \
+        --environment file:///tmp/event-updater-env.json \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+    rm -f /tmp/event-updater-env.json
+
+    echo "   ✓ Environment variables updated"
+fi
+
+# Sync S3 files
+echo ""
+if [ -d "admin" ]; then
+    echo "📤 Syncing admin files to S3..."
+    aws s3 sync admin/ s3://yallabalagan-ticket-admin/ \
+      --profile prod \
+      --exclude "*.md" \
+      --exclude ".DS_Store" \
+      --delete
+else
+    echo "⚠️  Skipping admin sync - directory not found"
+fi
 
 echo ""
-echo "Syncing admin files to S3..."
-aws s3 sync admin/ s3://yallabalagan-ticket-admin/ \
-  --exclude "*.md" \
-  --exclude ".DS_Store" \
-  --delete
+if [ -d "frontend" ]; then
+    echo "📤 Syncing frontend files to S3..."
+    aws s3 sync frontend/ s3://yallabalagan-tickets-frontend/ \
+      --profile prod \
+      --exclude "*.md" \
+      --exclude ".DS_Store" \
+      --delete
+else
+    echo "⚠️  Skipping frontend sync - directory not found"
+fi
 
 echo ""
-echo "Syncing frontend files to S3..."
-aws s3 sync frontend/ s3://yallabalagan-tickets-frontend/ \
-  --exclude "*.md" \
-  --exclude ".DS_Store" \
-  --delete
-
-echo ""
-echo "✅ Deployment complete!"
+echo "✅ ✅ ✅ Deployment complete! ✅ ✅ ✅"
 echo ""
 echo "URLs:"
 echo "  Admin:    http://yallabalagan-ticket-admin.s3-website.eu-north-1.amazonaws.com"
 echo "  Frontend: http://yallabalagan-tickets-frontend.s3-website.eu-north-1.amazonaws.com"
+echo "  API:      https://ovajavet67.execute-api.eu-north-1.amazonaws.com"
 echo ""
-echo "Get stack outputs:"
-echo "aws cloudformation describe-stacks --stack-name yallabalagan-ticket-service-prod --query 'Stacks[0].Outputs' --region eu-north-1"
+echo "Check Lambda logs:"
+echo "  aws logs tail /aws/lambda/yallabalagan-ticket-api --follow --profile prod"
+echo ""

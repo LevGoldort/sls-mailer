@@ -95,7 +95,13 @@ Globals:
       Variables:
         ENVIRONMENT: !Ref Environment
         PAYMENT_MODE: !Ref PaymentMode
-        EMAIL_SENDER_LAMBDA: !If [IsProd, yallabalagan-email-sender, !Sub yallabalagan-email-sender-${Environment}]
+        EMAIL_SENDER_LAMBDA: !If
+
+          - IsProd
+
+          - yallabalagan-email-sender
+
+          - !Sub yallabalagan-email-sender-${Environment}
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
@@ -112,7 +118,13 @@ Resources:
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If [IsProd, yallabalagan-events, !Sub yallabalagan-events-${Environment}]
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-events
+
+        - !Sub yallabalagan-events-${Environment}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -164,7 +176,13 @@ Resources:
   LocationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If [IsProd, yallabalagan-locations, !Sub yallabalagan-locations-${Environment}]
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-locations
+
+        - !Sub yallabalagan-locations-${Environment}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -194,7 +212,13 @@ Resources:
   OrdersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If [IsProd, yallabalagan-orders, !Sub yallabalagan-orders-${Environment}]
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-orders
+
+        - !Sub yallabalagan-orders-${Environment}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -238,7 +262,13 @@ Resources:
   CouponsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If [IsProd, yallabalagan-coupons, !Sub yallabalagan-coupons-${Environment}]
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-coupons
+
+        - !Sub yallabalagan-coupons-${Environment}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -272,7 +302,13 @@ Resources:
   SeatReservationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If [IsProd, yallabalagan-seat-reservations, !Sub yallabalagan-seat-reservations-${Environment}]
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-seat-reservations
+
+        - !Sub yallabalagan-seat-reservations-${Environment}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: event_id
@@ -311,7 +347,13 @@ Resources:
   MediaBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !If [IsProd, yallabalagan-ticket-media, !Sub yallabalagan-ticket-media-${Environment}]
+      BucketName: !If
+
+        - IsProd
+
+        - yallabalagan-ticket-media
+
+        - !Sub yallabalagan-ticket-media-${Environment}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -349,7 +391,13 @@ Resources:
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !If [IsProd, yallabalagan-tickets-frontend, !Sub yallabalagan-tickets-frontend-${Environment}]
+      BucketName: !If
+
+        - IsProd
+
+        - yallabalagan-tickets-frontend
+
+        - !Sub yallabalagan-tickets-frontend-${Environment}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -379,7 +427,13 @@ Resources:
   AdminBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !If [IsProd, yallabalagan-ticket-admin, !Sub yallabalagan-ticket-admin-${Environment}]
+      BucketName: !If
+
+        - IsProd
+
+        - yallabalagan-ticket-admin
+
+        - !Sub yallabalagan-ticket-admin-${Environment}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -413,7 +467,13 @@ Resources:
   TicketApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If [IsProd, yallabalagan-ticket-api, !Sub yallabalagan-ticket-api-${Environment}]
+      FunctionName: !If
+
+        - IsProd
+
+        - yallabalagan-ticket-api
+
+        - !Sub yallabalagan-ticket-api-${Environment}
       CodeUri: .
       Handler: lambdas/api-handler.lambda_handler
       Description: Main API handler for ticket service
@@ -458,7 +518,13 @@ Resources:
   SiteRegeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If [IsProd, yallabalagan-site-regenerator, !Sub yallabalagan-site-regenerator-${Environment}]
+      FunctionName: !If
+
+        - IsProd
+
+        - yallabalagan-site-regenerator
+
+        - !Sub yallabalagan-site-regenerator-${Environment}
       CodeUri: .
       Handler: lambdas/site-regenerator.lambda_handler
       Description: Generates static site from DynamoDB data
@@ -490,7 +556,13 @@ Resources:
   EmailSenderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If [IsProd, yallabalagan-email-sender, !Sub yallabalagan-email-sender-${Environment}]
+      FunctionName: !If
+
+        - IsProd
+
+        - yallabalagan-email-sender
+
+        - !Sub yallabalagan-email-sender-${Environment}
       CodeUri: .
       Handler: lambdas/email-sender.lambda_handler
       Description: Sends ticket confirmation emails
@@ -512,7 +584,13 @@ Resources:
   EventStatusUpdaterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If [IsProd, yallabalagan-event-status-updater, !Sub yallabalagan-event-status-updater-${Environment}]
+      FunctionName: !If
+
+        - IsProd
+
+        - yallabalagan-event-status-updater
+
+        - !Sub yallabalagan-event-status-updater-${Environment}
       CodeUri: .
       Handler: lambdas/event-status-updater.lambda_handler
       Description: Updates event status based on date/time
@@ -529,7 +607,13 @@ Resources:
   PendingOrdersCleanerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If [IsProd, yallabalagan-pending-orders-cleaner, !Sub yallabalagan-pending-orders-cleaner-${Environment}]
+      FunctionName: !If
+
+        - IsProd
+
+        - yallabalagan-pending-orders-cleaner
+
+        - !Sub yallabalagan-pending-orders-cleaner-${Environment}
       CodeUri: .
       Handler: lambdas/pending-orders-cleaner.lambda_handler
       Description: Cleans up expired pending orders
@@ -551,7 +635,13 @@ Resources:
   SiteTemplatesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: !If [IsProd, yallabalagan-site-templates, !Sub yallabalagan-site-templates-${Environment}]
+      LayerName: !If
+
+        - IsProd
+
+        - yallabalagan-site-templates
+
+        - !Sub yallabalagan-site-templates-${Environment}
       Description: Jinja2 templates for site generation
       ContentUri: frontend/
       CompatibleRuntimes:
@@ -609,46 +699,94 @@ Outputs:
     Description: API Gateway endpoint URL
     Value: !Sub https://${TicketApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
-      Name: !If [IsProd, TicketApiUrl, !Sub ${Environment}-TicketApiUrl]
+      Name: !If
+
+        - IsProd
+
+        - TicketApiUrl
+
+        - !Sub ${Environment}-TicketApiUrl
 
   FrontendUrl:
     Description: Frontend S3 website URL
     Value: !GetAtt FrontendBucket.WebsiteURL
     Export:
-      Name: !If [IsProd, FrontendUrl, !Sub ${Environment}-FrontendUrl]
+      Name: !If
+
+        - IsProd
+
+        - FrontendUrl
+
+        - !Sub ${Environment}-FrontendUrl
 
   AdminUrl:
     Description: Admin S3 website URL
     Value: !GetAtt AdminBucket.WebsiteURL
     Export:
-      Name: !If [IsProd, AdminUrl, !Sub ${Environment}-AdminUrl]
+      Name: !If
+
+        - IsProd
+
+        - AdminUrl
+
+        - !Sub ${Environment}-AdminUrl
 
   EventsTableName:
     Description: DynamoDB Events Table Name
     Value: !Ref EventsTable
     Export:
-      Name: !If [IsProd, EventsTable, !Sub ${Environment}-EventsTable]
+      Name: !If
+
+        - IsProd
+
+        - EventsTable
+
+        - !Sub ${Environment}-EventsTable
 
   LocationsTableName:
     Description: DynamoDB Locations Table Name
     Value: !Ref LocationsTable
     Export:
-      Name: !If [IsProd, LocationsTable, !Sub ${Environment}-LocationsTable]
+      Name: !If
+
+        - IsProd
+
+        - LocationsTable
+
+        - !Sub ${Environment}-LocationsTable
 
   OrdersTableName:
     Description: DynamoDB Orders Table Name
     Value: !Ref OrdersTable
     Export:
-      Name: !If [IsProd, OrdersTable, !Sub ${Environment}-OrdersTable]
+      Name: !If
+
+        - IsProd
+
+        - OrdersTable
+
+        - !Sub ${Environment}-OrdersTable
 
   MediaBucketName:
     Description: Media S3 Bucket Name
     Value: !Ref MediaBucket
     Export:
-      Name: !If [IsProd, MediaBucket, !Sub ${Environment}-MediaBucket]
+      Name: !If
+
+        - IsProd
+
+        - MediaBucket
+
+        - !Sub ${Environment}-MediaBucket
 
   SeatReservationsTableName:
     Description: DynamoDB Seat Reservations Table Name
     Value: !Ref SeatReservationsTable
     Export:
-      Name: !If [IsProd, SeatReservationsTable, !Sub ${Environment}-SeatReservationsTable]
+      Name: !If
+
+        - IsProd
+
+        - SeatReservationsTable
+
+        - !Sub ${Environment}-SeatReservationsTable

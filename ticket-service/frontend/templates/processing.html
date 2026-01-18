@@ -51,7 +51,7 @@
 
 <script>
 // Configuration
-const API_URL = 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev';
+const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 const POLL_INTERVAL = 3000; // 3 seconds
 const MAX_POLLS = 60; // 3 minutes total
 let pollCount = 0;

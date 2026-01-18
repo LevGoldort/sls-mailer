@@ -183,17 +183,21 @@ class AllPayProvider(PaymentProvider):
         self.api_key = os.environ.get('ALLPAY_API_KEY', '')
         self.use_api = os.environ.get('ALLPAY_USE_API', 'false').lower() == 'true'
         self.expire_minutes = int(os.environ.get('PAYMENT_EXPIRE_MINUTES', '10'))
-        self.api_endpoint = 'https://allpay.to/app/?show=getpayment&mode=api9'
+        self.api_endpoint = 'https://allpay.to/app/?show=getpayment&mode=api10'
 
         # URLs
         api_url_base = os.environ.get('API_URL', 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev')
         self.notifications_url = f"{api_url_base}/api/webhooks/allpay"
 
+        # Frontend URLs - use S3 bucket URL for AllPay compatibility
         frontend_bucket = os.environ.get('FRONTEND_BUCKET', 'yallabalagan-tickets-frontend-dev')
-        self.frontend_url = f"http://{frontend_bucket}.s3-website.eu-north-1.amazonaws.com"
+        self.frontend_s3_url = f"http://{frontend_bucket}.s3-website.eu-north-1.amazonaws.com"
 
-        # Return URL after payment (for legacy links)
-        self.return_url = os.environ.get('PAYMENT_RETURN_URL', f'{self.frontend_url}/processing.html')
+        # Custom domain (for display purposes)
+        self.frontend_url = os.environ.get('FRONTEND_URL', self.frontend_s3_url)
+
+        # Return URL after payment - use S3 URL for AllPay API (domain must be registered)
+        self.return_url = os.environ.get('PAYMENT_RETURN_URL', f'{self.frontend_s3_url}/processing.html')
 
     def _generate_request_signature(self, params: Dict) -> str:
         """
@@ -300,8 +304,8 @@ class AllPayProvider(PaymentProvider):
             # Note: client_phone omitted (not collected currently, avoid empty strings)
             "expire": expire_timestamp,
             "lang": "EN"  # Payment form language
-            # Note: success_url and backlink_url removed - S3 URLs cause "Invalid domain" error
-            # AllPay will use their default success page. User will be notified via webhook.
+            # Note: success_url and backlink_url not needed for iframe/Hosted Fields mode
+            # AllPay Hosted Fields JS library handles success/error callbacks
         }
 
         # Only include client_name if provided (AllPay requires non-empty name)
@@ -512,7 +516,7 @@ class AllPayProvider(PaymentProvider):
         """
         Issue refund via AllPay API
 
-        API Endpoint: POST https://allpay.to/app/?show=refund&mode=api9
+        API Endpoint: POST https://allpay.to/app/?show=refund&mode=api10
         Required: login, order_id, amount, sign (SHA256)
 
         Args:
@@ -546,7 +550,7 @@ class AllPayProvider(PaymentProvider):
         refund_data['sign'] = signature
 
         # Make API request
-        refund_url = 'https://allpay.to/app/?show=refund&mode=api9'
+        refund_url = 'https://allpay.to/app/?show=refund&mode=api10'
 
         print(f"Requesting refund from AllPay: order_id={order_id}, amount={amount}")
 
