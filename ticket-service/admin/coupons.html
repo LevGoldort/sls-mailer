@@ -417,10 +417,10 @@
         }
 
         async function showCreateModal() {
-            // Load events for selection
+            // Load events for selection (only active)
             try {
                 const data = await API.getEvents();
-                allEvents = data.events || [];
+                allEvents = data.events.filter(e => e.status === 'active') || [];
 
                 const eventsList = document.getElementById('events-list');
                 eventsList.innerHTML = allEvents.map(e => `

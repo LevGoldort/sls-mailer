@@ -923,11 +923,12 @@
                     <div class="form-group">
                         <label>Всего билетов *</label>
                         <input type="number" class="tt-total" value="${data?.total || ''}" ${isSeatedVenue ? '' : 'required'} min="1">
+                        <div class="help-text tt-sold-info" style="display: none;"></div>
                     </div>
                     <div class="form-group">
-                        <label>Доступно</label>
-                        <input type="number" class="tt-available" value="${data?.available || data?.total || ''}" min="0">
-                        <div class="help-text">Оставьте пустым для новых событий</div>
+                        <label>Доступно для продажи</label>
+                        <input type="number" class="tt-available" value="${data?.available || data?.total || ''}" min="0" readonly style="background: #f5f5f5;">
+                        <div class="help-text">Рассчитывается автоматически: Всего − Продано</div>
                     </div>
                 </div>
                 ${isSeatedVenue ? `
@@ -968,6 +969,33 @@
                 helpText.textContent = '💡 Изменение цены влияет только на новые покупки. Купленные билеты сохраняют оригинальную цену.';
                 priceInput.parentElement.appendChild(helpText);
             }
+
+            // Auto-recalculate available when total changes (for standing venues)
+            const totalInput = div.querySelector('.tt-quantity-fields .tt-total');
+            const availableInput = div.querySelector('.tt-quantity-fields .tt-available');
+            if (totalInput && availableInput) {
+                totalInput.addEventListener('input', function() {
+                    const newTotal = parseInt(this.value) || 0;
+                    const sold = soldTicketsByType[id] || 0;
+
+                    // Validate: total cannot be less than sold
+                    if (newTotal < sold) {
+                        this.style.borderColor = '#dc2626';
+                        this.style.backgroundColor = '#fef2f2';
+                        this.title = `Минимум ${sold} (уже продано)`;
+                        // Set minimum to sold count
+                        this.min = sold;
+                    } else {
+                        this.style.borderColor = '';
+                        this.style.backgroundColor = '';
+                        this.title = '';
+                        this.min = 1;
+                        // Recalculate available: new_available = new_total - sold
+                        const newAvailable = newTotal - sold;
+                        availableInput.value = newAvailable;
+                    }
+                });
+            }
         }
 
         function removeTicketType(id) {
@@ -1006,6 +1034,16 @@
 
                 if (ticketTypes.length === 0) {
                     throw new Error('Добавьте хотя бы один тип билета');
+                }
+
+                // Validate total >= sold for each ticket type
+                for (const tt of ticketTypes) {
+                    const sold = soldTicketsByType[tt.id] || 0;
+                    if (tt.total < sold) {
+                        throw new Error(
+                            `Количество билетов "${tt.name}" (${tt.total}) не может быть меньше уже проданных (${sold})`
+                        );
+                    }
                 }
 
                 // Validate total tickets against location capacity
@@ -1107,6 +1145,9 @@
                 // Show sales warning if needed
                 showSalesWarning();
 
+                // Update sold info for each ticket type
+                updateTicketTypeSoldInfo();
+
                 displayOrders(orders);
 
                 // Show orders section
@@ -1139,6 +1180,38 @@
         function checkTicketTypeHasSales(ticketTypeId) {
             if (!soldTicketsByType) return false;
             return (soldTicketsByType[ticketTypeId] || 0) > 0;
+        }
+
+        function updateTicketTypeSoldInfo() {
+            // Update sold info display for each ticket type
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                const id = item.dataset.id;
+                const sold = soldTicketsByType[id] || 0;
+                const soldInfoEl = item.querySelector('.tt-sold-info');
+                const totalInput = item.querySelector('.tt-quantity-fields .tt-total');
+
+                if (soldInfoEl) {
+                    if (sold > 0) {
+                        soldInfoEl.innerHTML = `🔒 <strong>Продано: ${sold}</strong> (минимум)`;
+                        soldInfoEl.style.display = 'block';
+                        soldInfoEl.style.color = '#059669';
+                        // Set minimum value
+                        if (totalInput) {
+                            totalInput.min = sold;
+                        }
+                    } else {
+                        soldInfoEl.style.display = 'none';
+                    }
+                }
+
+                // Also recalculate available based on actual sold count
+                const availableInput = item.querySelector('.tt-quantity-fields .tt-available');
+                if (totalInput && availableInput) {
+                    const total = parseInt(totalInput.value) || 0;
+                    const newAvailable = Math.max(0, total - sold);
+                    availableInput.value = newAvailable;
+                }
+            });
         }
 
         function displayOrders(orders) {

@@ -33,7 +33,39 @@ aws iam put-role-policy \
   --policy-name S3-SiteRegenerator-Policy \
   --policy-document file:///tmp/s3-policy.json
 
-# 2. Lambda invoke permissions
+# 2. DynamoDB permissions for seat-reservations table
+echo "📝 Adding DynamoDB permissions for seat-reservations..."
+cat > /tmp/dynamodb-seat-reservations-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:eu-north-1:982534389905:table/yallabalagan-seat-reservations",
+        "arn:aws:dynamodb:eu-north-1:982534389905:table/yallabalagan-seat-reservations/index/*"
+      ]
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name "$ROLE_NAME" \
+  --policy-name DynamoDB-SeatReservations-Policy \
+  --policy-document file:///tmp/dynamodb-seat-reservations-policy.json
+
+# 3. Lambda invoke permissions
 echo "📝 Adding Lambda invoke permissions..."
 cat > /tmp/lambda-invoke-policy.json <<EOF
 {
@@ -54,6 +86,6 @@ aws iam put-role-policy \
   --policy-document file:///tmp/lambda-invoke-policy.json
 
 # Cleanup
-rm /tmp/s3-policy.json /tmp/lambda-invoke-policy.json
+rm /tmp/s3-policy.json /tmp/dynamodb-seat-reservations-policy.json /tmp/lambda-invoke-policy.json
 
 echo "✅ Permissions configured!"
