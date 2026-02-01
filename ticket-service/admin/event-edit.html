@@ -721,7 +721,8 @@
         let totalSoldTickets = 0;
         let hasSalesWithSeats = false;
         let hasSalesWithoutSeats = false;
-        let soldTicketsByType = {};  // {ticket_type_id: count}
+        let soldTicketsByType = {};  // {ticket_type_id: count} - only COMPLETED
+        let pendingTicketsByType = {};  // {ticket_type_id: count} - only PENDING
 
         function slugify(value) {
             if (!value) return '';
@@ -1122,14 +1123,16 @@
                 totalSoldTickets = 0;
                 hasSalesWithSeats = false;
                 hasSalesWithoutSeats = false;
-                soldTicketsByType = {};
+                soldTicketsByType = {};  // Only COMPLETED orders (for calculating available)
+                pendingTicketsByType = {};  // Pending orders (for info only)
 
                 orders.forEach(order => {
-                    if (order.payment.status === 'completed' || order.payment.status === 'pending') {
+                    const status = order.payment.status;
+                    if (status === 'completed') {
                         order.tickets.forEach(ticket => {
                             totalSoldTickets += ticket.quantity;
 
-                            // Track sales by type
+                            // Track completed sales by type (used for available calculation)
                             soldTicketsByType[ticket.type_id] =
                                 (soldTicketsByType[ticket.type_id] || 0) + ticket.quantity;
 
@@ -1138,6 +1141,12 @@
                             } else {
                                 hasSalesWithoutSeats = true;
                             }
+                        });
+                    } else if (status === 'pending') {
+                        // Track pending separately (doesn't block available)
+                        order.tickets.forEach(ticket => {
+                            pendingTicketsByType[ticket.type_id] =
+                                (pendingTicketsByType[ticket.type_id] || 0) + ticket.quantity;
                         });
                     }
                 });
@@ -1187,16 +1196,25 @@
             document.querySelectorAll('.ticket-type-item').forEach(item => {
                 const id = item.dataset.id;
                 const sold = soldTicketsByType[id] || 0;
+                const pending = pendingTicketsByType[id] || 0;
                 const soldInfoEl = item.querySelector('.tt-sold-info');
                 const totalInput = item.querySelector('.tt-quantity-fields .tt-total');
 
                 if (soldInfoEl) {
-                    if (sold > 0) {
-                        soldInfoEl.innerHTML = `🔒 <strong>Продано: ${sold}</strong> (минимум)`;
+                    if (sold > 0 || pending > 0) {
+                        let infoHtml = '';
+                        if (sold > 0) {
+                            infoHtml += `🔒 <strong>Продано: ${sold}</strong> (минимум)`;
+                        }
+                        if (pending > 0) {
+                            infoHtml += sold > 0 ? '<br>' : '';
+                            infoHtml += `⏳ В процессе оплаты: ${pending}`;
+                        }
+                        soldInfoEl.innerHTML = infoHtml;
                         soldInfoEl.style.display = 'block';
                         soldInfoEl.style.color = '#059669';
-                        // Set minimum value
-                        if (totalInput) {
+                        // Set minimum value based on COMPLETED only
+                        if (totalInput && sold > 0) {
                             totalInput.min = sold;
                         }
                     } else {
@@ -1204,7 +1222,7 @@
                     }
                 }
 
-                // Also recalculate available based on actual sold count
+                // Recalculate available based on COMPLETED sold count only
                 const availableInput = item.querySelector('.tt-quantity-fields .tt-available');
                 if (totalInput && availableInput) {
                     const total = parseInt(totalInput.value) || 0;
