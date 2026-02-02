@@ -229,6 +229,53 @@
             color: #999;
         }
 
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            border: none;
+            background: #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #d0d0d0;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-count {
+            background: rgba(255,255,255,0.3);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+
+        .tab.active .tab-count {
+            background: rgba(255,255,255,0.3);
+        }
+
         .toast {
             position: fixed;
             bottom: 20px;
@@ -285,8 +332,25 @@
         </div>
 
         <div class="section">
-            <div id="events-container" class="events-grid">
-                <div class="loading">Загрузка событий...</div>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('upcoming')" id="tab-upcoming">
+                    Активные <span class="tab-count" id="count-upcoming">0</span>
+                </button>
+                <button class="tab" onclick="switchTab('past')" id="tab-past">
+                    Прошедшие <span class="tab-count" id="count-past">0</span>
+                </button>
+            </div>
+
+            <div id="upcoming-tab" class="tab-content active">
+                <div id="upcoming-container" class="events-grid">
+                    <div class="loading">Загрузка событий...</div>
+                </div>
+            </div>
+
+            <div id="past-tab" class="tab-content">
+                <div id="past-container" class="events-grid">
+                    <div class="loading">Загрузка событий...</div>
+                </div>
             </div>
         </div>
     </div>
@@ -294,28 +358,83 @@
     <script src="shared.js?v=1764370571"></script>
     <script>
         let allEvents = [];
+        let upcomingEvents = [];
+        let pastEvents = [];
+        let currentTab = 'upcoming';
 
         async function loadEvents() {
             try {
                 const data = await API.getEvents();
                 allEvents = data.events || [];
-                displayEvents(allEvents);
+
+                // Separate into upcoming and past
+                const now = new Date();
+                upcomingEvents = [];
+                pastEvents = [];
+
+                allEvents.forEach(event => {
+                    const eventDate = new Date(event.date);
+                    if (eventDate >= now || event.status === 'active') {
+                        upcomingEvents.push(event);
+                    } else {
+                        pastEvents.push(event);
+                    }
+                });
+
+                // Sort: upcoming by date ascending, past by date descending
+                upcomingEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
+                pastEvents.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                // Update counts
+                document.getElementById('count-upcoming').textContent = upcomingEvents.length;
+                document.getElementById('count-past').textContent = pastEvents.length;
+
+                // Display based on current tab
+                displayEvents();
             } catch (error) {
                 handleError(error, 'Ошибка загрузки событий');
-                document.getElementById('events-container').innerHTML =
+                document.getElementById('upcoming-container').innerHTML =
                     '<div class="empty">Ошибка загрузки событий</div>';
             }
         }
 
-        function displayEvents(events) {
-            const container = document.getElementById('events-container');
+        function displayEvents() {
+            const upcomingContainer = document.getElementById('upcoming-container');
+            const pastContainer = document.getElementById('past-container');
 
-            if (events.length === 0) {
-                container.innerHTML = '<div class="empty">Нет событий</div>';
-                return;
+            // Apply filters
+            const search = document.getElementById('search').value.toLowerCase();
+            const status = document.getElementById('status-filter').value;
+
+            let filteredUpcoming = upcomingEvents;
+            let filteredPast = pastEvents;
+
+            if (search) {
+                filteredUpcoming = filteredUpcoming.filter(e =>
+                    e.title.toLowerCase().includes(search) ||
+                    (e.description && e.description.toLowerCase().includes(search))
+                );
+                filteredPast = filteredPast.filter(e =>
+                    e.title.toLowerCase().includes(search) ||
+                    (e.description && e.description.toLowerCase().includes(search))
+                );
             }
 
-            container.innerHTML = events.map(event => {
+            if (status) {
+                filteredUpcoming = filteredUpcoming.filter(e => e.status === status);
+                filteredPast = filteredPast.filter(e => e.status === status);
+            }
+
+            upcomingContainer.innerHTML = renderEventsList(filteredUpcoming, 'Нет активных событий');
+            pastContainer.innerHTML = renderEventsList(filteredPast, 'Нет прошедших событий');
+        }
+
+        function renderEventsList(events, emptyMessage) {
+            if (events.length === 0) {
+                return `<div class="empty">${emptyMessage}</div>`;
+            }
+
+            return events.map(event => {
                 const stats = calculateEventStats(event);
                 const statusClass = `status-${event.status}`;
                 const publicUrl = event.slug ? `/events/${event.slug}.html` : `/events/${event.event_id}.html`;
@@ -358,6 +477,18 @@
             }).join('');
         }
 
+        function switchTab(tab) {
+            currentTab = tab;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById(`${tab}-tab`).classList.add('active');
+        }
+
         function editEvent(eventId) {
             window.location.href = `event-edit.html?id=${eventId}`;
         }
@@ -378,32 +509,12 @@
 
         // Filters
         document.getElementById('search').addEventListener('input', (e) => {
-            filterEvents();
+            displayEvents();
         });
 
         document.getElementById('status-filter').addEventListener('change', (e) => {
-            filterEvents();
+            displayEvents();
         });
-
-        function filterEvents() {
-            const search = document.getElementById('search').value.toLowerCase();
-            const status = document.getElementById('status-filter').value;
-
-            let filtered = allEvents;
-
-            if (search) {
-                filtered = filtered.filter(e =>
-                    e.title.toLowerCase().includes(search) ||
-                    e.description.toLowerCase().includes(search)
-                );
-            }
-
-            if (status) {
-                filtered = filtered.filter(e => e.status === status);
-            }
-
-            displayEvents(filtered);
-        }
 
         // Load events on page load
         loadEvents();

@@ -163,7 +163,7 @@ function showSuccess(order) {
         </div>
         <div class="detail-row">
             <strong>Сумма:</strong>
-            <span>${order.total_amount} ${order.currency}</span>
+            <span>${parseFloat(order.total_amount).toFixed(2)} ${order.currency}</span>
         </div>
         <div class="detail-row">
             <strong>Билеты:</strong>

@@ -271,20 +271,20 @@ def get_purchased_seats(event_id: str) -> Dict:
             if payment_status != 'completed':
                 continue
 
-            for ticket in order.get('tickets', []):
-                ticket_type_id = ticket.get('type_id')
-                seats = ticket.get('purchased_seats', [])
+            for qr in order.get('qr_codes', []):
+                if not qr.get('seat_id') or qr.get('cancelled', False):
+                    continue
 
-                for seat_id in seats:
-                    purchased_seats[seat_id] = {
-                        'ticket_type_id': ticket_type_id,
-                        'order_id': order.get('order_id'),
-                        'status': payment_status
-                    }
+                seat_id = qr['seat_id']
+                ticket_type_id = qr.get('ticket_type')
 
-                # Count tickets by type
-                if seats:  # Only count if seats are specified
-                    counts_by_type[ticket_type_id] = counts_by_type.get(ticket_type_id, 0) + len(seats)
+                purchased_seats[seat_id] = {
+                    'ticket_type_id': ticket_type_id,
+                    'order_id': order.get('order_id'),
+                    'status': payment_status
+                }
+
+                counts_by_type[ticket_type_id] = counts_by_type.get(ticket_type_id, 0) + 1
 
         return success_response({
             'event_id': event_id,
@@ -569,6 +569,7 @@ def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
     for all purchased seats in an event
 
     NOTE: Only returns COMPLETED purchases. Pending orders are handled via seat reservations.
+    Cancelled tickets are excluded so their seats can be re-purchased.
     """
     orders = db.get_orders_by_event(event_id)
     purchased = {}
@@ -576,10 +577,10 @@ def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
     for order in orders:
         # Only count seats as purchased if payment is completed
         if order.get('payment', {}).get('status') == 'completed':
-            for ticket in order.get('tickets', []):
-                for seat_id in ticket.get('purchased_seats', []):
-                    purchased[seat_id] = {
-                        'ticket_type_id': ticket['type_id'],
+            for qr in order.get('qr_codes', []):
+                if qr.get('seat_id') and not qr.get('cancelled', False):
+                    purchased[qr['seat_id']] = {
+                        'ticket_type_id': qr.get('ticket_type'),
                         'order_id': order.get('order_id'),
                         'status': order.get('payment', {}).get('status')
                     }
@@ -592,6 +593,7 @@ def get_purchased_seats_set(event_id: str) -> set:
     Helper function: Returns set of all purchased seat IDs for an event
 
     NOTE: Only returns COMPLETED purchases. Pending orders are handled via seat reservations.
+    Cancelled tickets are excluded so their seats can be re-purchased.
     """
     orders = db.get_orders_by_event(event_id)
     purchased = set()
@@ -599,8 +601,9 @@ def get_purchased_seats_set(event_id: str) -> set:
     for order in orders:
         # Only count seats as purchased if payment is completed
         if order.get('payment', {}).get('status') == 'completed':
-            for ticket in order.get('tickets', []):
-                purchased.update(ticket.get('purchased_seats', []))
+            for qr in order.get('qr_codes', []):
+                if qr.get('seat_id') and not qr.get('cancelled', False):
+                    purchased.add(qr['seat_id'])
 
     return purchased
 
@@ -1119,6 +1122,16 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
         order_id = path.split('/')[-2]  # /api/orders/{id}/can-refund
         return check_can_refund(order_id)
 
+    # POST /api/orders/{id}/cancel-tickets - partial ticket cancellation
+    if method == 'POST' and path.endswith('/cancel-tickets'):
+        order_id = path.split('/')[-2]
+        return cancel_tickets(order_id, event)
+
+    # POST /api/orders/{id}/resend-email - resend order confirmation email
+    if method == 'POST' and path.endswith('/resend-email'):
+        order_id = path.split('/')[-2]
+        return resend_order_email(order_id, event)
+
     # POST /api/orders/{id}/refund - обработать возврат
     if method == 'POST' and path.endswith('/refund'):
         order_id = path.split('/')[-2]  # /api/orders/{id}/refund
@@ -1319,6 +1332,7 @@ def create_order(request_event: Dict) -> Dict:
         # Process coupon if provided
         coupon_code = body.get('coupon_code')
         discount_amount = 0
+        coupon = None
 
         if coupon_code:
             # Get and validate coupon
@@ -1341,7 +1355,7 @@ def create_order(request_event: Dict) -> Dict:
             # (in webhook handler when payment_status == 'completed')
 
         # Calculate total with discount
-        total_amount = subtotal - discount_amount
+        total_amount = round(subtotal - discount_amount, 2)
 
         # Определяем является ли заказ бесплатным (100% скидка)
         is_free_order = (total_amount == 0)
@@ -1462,7 +1476,9 @@ def create_order(request_event: Dict) -> Dict:
                 event_id=event_id,
                 customer_name=order.customer.name,
                 tickets=order_tickets,  # NEW: for API mode items array
-                order_created_at=order.created_at  # NEW: for expire calculation
+                order_created_at=order.created_at,  # NEW: for expire calculation
+                discount_type=coupon.discount_type if coupon and discount_amount > 0 else None,
+                discount_value=coupon.discount_value if coupon and discount_amount > 0 else 0
             )
         except Exception as e:
             print(f"Failed to create payment URL: {str(e)}")
@@ -1655,6 +1671,168 @@ def check_can_refund(order_id: str) -> Dict:
         return error_response(500, f"Failed to check refund eligibility: {str(e)}")
 
 
+def cancel_tickets(order_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - POST /api/orders/{id}/cancel-tickets - partial ticket cancellation"""
+
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_cancel_tickets', {
+            'order_id': order_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        qr_codes_to_cancel = body.get('qr_codes', [])
+        reason = body.get('reason', '')
+
+        if not qr_codes_to_cancel:
+            return error_response(400, "qr_codes list is required")
+
+        # Load order
+        order_data = db.get_order(order_id)
+        if not order_data:
+            return error_response(404, "Order not found")
+
+        order = Order.from_dynamodb_item(order_data)
+
+        if order.payment.status != 'completed':
+            return error_response(400, "Can only cancel tickets on completed orders")
+
+        # Load event for restoring availability
+        event_data = db.get_event(order.event_id)
+        if not event_data:
+            return error_response(404, "Event not found")
+
+        event_obj = Event.from_dynamodb_item(event_data)
+
+        # Build lookup of QR codes in order
+        qr_map = {qr.code: qr for qr in order.qr_codes}
+
+        # Validate all requested codes
+        cancelled_count = 0
+        tickets_to_restore = {}  # type_id -> count
+
+        for code in qr_codes_to_cancel:
+            if code not in qr_map:
+                return error_response(400, f"QR code {code} not found in this order")
+            qr = qr_map[code]
+            if qr.cancelled:
+                return error_response(400, f"QR code {code} is already cancelled")
+            if qr.scanned:
+                return error_response(400, f"QR code {code} has already been scanned")
+
+        # Cancel the tickets
+        now = datetime.now(timezone.utc).isoformat()
+        for code in qr_codes_to_cancel:
+            qr = qr_map[code]
+            qr.cancelled = True
+            qr.cancelled_at = now
+            cancelled_count += 1
+            tickets_to_restore[qr.ticket_type] = tickets_to_restore.get(qr.ticket_type, 0) + 1
+
+        # Restore availability on event
+        for type_id, count in tickets_to_restore.items():
+            event_obj.increase_available(type_id, count)
+
+        # Save both
+        db.put_order(order.to_dynamodb_item())
+        db.put_event(event_obj.to_dynamodb_item())
+
+        print(f"Cancelled {cancelled_count} tickets for order {order_id}: {qr_codes_to_cancel}. Reason: {reason}")
+
+        # Send cancellation email
+        try:
+            lambda_client = boto3.client('lambda')
+            lambda_client.invoke(
+                FunctionName=os.environ.get('EMAIL_SENDER_LAMBDA', 'yallabalagan-email-sender'),
+                InvocationType='Event',
+                Payload=json.dumps({
+                    'order_id': order_id,
+                    'email_type': 'cancellation',
+                    'cancelled_codes': qr_codes_to_cancel
+                })
+            )
+            print(f"Cancellation email triggered for order {order_id}")
+        except Exception as e:
+            print(f"Warning: Failed to trigger cancellation email: {e}")
+
+        return success_response({
+            'status': 'success',
+            'message': f'{cancelled_count} ticket(s) cancelled',
+            'cancelled_codes': qr_codes_to_cancel,
+            'order_id': order_id
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+    except Exception as e:
+        print(f"Error cancelling tickets: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to cancel tickets: {str(e)}")
+
+
+def resend_order_email(order_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - POST /api/orders/{id}/resend-email - resend confirmation email"""
+
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_resend_email', {
+            'order_id': order_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        custom_message = body.get('custom_message', '')
+
+        # Load order
+        order_data = db.get_order(order_id)
+        if not order_data:
+            return error_response(404, "Order not found")
+
+        order = Order.from_dynamodb_item(order_data)
+
+        if order.payment.status != 'completed':
+            return error_response(400, "Can only resend email for completed orders")
+
+        # Invoke email Lambda asynchronously
+        lambda_client = boto3.client('lambda')
+        payload = {
+            'order_id': order_id,
+            'force_resend': True,
+            'custom_message': custom_message
+        }
+        lambda_client.invoke(
+            FunctionName=os.environ.get('EMAIL_SENDER_LAMBDA', 'yallabalagan-email-sender'),
+            InvocationType='Event',
+            Payload=json.dumps(payload)
+        )
+
+        print(f"Email resend triggered for order {order_id}")
+
+        return success_response({
+            'status': 'success',
+            'message': 'Email resend triggered',
+            'order_id': order_id
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+    except Exception as e:
+        print(f"Error resending email: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to resend email: {str(e)}")
+
+
 def process_refund(order_id: str, request_event: Dict) -> Dict:
     """ADMIN ONLY - POST /api/orders/{id}/refund - обрабатывает возврат (placeholder)"""
 
@@ -1758,10 +1936,13 @@ def verify_ticket(ticket_code: str) -> Dict:
         # Validate ticket
         if order.payment.status != "completed":
             return error_response(400, "Ticket payment not completed")
-        
+
         if order.payment.status == "refunded":
             return error_response(400, "Ticket has been refunded")
-        
+
+        if qr_code.cancelled:
+            return error_response(400, "Ticket has been cancelled")
+
         if qr_code.scanned:
             return error_response(400, "Ticket already scanned", extra_data={
                 'scanned_at': qr_code.scanned_at,

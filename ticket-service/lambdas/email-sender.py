@@ -47,6 +47,12 @@ def load_email_template() -> str:
     </div>
     
     <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+        {% if custom_message %}
+        <div style="background: #e3f2fd; border: 2px solid #2196f3; padding: 20px; margin-bottom: 24px; border-radius: 8px;">
+            <p style="margin: 0; font-size: 17px; line-height: 1.5; color: #1a1a1a;">📢 {{ custom_message }}</p>
+        </div>
+        {% endif %}
+
         <h2 style="color: #667eea; margin-top: 0;">{{ event.title }}</h2>
 
         {% if event.images and event.images|length > 0 %}
@@ -62,7 +68,7 @@ def load_email_template() -> str:
             <p><strong>💰 Сумма:</strong> {{ order.total_amount }} {{ order.currency }}</p>
             <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
         </div>
-        
+
         {% if enriched_qr_codes %}
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <h3 style="color: #667eea; margin-top: 0;">Ваши билеты:</h3>
@@ -155,6 +161,84 @@ def get_seat_display(seat_id: str, seating_map) -> str:
     return f"Ряд {row_display}, Место {seat_display}"
 
 
+def load_cancellation_template() -> str:
+    """Загружает HTML шаблон для email отмены билетов"""
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отмена билетов</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #e53935 0%, #ff6f00 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0; font-size: 28px;">Отмена билетов</h1>
+    </div>
+
+    <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+        <h2 style="color: #e53935; margin-top: 0;">{{ event.title }}</h2>
+
+        <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <p><strong>📅 Дата и время:</strong> {{ event_date_formatted }}</p>
+            <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #e53935; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
+            <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
+        </div>
+
+        <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #e53935; margin-top: 0;">Отменённые билеты:</h3>
+
+            {% for qr in cancelled_qr_codes %}
+            <div style="border: 2px solid #ffcdd2; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                <p style="margin: 0 0 6px 0; font-size: 16px; font-weight: 600; color: #e53935;">{{ qr['ticket_type_name'] }}</p>
+                {% if qr['seat_id'] %}
+                <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #333;">💺 Ряд {{ qr['display_row'] }}, Место {{ qr['display_seat'] }}</p>
+                {% endif %}
+                <p style="margin: 0; font-size: 12px; color: #999;">ID билета: <span style="font-family: monospace; color: #666;">{{ qr['code'] }}</span></p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px;">По всем дополнительным вопросам связанным с отменой и рефандом пишите на <a href="mailto:yalla@yallabalagan.org" style="color: #e53935;">yalla@yallabalagan.org</a></p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+def get_seat_display(seat_id, seating_map_config):
+    """Convert 0-indexed seat_id ('row-seat') to display numbers (row, seat).
+
+    Uses seating_map_config for custom_numbers and numbering_direction,
+    falls back to simple +1 if config is unavailable.
+    """
+    parts = seat_id.split('-')
+    if len(parts) != 2:
+        return seat_id, seat_id
+
+    row_idx = int(parts[0])
+    seat_idx = int(parts[1])
+    display_row = row_idx + 1  # Rows are always 1-indexed
+
+    if seating_map_config:
+        # Check custom numbers first
+        custom_numbers = getattr(seating_map_config, 'custom_numbers', {}) or {}
+        if seat_id in custom_numbers:
+            custom = custom_numbers[seat_id]
+            if isinstance(custom, dict) and 'seat' in custom:
+                return display_row, custom['seat']
+
+        # Apply numbering direction
+        direction = getattr(seating_map_config, 'numbering_direction', 'left-to-right')
+        seats_per_row = getattr(seating_map_config, 'seats_per_row', 0)
+        if direction == 'right-to-left' and seats_per_row:
+            return display_row, seats_per_row - seat_idx
+
+    return display_row, seat_idx + 1
+
+
 def format_event_date(event_date: str) -> str:
     """Форматирует дату события для отображения"""
     try:
@@ -193,15 +277,20 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 payload = body
         
         order_id = payload.get('order_id')
+        email_type = payload.get('email_type', 'confirmation')
+        force_resend = payload.get('force_resend', False)
+        custom_message = payload.get('custom_message')
+        cancelled_codes = payload.get('cancelled_codes', [])
+
         if not order_id:
             print("Error: order_id not provided")
             return {
                 'statusCode': 400,
                 'body': json.dumps({'error': 'order_id is required'})
             }
-        
-        print(f"Processing email for order {order_id}")
-        
+
+        print(f"Processing email for order {order_id} (force_resend={force_resend})")
+
         # Load order from DynamoDB
         order_data = db.get_order(order_id)
         if not order_data:
@@ -210,11 +299,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'statusCode': 404,
                 'body': json.dumps({'error': f'Order {order_id} not found'})
             }
-        
+
         order = Order.from_dynamodb_item(order_data)
-        
-        # Check if email already sent
-        if order.notifications.email_sent:
+
+        # Check if email already sent (skip guard on force_resend and cancellation)
+        if email_type != 'cancellation' and order.notifications.email_sent and not force_resend:
             print(f"Email already sent for order {order_id}")
             return {
                 'statusCode': 200,
@@ -251,7 +340,71 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     seating_map = location.venue_config.seating_map
         except Exception as e:
             print(f"Warning: Failed to load location: {e}")  # Log the error instead of silently ignoring
-        
+
+        # --- Cancellation email branch ---
+        if email_type == 'cancellation':
+            print(f"Rendering cancellation email for codes: {cancelled_codes}")
+
+            # Enrich only the cancelled QR codes
+            ticket_type_map = {t.type_id: t.type_name for t in order.tickets}
+            cancelled_qr_codes = []
+            for qr in order.qr_codes:
+                if qr.code in cancelled_codes:
+                    qr_dict = qr.to_dict()
+                    qr_dict['ticket_type_name'] = ticket_type_map.get(qr.ticket_type, qr.ticket_type)
+                    if qr_dict.get('seat_id'):
+                        d_row, d_seat = get_seat_display(qr_dict['seat_id'], seating_map_config)
+                        qr_dict['display_row'] = d_row
+                        qr_dict['display_seat'] = d_seat
+                    cancelled_qr_codes.append(qr_dict)
+
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
+            cancel_template = Template(load_cancellation_template())
+            email_html = cancel_template.render(
+                order=order,
+                event=event_obj,
+                event_date_formatted=format_event_date(event_obj.date),
+                location_name=location_name,
+                location_address=location_address,
+                location_id=location_id,
+                cancelled_qr_codes=cancelled_qr_codes,
+                frontend_url=frontend_url
+            )
+
+            sender_email = os.environ.get('SENDER_EMAIL', 'yalla@yallabalagan.org')
+            recipient_email = order.customer.email
+
+            print(f"Sending cancellation email from {sender_email} to {recipient_email}")
+
+            response = ses_client.send_email(
+                Source=sender_email,
+                Destination={'ToAddresses': [recipient_email]},
+                Message={
+                    'Subject': {
+                        'Data': f'Отмена билетов: {event_obj.title}',
+                        'Charset': 'UTF-8'
+                    },
+                    'Body': {
+                        'Html': {
+                            'Data': email_html,
+                            'Charset': 'UTF-8'
+                        }
+                    }
+                }
+            )
+
+            print(f"Cancellation email sent. MessageId: {response['MessageId']}")
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': 'Cancellation email sent successfully',
+                    'order_id': order_id,
+                    'message_id': response['MessageId']
+                })
+            }
+
+        # --- Confirmation email flow (default) ---
+
         # Load email template
         template_str = load_email_template()
         template = Template(template_str)
@@ -264,18 +417,28 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             ticket_type_map = {t.type_id: t.type_name for t in order.tickets}
             enriched_qr_codes = []
             for qr in order.qr_codes:
+                if getattr(qr, 'cancelled', False):
+                    continue
                 qr_dict = qr.to_dict()
                 qr_dict['ticket_type_name'] = ticket_type_map.get(qr.ticket_type, qr.ticket_type)
                 if qr.seat_id:
                     qr_dict['seat_display'] = get_seat_display(qr.seat_id, seating_map)
                 enriched_qr_codes.append(qr_dict)
-            print(f"Enriched {len(enriched_qr_codes)} QR codes")
+            print(f"Enriched {len(enriched_qr_codes)} QR codes (excluded cancelled)")
         except Exception as e:
             print(f"Error enriching QR codes: {e}")
             import traceback
             traceback.print_exc()
             # Fallback to empty list
             enriched_qr_codes = []
+
+        # Pre-compute seat display map for summary line
+        seat_display_map = {}
+        for ticket in order.tickets:
+            if ticket.purchased_seats:
+                for sid in ticket.purchased_seats:
+                    d_row, d_seat = get_seat_display(sid, seating_map_config)
+                    seat_display_map[sid] = {'row': d_row, 'seat': d_seat}
 
         # Get frontend URL from environment
         frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')

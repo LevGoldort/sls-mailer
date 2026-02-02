@@ -241,6 +241,16 @@
             color: #e65100;
         }
 
+        .status-cancelled {
+            background: #fce4ec;
+            color: #c62828;
+        }
+
+        .status-partially_cancelled {
+            background: #fff8e1;
+            color: #f57f17;
+        }
+
         .empty-orders {
             text-align: center;
             padding: 40px;
@@ -1396,6 +1406,7 @@
     </div>
 
     <script src="shared.js?v=1764370571"></script>
+    <script src="order-modal.js?v=1770008382"></script>
     <script src="shared-image-upload.js"></script>
     <script src="seating-allocation-editor.js"></script>
     <script>
@@ -1419,7 +1430,8 @@
         let totalSoldTickets = 0;
         let hasSalesWithSeats = false;
         let hasSalesWithoutSeats = false;
-        let soldTicketsByType = {};  // {ticket_type_id: count}
+        let soldTicketsByType = {};  // {ticket_type_id: count} - only COMPLETED
+        let pendingTicketsByType = {};  // {ticket_type_id: count} - only PENDING
 
         function slugify(value) {
             if (!value) return '';
@@ -1633,11 +1645,12 @@
                     <div class="form-group">
                         <label>Всего билетов *</label>
                         <input type="number" class="tt-total" value="${data?.total || ''}" ${isSeatedVenue ? '' : 'required'} min="1">
+                        <div class="help-text tt-sold-info" style="display: none;"></div>
                     </div>
                     <div class="form-group">
-                        <label>Доступно</label>
-                        <input type="number" class="tt-available" value="${data?.available || data?.total || ''}" min="0">
-                        <div class="help-text">Оставьте пустым для новых событий</div>
+                        <label>Доступно для продажи</label>
+                        <input type="number" class="tt-available" value="${data?.available || data?.total || ''}" min="0" readonly style="background: #f5f5f5;">
+                        <div class="help-text">Рассчитывается автоматически: Всего − Продано</div>
                     </div>
                 </div>
                 ${isSeatedVenue ? `
@@ -1678,6 +1691,33 @@
                 helpText.textContent = '💡 Изменение цены влияет только на новые покупки. Купленные билеты сохраняют оригинальную цену.';
                 priceInput.parentElement.appendChild(helpText);
             }
+
+            // Auto-recalculate available when total changes (for standing venues)
+            const totalInput = div.querySelector('.tt-quantity-fields .tt-total');
+            const availableInput = div.querySelector('.tt-quantity-fields .tt-available');
+            if (totalInput && availableInput) {
+                totalInput.addEventListener('input', function() {
+                    const newTotal = parseInt(this.value) || 0;
+                    const sold = soldTicketsByType[id] || 0;
+
+                    // Validate: total cannot be less than sold
+                    if (newTotal < sold) {
+                        this.style.borderColor = '#dc2626';
+                        this.style.backgroundColor = '#fef2f2';
+                        this.title = `Минимум ${sold} (уже продано)`;
+                        // Set minimum to sold count
+                        this.min = sold;
+                    } else {
+                        this.style.borderColor = '';
+                        this.style.backgroundColor = '';
+                        this.title = '';
+                        this.min = 1;
+                        // Recalculate available: new_available = new_total - sold
+                        const newAvailable = newTotal - sold;
+                        availableInput.value = newAvailable;
+                    }
+                });
+            }
         }
 
         function removeTicketType(id) {
@@ -1716,6 +1756,16 @@
 
                 if (ticketTypes.length === 0) {
                     throw new Error('Добавьте хотя бы один тип билета');
+                }
+
+                // Validate total >= sold for each ticket type
+                for (const tt of ticketTypes) {
+                    const sold = soldTicketsByType[tt.id] || 0;
+                    if (tt.total < sold) {
+                        throw new Error(
+                            `Количество билетов "${tt.name}" (${tt.total}) не может быть меньше уже проданных (${sold})`
+                        );
+                    }
                 }
 
                 // Validate total tickets against location capacity
@@ -1805,14 +1855,16 @@
                 totalSoldTickets = 0;
                 hasSalesWithSeats = false;
                 hasSalesWithoutSeats = false;
-                soldTicketsByType = {};
+                soldTicketsByType = {};  // Only COMPLETED orders (for calculating available)
+                pendingTicketsByType = {};  // Pending orders (for info only)
 
                 orders.forEach(order => {
-                    if (order.payment.status === 'completed' || order.payment.status === 'pending') {
+                    const status = order.payment.status;
+                    if (status === 'completed') {
                         order.tickets.forEach(ticket => {
                             totalSoldTickets += ticket.quantity;
 
-                            // Track sales by type
+                            // Track completed sales by type (used for available calculation)
                             soldTicketsByType[ticket.type_id] =
                                 (soldTicketsByType[ticket.type_id] || 0) + ticket.quantity;
 
@@ -1822,11 +1874,20 @@
                                 hasSalesWithoutSeats = true;
                             }
                         });
+                    } else if (status === 'pending') {
+                        // Track pending separately (doesn't block available)
+                        order.tickets.forEach(ticket => {
+                            pendingTicketsByType[ticket.type_id] =
+                                (pendingTicketsByType[ticket.type_id] || 0) + ticket.quantity;
+                        });
                     }
                 });
 
                 // Show sales warning if needed
                 showSalesWarning();
+
+                // Update sold info for each ticket type
+                updateTicketTypeSoldInfo();
 
                 displayOrders(orders);
 
@@ -1864,6 +1925,65 @@
             return (soldTicketsByType[ticketTypeId] || 0) > 0;
         }
 
+        function updateTicketTypeSoldInfo() {
+            // Update sold info display for each ticket type
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                const id = item.dataset.id;
+                const sold = soldTicketsByType[id] || 0;
+                const pending = pendingTicketsByType[id] || 0;
+                const soldInfoEl = item.querySelector('.tt-sold-info');
+                const totalInput = item.querySelector('.tt-quantity-fields .tt-total');
+
+                if (soldInfoEl) {
+                    if (sold > 0 || pending > 0) {
+                        let infoHtml = '';
+                        if (sold > 0) {
+                            infoHtml += `🔒 <strong>Продано: ${sold}</strong> (минимум)`;
+                        }
+                        if (pending > 0) {
+                            infoHtml += sold > 0 ? '<br>' : '';
+                            infoHtml += `⏳ В процессе оплаты: ${pending}`;
+                        }
+                        soldInfoEl.innerHTML = infoHtml;
+                        soldInfoEl.style.display = 'block';
+                        soldInfoEl.style.color = '#059669';
+                        // Set minimum value based on COMPLETED only
+                        if (totalInput && sold > 0) {
+                            totalInput.min = sold;
+                        }
+                    } else {
+                        soldInfoEl.style.display = 'none';
+                    }
+                }
+
+                // Recalculate available based on COMPLETED sold count only
+                const availableInput = item.querySelector('.tt-quantity-fields .tt-available');
+                if (totalInput && availableInput) {
+                    const total = parseInt(totalInput.value) || 0;
+                    const newAvailable = Math.max(0, total - sold);
+                    availableInput.value = newAvailable;
+                }
+            });
+        }
+
+        function getOrderDisplayStatus(order) {
+            const paymentStatus = (order.payment || {}).status || 'pending';
+            if (paymentStatus !== 'completed') {
+                return { label: paymentStatus, cls: 'status-pending' };
+            }
+            const qrCodes = order.qr_codes || [];
+            if (qrCodes.length > 0) {
+                const cancelledCount = qrCodes.filter(qr => qr.cancelled).length;
+                if (cancelledCount === qrCodes.length) {
+                    return { label: 'cancelled', cls: 'status-cancelled' };
+                }
+                if (cancelledCount > 0) {
+                    return { label: 'partially cancelled', cls: 'status-partially_cancelled' };
+                }
+            }
+            return { label: 'completed', cls: 'status-completed' };
+        }
+
         function displayOrders(orders) {
             const container = document.getElementById('orders-container');
 
@@ -1888,18 +2008,17 @@
                     <tbody>
                         ${orders.map(order => {
                             const customer = order.customer || {};
-                            const payment = order.payment || {};
                             const ticketCount = (order.tickets || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
-                            const statusClass = payment.status === 'completed' ? 'status-completed' : 'status-pending';
+                            const status = getOrderDisplayStatus(order);
 
                             return `
-                                <tr>
+                                <tr onclick="openOrderModal('${order.order_id}')" style="cursor: pointer;">
                                     <td><strong>${order.order_id}</strong></td>
                                     <td>${customer.name || '-'}</td>
                                     <td>${customer.email || '-'}</td>
                                     <td>${ticketCount} шт</td>
                                     <td><strong>${formatCurrency(order.total_amount)}</strong></td>
-                                    <td><span class="status-badge ${statusClass}">${payment.status || 'pending'}</span></td>
+                                    <td><span class="status-badge ${status.cls}">${status.label}</span></td>
                                     <td>${formatDate(order.created_at)}</td>
                                 </tr>
                             `;

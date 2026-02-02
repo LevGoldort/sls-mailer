@@ -20,7 +20,9 @@ class PaymentProvider(ABC):
         event_id: str = None,
         customer_name: str = None,
         tickets: list = None,
-        order_created_at: str = None
+        order_created_at: str = None,
+        discount_type: str = None,
+        discount_value: float = 0
     ) -> str:
         """
         Create payment URL for order
@@ -103,7 +105,9 @@ class MockPaymentProvider(PaymentProvider):
         event_id: str = None,
         customer_name: str = None,
         tickets: list = None,
-        order_created_at: str = None
+        order_created_at: str = None,
+        discount_type: str = None,
+        discount_value: float = 0
     ) -> str:
         """
         Returns URL to mock payment page
@@ -261,7 +265,9 @@ class AllPayProvider(PaymentProvider):
         email: str,
         customer_name: str,
         tickets: list,
-        expire_timestamp: int
+        expire_timestamp: int,
+        discount_type: str = None,
+        discount_value: float = 0
     ) -> str:
         """
         Create payment via AllPay API v9.
@@ -292,6 +298,30 @@ class AllPayProvider(PaymentProvider):
                 "price": f"{ticket.price_per_ticket:.2f}",
                 "vat": "Y"  # All prices include VAT in Israel
             })
+
+        # Apply coupon discount to item prices so AllPay charges the correct amount
+        items_subtotal = float(sum(ticket.quantity * ticket.price_per_ticket for ticket in tickets))
+        if items_subtotal > 0 and amount < items_subtotal:
+            adjusted_total = 0
+            if discount_type == "fixed_amount":
+                # Flat discount: subtract discount_value from each ticket price
+                for i, ticket in enumerate(tickets):
+                    adjusted_price = round(max(float(ticket.price_per_ticket) - float(discount_value), 0), 2)
+                    items[i]["price"] = f"{adjusted_price:.2f}"
+                    adjusted_total += adjusted_price * ticket.quantity
+            else:
+                # Percentage discount (or unknown type): apply proportional ratio
+                ratio = amount / items_subtotal
+                for i, ticket in enumerate(tickets):
+                    adjusted_price = round(float(ticket.price_per_ticket) * ratio, 2)
+                    items[i]["price"] = f"{adjusted_price:.2f}"
+                    adjusted_total += adjusted_price * ticket.quantity
+
+            # Fix rounding: add/subtract remainder to last item
+            rounding_diff = round(amount - adjusted_total, 2)
+            if rounding_diff != 0 and items:
+                last_price = float(items[-1]["price"])
+                items[-1]["price"] = f"{last_price + rounding_diff:.2f}"
 
         # Build request body
         request_body = {
@@ -352,7 +382,9 @@ class AllPayProvider(PaymentProvider):
         event_id: str = None,
         customer_name: str = None,
         tickets: list = None,
-        order_created_at: str = None
+        order_created_at: str = None,
+        discount_type: str = None,
+        discount_value: float = 0
     ) -> str:
         """
         Create payment URL for AllPay redirect
@@ -385,7 +417,9 @@ class AllPayProvider(PaymentProvider):
                 email=email,
                 customer_name=customer_name,
                 tickets=tickets,
-                expire_timestamp=expire_timestamp
+                expire_timestamp=expire_timestamp,
+                discount_type=discount_type,
+                discount_value=discount_value
             )
 
         # Fallback to legacy payment link
