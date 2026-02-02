@@ -1335,7 +1335,7 @@ def create_order(request_event: Dict) -> Dict:
             # (in webhook handler when payment_status == 'completed')
 
         # Calculate total with discount
-        total_amount = subtotal - discount_amount
+        total_amount = round(subtotal - discount_amount, 2)
 
         # Определяем является ли заказ бесплатным (100% скидка)
         is_free_order = (total_amount == 0)
