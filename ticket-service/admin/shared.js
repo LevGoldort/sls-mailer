@@ -74,6 +74,7 @@ const API = {
     getOrders: () => apiCall('/api/orders'),
     getOrdersByEvent: (eventId) => apiCall(`/api/orders?event_id=${eventId}`),
     getOrder: (id) => apiCall(`/api/orders/${id}`),
+    resendEmail: (orderId, data) => apiCall(`/api/orders/${orderId}/resend-email`, 'POST', data),
 
     // Coupons
     getCoupons: (status = null) => apiCall(`/api/coupons${status ? `?status=${status}` : ''}`),

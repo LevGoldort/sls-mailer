@@ -38,9 +38,10 @@
             cursor: pointer;
         }
         .nav-btn:hover { background: #5568d3; }
+
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -49,116 +50,236 @@
             padding: 25px;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
         }
+        .stat-card:hover { transform: translateY(-3px); }
         .stat-card h3 {
-            font-size: 14px;
+            font-size: 13px;
             color: #666;
             margin-bottom: 10px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .stat-card .number {
-            font-size: 36px;
+        .stat-card .stat-number {
+            font-size: 32px;
             font-weight: bold;
             color: #667eea;
             margin-bottom: 5px;
         }
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: #999;
+        }
+
         .section {
             background: white;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            padding: 30px;
+            padding: 25px 30px;
             margin-bottom: 30px;
         }
         .section h2 {
             margin-bottom: 20px;
             color: #333;
         }
-        .events-ranking {
-            display: grid;
-            gap: 15px;
-        }
-        .event-rank {
+
+        /* Bar Chart */
+        .bar-chart {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: #f9f9f9;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
+            align-items: flex-end;
+            gap: 6px;
+            height: 200px;
+            padding: 0 5px;
+            border-bottom: 2px solid #e0e0e0;
         }
-        .event-rank-info {
+        .chart-bar-wrapper {
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+            min-width: 0;
         }
-        .event-rank-title {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-        }
-        .event-rank-stats {
-            font-size: 14px;
-            color: #666;
-        }
-        .rank-badge {
-            font-size: 24px;
-            font-weight: bold;
+        .chart-bar-value {
+            font-size: 11px;
             color: #667eea;
-            min-width: 40px;
-            text-align: center;
+            font-weight: 600;
+            margin-bottom: 4px;
         }
+        .chart-bar {
+            width: 100%;
+            max-width: 40px;
+            border-radius: 4px 4px 0 0;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            min-height: 2px;
+            transition: height 0.5s ease;
+        }
+        .chart-bar-label {
+            font-size: 10px;
+            color: #999;
+            margin-top: 8px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .chart-empty {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        /* Two-column layout for chart + breakdown */
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 900px) {
+            .dashboard-row { grid-template-columns: 1fr; }
+        }
+
+        /* Event breakdown table */
+        .event-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .event-table th {
+            background: #f5f5f5;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            font-size: 13px;
+        }
+        .event-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        .event-table tr:hover { background: #f9f9f9; }
+        .event-table tr { cursor: pointer; }
+        .event-table .event-name-cell {
+            font-weight: 600;
+            color: #333;
+        }
+        .event-table .event-name-cell small {
+            display: block;
+            font-weight: 400;
+            color: #999;
+            font-size: 12px;
+        }
+
+        /* Progress bar */
+        .progress-bar-container {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            min-width: 80px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: #4caf50;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .progress-bar-fill.high { background: #ff9800; }
+
+        /* Coupon table */
+        .coupon-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .coupon-table th {
+            background: #f5f5f5;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            font-size: 13px;
+        }
+        .coupon-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        .coupon-table tr:hover { background: #f9f9f9; }
+
         .loading { text-align: center; padding: 60px; color: #666; }
-        .empty { text-align: center; padding: 80px; color: #999; }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-active { background: #e8f5e9; color: #2e7d32; }
+        .status-sold_out { background: #fff3e0; color: #e65100; }
+        .status-cancelled { background: #fce4ec; color: #c62828; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📈 Аналитика и статистика</h1>
+            <h1>Аналитика</h1>
             <div class="nav">
-                <a href="index.html" class="nav-btn">📊 Dashboard</a>
-                <a href="events.html" class="nav-btn">🎪 События</a>
-                <a href="locations.html" class="nav-btn">📍 Локации</a>
-                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
-                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
-                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+                <a href="index.html" class="nav-btn">Dashboard</a>
+                <a href="events.html" class="nav-btn">События</a>
+                <a href="locations.html" class="nav-btn">Локации</a>
+                <a href="orders.html" class="nav-btn">Заказы</a>
+                <a href="analytics.html" class="nav-btn">Аналитика</a>
+                <a href="coupons.html" class="nav-btn">Купоны</a>
             </div>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card">
-                <h3>Общая выручка</h3>
-                <div class="number" id="total-revenue">-</div>
+                <h3>Текущая выручка</h3>
+                <div class="stat-number" id="stat-earnings">-</div>
+                <div class="stat-label" id="stat-earnings-label">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Потенциальная выручка</h3>
+                <div class="stat-number" id="stat-potential">-</div>
+                <div class="stat-label">если все билеты проданы</div>
+            </div>
+            <div class="stat-card">
+                <h3>Билеты проданы</h3>
+                <div class="stat-number" id="stat-tickets-sold">-</div>
+                <div class="stat-label" id="stat-tickets-remaining">-</div>
             </div>
             <div class="stat-card">
                 <h3>Средний чек</h3>
-                <div class="number" id="avg-order">-</div>
-            </div>
-            <div class="stat-card">
-                <h3>Всего билетов</h3>
-                <div class="number" id="total-tickets">-</div>
-            </div>
-            <div class="stat-card">
-                <h3>Конверсия</h3>
-                <div class="number" id="conversion">-</div>
+                <div class="stat-number" id="stat-avg-order">-</div>
+                <div class="stat-label" id="stat-avg-label">на заказ</div>
             </div>
         </div>
 
         <div class="section">
-            <h2>Топ событий по продажам</h2>
-            <div id="top-events" class="events-ranking">
-                <div class="loading">Загрузка...</div>
-            </div>
+            <h2>Продажи билетов за 30 дней</h2>
+            <div id="sales-chart" class="bar-chart"></div>
         </div>
 
-        <div class="section">
-            <h2>Топ событий по выручке</h2>
-            <div id="top-revenue" class="events-ranking">
-                <div class="loading">Загрузка...</div>
+        <div class="dashboard-row">
+            <div class="section" style="margin-bottom: 0;">
+                <h2>По событиям</h2>
+                <div id="events-breakdown"></div>
+            </div>
+            <div class="section" style="margin-bottom: 0;" id="coupon-section">
+                <h2>Купоны</h2>
+                <div id="coupon-usage"></div>
             </div>
         </div>
     </div>
 
     <script src="shared.js?v=1764370571"></script>
     <script>
+        let allEvents = [];
+        let allOrders = [];
+
         async function loadAnalytics() {
             try {
                 const [eventsData, ordersData] = await Promise.all([
@@ -166,69 +287,209 @@
                     API.getOrders()
                 ]);
 
-                const events = eventsData.events || [];
-                const orders = ordersData.orders || [];
+                allEvents = eventsData.events || [];
+                allOrders = ordersData.orders || [];
 
-                // Calculate overall stats
-                const orderStats = calculateOrdersStats(orders);
-                const avgOrder = orderStats.totalOrders > 0 ? orderStats.totalRevenue / orderStats.totalOrders : 0;
+                const activeEvents = allEvents.filter(e => e.status === 'active');
+                const activeEventIds = new Set(activeEvents.map(e => e.event_id));
+                const activeOrders = allOrders.filter(o => activeEventIds.has(o.event_id));
 
-                let totalTickets = 0;
-                events.forEach(e => {
-                    e.ticket_types?.forEach(tt => {
-                        totalTickets += (tt.total || 0) - (tt.available || 0);
-                    });
-                });
-
-                const conversion = events.length > 0 ? (orderStats.totalOrders / events.length * 100) : 0;
-
-                document.getElementById('total-revenue').textContent = formatCurrency(orderStats.totalRevenue);
-                document.getElementById('avg-order').textContent = formatCurrency(avgOrder);
-                document.getElementById('total-tickets').textContent = totalTickets;
-                document.getElementById('conversion').textContent = formatPercent(conversion);
-
-                // Top events by tickets sold
-                const eventStats = events.map(e => ({
-                    ...e,
-                    stats: calculateEventStats(e)
-                })).sort((a, b) => b.stats.soldTickets - a.stats.soldTickets);
-
-                displayTopEvents(eventStats.slice(0, 5), 'top-events', 'soldTickets');
-
-                // Top events by revenue
-                const eventsByRevenue = [...eventStats].sort((a, b) => b.stats.revenue - a.stats.revenue);
-                displayTopEvents(eventsByRevenue.slice(0, 5), 'top-revenue', 'revenue');
-
+                renderStats(activeEvents, activeOrders);
+                renderSalesChart(activeOrders);
+                renderEventsBreakdown(activeEvents, activeOrders);
+                renderCouponUsage(activeOrders);
             } catch (error) {
                 handleError(error, 'Ошибка загрузки аналитики');
             }
         }
 
-        function displayTopEvents(events, containerId, metric) {
-            const container = document.getElementById(containerId);
+        function renderStats(events, orders) {
+            const completedOrders = orders.filter(o => o.payment?.status === 'completed');
+            const refundedOrders = orders.filter(o => o.payment?.status === 'refunded');
 
-            if (events.length === 0) {
-                container.innerHTML = '<div class="empty">Нет данных</div>';
+            const completedRevenue = completedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+            const refundedAmount = refundedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+            const currentEarnings = completedRevenue - refundedAmount;
+
+            let ticketsSold = 0;
+            completedOrders.forEach(o => {
+                (o.tickets || []).forEach(t => { ticketsSold += (t.quantity || 0); });
+            });
+
+            let totalTickets = 0;
+            let potentialRemaining = 0;
+            events.forEach(e => {
+                (e.ticket_types || []).forEach(tt => {
+                    totalTickets += tt.total || 0;
+                    potentialRemaining += (tt.available || 0) * (tt.price || 0);
+                });
+            });
+
+            const potentialFull = currentEarnings + potentialRemaining;
+            const ticketsRemaining = totalTickets - ticketsSold;
+            const avgOrder = completedOrders.length > 0 ? currentEarnings / completedOrders.length : 0;
+
+            document.getElementById('stat-earnings').textContent = formatCurrency(currentEarnings);
+            document.getElementById('stat-earnings-label').textContent = completedOrders.length + ' оплаченных заказов';
+            document.getElementById('stat-potential').textContent = formatCurrency(potentialFull);
+            document.getElementById('stat-tickets-sold').textContent = ticketsSold;
+            document.getElementById('stat-tickets-remaining').textContent = 'осталось ' + ticketsRemaining + ' из ' + totalTickets;
+            document.getElementById('stat-avg-order').textContent = formatCurrency(avgOrder);
+        }
+
+        function renderSalesChart(orders) {
+            const container = document.getElementById('sales-chart');
+            const completedOrders = orders.filter(o => o.payment?.status === 'completed');
+            const days = 30;
+            const now = new Date();
+            const data = [];
+
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                const key = d.toISOString().slice(0, 10);
+                data.push({
+                    date: key,
+                    label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+                    count: 0
+                });
+            }
+
+            completedOrders.forEach(o => {
+                const dateStr = (o.payment?.paid_at || o.created_at || '').slice(0, 10);
+                const entry = data.find(r => r.date === dateStr);
+                if (entry) {
+                    (o.tickets || []).forEach(t => { entry.count += (t.quantity || 0); });
+                }
+            });
+
+            const maxVal = Math.max(...data.map(d => d.count), 1);
+
+            if (data.every(d => d.count === 0)) {
+                container.innerHTML = '<div class="chart-empty">Нет продаж за последние 30 дней</div>';
+                container.classList.remove('bar-chart');
                 return;
             }
 
-            container.innerHTML = events.map((event, index) => {
-                const value = metric === 'soldTickets' ?
-                    `${event.stats.soldTickets} билетов` :
-                    formatCurrency(event.stats.revenue);
-
+            container.classList.add('bar-chart');
+            container.innerHTML = data.map(d => {
+                const pct = (d.count / maxVal) * 100;
                 return `
-                    <div class="event-rank">
-                        <div class="rank-badge">#${index + 1}</div>
-                        <div class="event-rank-info">
-                            <div class="event-rank-title">${event.title}</div>
-                            <div class="event-rank-stats">
-                                ${value} • Заполненность: ${event.stats.capacity}%
-                            </div>
-                        </div>
+                    <div class="chart-bar-wrapper">
+                        <div class="chart-bar-value">${d.count || ''}</div>
+                        <div class="chart-bar" style="height: ${Math.max(pct, 2)}%"></div>
+                        <div class="chart-bar-label">${d.label}</div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function renderEventsBreakdown(events, orders) {
+            const container = document.getElementById('events-breakdown');
+            if (events.length === 0) {
+                container.innerHTML = '<div class="chart-empty">Нет активных событий</div>';
+                return;
+            }
+
+            const completedOrders = orders.filter(o => o.payment?.status === 'completed');
+
+            // Build per-event stats
+            const rows = events.map(e => {
+                const stats = calculateEventStats(e);
+                // Revenue from actual completed orders for this event
+                const eventOrders = completedOrders.filter(o => o.event_id === e.event_id);
+                const actualRevenue = eventOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+                const pct = stats.totalTickets > 0 ? (stats.soldTickets / stats.totalTickets) * 100 : 0;
+
+                return { event: e, stats, actualRevenue, pct, orderCount: eventOrders.length };
+            }).sort((a, b) => b.actualRevenue - a.actualRevenue);
+
+            container.innerHTML = `
+                <table class="event-table">
+                    <thead>
+                        <tr>
+                            <th>Событие</th>
+                            <th>Продано</th>
+                            <th>Заполненность</th>
+                            <th style="text-align:right">Выручка</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(r => {
+                            const highClass = r.pct > 80 ? ' high' : '';
+                            const dateStr = r.event.date ? r.event.date.replace('Z','').split('T')[0] : '';
+                            return `
+                                <tr onclick="window.location.href='event-edit.html?id=${r.event.event_id}'">
+                                    <td class="event-name-cell">
+                                        ${r.event.title}
+                                        <small>${dateStr}</small>
+                                    </td>
+                                    <td>${r.stats.soldTickets} / ${r.stats.totalTickets}</td>
+                                    <td>
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar-fill${highClass}" style="width:${r.pct}%"></div>
+                                        </div>
+                                    </td>
+                                    <td style="text-align:right;font-weight:600;color:#667eea">${formatCurrency(r.actualRevenue)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderCouponUsage(orders) {
+            const section = document.getElementById('coupon-section');
+            const container = document.getElementById('coupon-usage');
+            const completedOrders = orders.filter(o => o.payment?.status === 'completed');
+
+            const couponMap = {};
+            completedOrders.forEach(o => {
+                const code = o.coupon_code;
+                if (!code) return;
+                if (!couponMap[code]) {
+                    couponMap[code] = { count: 0, revenue: 0, discount: 0 };
+                }
+                couponMap[code].count++;
+                couponMap[code].revenue += (o.total_amount || 0);
+                couponMap[code].discount += (o.discount_amount || 0);
+            });
+
+            const codes = Object.keys(couponMap);
+            if (codes.length === 0) {
+                container.innerHTML = '<div class="chart-empty">Нет использованных купонов</div>';
+                return;
+            }
+
+            // Sort by usage count descending
+            codes.sort((a, b) => couponMap[b].count - couponMap[a].count);
+
+            container.innerHTML = `
+                <table class="coupon-table">
+                    <thead>
+                        <tr>
+                            <th>Купон</th>
+                            <th>Использований</th>
+                            <th>Выручка</th>
+                            <th>Скидки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${codes.map(code => {
+                            const c = couponMap[code];
+                            return `
+                                <tr>
+                                    <td><strong>${code}</strong></td>
+                                    <td>${c.count}</td>
+                                    <td>${formatCurrency(c.revenue)}</td>
+                                    <td style="color:#f44336">-${formatCurrency(c.discount)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
         }
 
         loadAnalytics();

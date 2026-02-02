@@ -70,9 +70,9 @@ update_lambda() {
     echo "🚀 Updating Lambda: $function_name..."
 
     # Create zip package
-    cd "$build_dir"
-    zip -r -q "../../${function_name}.zip" .
-    cd ../..
+    cd "$SCRIPT_DIR/$build_dir"
+    zip -r -q "$SCRIPT_DIR/${function_name}.zip" .
+    cd "$SCRIPT_DIR"
 
     local zip_file="${function_name}.zip"
 
@@ -149,9 +149,9 @@ echo ""
 echo "📦 Updating SiteTemplatesLayer..."
 
 # Create layer zip (templates/ and static/ at root level)
-cd frontend
-zip -r -q ../site-templates-layer.zip templates static
-cd ..
+cd "$SCRIPT_DIR/frontend"
+zip -r -q "$SCRIPT_DIR/site-templates-layer.zip" templates static
+cd "$SCRIPT_DIR"
 
 # Publish new layer version
 LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
@@ -303,8 +303,7 @@ if [ -d "frontend" ]; then
     aws s3 sync frontend/ s3://yallabalagan-tickets-frontend/ \
       --profile prod \
       --exclude "*.md" \
-      --exclude ".DS_Store" \
-      --delete
+      --exclude ".DS_Store"
 else
     echo "⚠️  Skipping frontend sync - directory not found"
 fi

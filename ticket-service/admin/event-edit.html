@@ -513,13 +513,716 @@
             font-size: 14px;
             color: #333;
         }
+
+        /* ===== Management Hub Styles ===== */
+        .container.management-mode {
+            max-width: 1200px;
+        }
+
+        .management-header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .management-header-info h1 {
+            margin-bottom: 8px;
+            font-size: 28px;
+        }
+
+        .management-header-meta {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .event-status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .event-status-active {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .event-status-sold_out {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .event-status-cancelled {
+            background: #fce4ec;
+            color: #c62828;
+        }
+
+        /* Tabs */
+        .management-tabs {
+            background: white;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            padding: 0 30px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .management-tab {
+            padding: 15px 24px;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .management-tab:hover {
+            color: #667eea;
+        }
+
+        .management-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .management-tab-content {
+            display: none;
+        }
+
+        .management-tab-content.active {
+            display: block;
+        }
+
+        /* Stat Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .stat-card h3 {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* Bar Chart */
+        .chart-section {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .chart-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            height: 200px;
+            padding: 0 5px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .chart-bar-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+            min-width: 0;
+        }
+
+        .chart-bar-value {
+            font-size: 11px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .chart-bar {
+            width: 100%;
+            max-width: 40px;
+            border-radius: 4px 4px 0 0;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            min-height: 2px;
+            transition: height 0.5s ease;
+        }
+
+        .chart-bar-label {
+            font-size: 10px;
+            color: #999;
+            margin-top: 8px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .chart-empty {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        /* Ticket Type Breakdown */
+        .breakdown-section {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .breakdown-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .breakdown-item {
+            display: grid;
+            grid-template-columns: 1fr 100px 200px 100px;
+            gap: 15px;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .breakdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .breakdown-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .breakdown-name small {
+            display: block;
+            font-weight: 400;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .breakdown-sold {
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .breakdown-progress {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .breakdown-progress-bar {
+            height: 100%;
+            background: #4caf50;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .breakdown-progress-bar.high {
+            background: #ff9800;
+        }
+
+        .breakdown-revenue {
+            text-align: right;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        /* Coupon Usage */
+        .coupon-section {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .coupon-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .coupon-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .coupon-table th {
+            background: #f5f5f5;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            font-size: 13px;
+        }
+
+        .coupon-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .coupon-table tr:hover {
+            background: #f9f9f9;
+        }
+
+        /* Edit Details Modal */
+        .edit-details-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 5000;
+            display: none;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        .edit-details-modal.show {
+            display: flex;
+        }
+
+        .edit-details-modal-content {
+            background: #f0f2f5;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            padding: 30px;
+            position: relative;
+        }
+
+        .edit-details-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .edit-details-modal-header h2 {
+            color: #667eea;
+            margin: 0;
+        }
+
+        .edit-modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 32px;
+            color: #999;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .edit-modal-close-btn:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        /* Orders tab filters */
+        .orders-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .orders-filters .filter-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn-export {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-export:hover {
+            background: #5568d3;
+        }
+
+        /* Bulk Resend Modal */
+        .bulk-resend-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 6000;
+            display: none;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        .bulk-resend-modal.show {
+            display: flex;
+        }
+
+        .bulk-resend-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+        }
+
+        .bulk-resend-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .bulk-resend-header h2 {
+            color: #667eea;
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .bulk-resend-body {
+            padding: 20px 25px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .bulk-resend-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .bulk-resend-toolbar .bulk-count {
+            margin-left: auto;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .bulk-resend-list {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .bulk-resend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        .bulk-resend-item:last-child {
+            border-bottom: none;
+        }
+
+        .bulk-resend-item label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            flex: 1;
+            margin: 0;
+            font-weight: 400;
+        }
+
+        .bulk-resend-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .bulk-resend-item .order-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .bulk-resend-item .order-info strong {
+            color: #333;
+        }
+
+        .bulk-resend-item .order-info small {
+            color: #999;
+            display: block;
+            font-size: 12px;
+        }
+
+        .bulk-resend-item .order-tickets {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .bulk-resend-message {
+            margin-top: 15px;
+        }
+
+        .bulk-resend-message textarea {
+            width: 100%;
+            min-height: 70px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .bulk-resend-message label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .bulk-resend-footer {
+            padding: 15px 25px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .bulk-resend-footer .bulk-progress {
+            flex: 1;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .btn-bulk-send {
+            background: #667eea;
+            color: white;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-bulk-send:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .btn-bulk-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .management-header-actions {
+            display: flex;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+    <div class="container" id="main-container">
+        <!-- Create mode header (shown when no eventId) -->
+        <div class="header" id="create-header">
             <a href="events.html" class="back-link">← Назад к списку событий</a>
             <h1 id="page-title">Создание события</h1>
+        </div>
+
+        <!-- Management Hub (shown when editing) -->
+        <div id="management-view" style="display: none;">
+            <div class="management-header">
+                <div class="management-header-info">
+                    <a href="events.html" class="back-link">← Назад к списку событий</a>
+                    <h1 id="management-title">-</h1>
+                    <div class="management-header-meta">
+                        <span class="event-status-badge" id="management-status-badge">-</span>
+                        <span id="management-date">-</span>
+                        <span id="management-location">-</span>
+                    </div>
+                </div>
+                <div class="management-header-actions">
+                    <button class="btn" onclick="openBulkResendModal()">Перевыпустить билеты</button>
+                    <button class="btn btn-secondary" onclick="openEditDetailsModal()">Редактировать</button>
+                </div>
+            </div>
+            <div class="management-tabs">
+                <button class="management-tab active" onclick="switchManagementTab('overview', this)">Обзор</button>
+                <button class="management-tab" onclick="switchManagementTab('orders', this)">Заказы</button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="management-tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Текущая выручка</h3>
+                        <div class="stat-number" id="stat-earnings">-</div>
+                        <div class="stat-label" id="stat-earnings-label">оплаченные заказы</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Потенциальная выручка</h3>
+                        <div class="stat-number" id="stat-potential">-</div>
+                        <div class="stat-label">если все билеты проданы</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Билеты проданы</h3>
+                        <div class="stat-number" id="stat-tickets-sold">-</div>
+                        <div class="stat-label" id="stat-tickets-remaining">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Средний чек</h3>
+                        <div class="stat-number" id="stat-avg-order">-</div>
+                        <div class="stat-label" id="stat-avg-label">на заказ</div>
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <h3>Продажи билетов за 14 дней</h3>
+                    <div id="sales-chart" class="bar-chart"></div>
+                </div>
+
+                <div class="breakdown-section">
+                    <h3>По типам билетов</h3>
+                    <div id="ticket-breakdown"></div>
+                </div>
+
+                <div class="coupon-section" id="coupon-usage-section" style="display: none;">
+                    <h3>Использование купонов</h3>
+                    <div id="coupon-usage"></div>
+                </div>
+            </div>
+
+            <!-- Orders Tab -->
+            <div id="tab-orders" class="management-tab-content">
+                <div class="orders-section" style="margin-top: 0;">
+                    <div class="orders-filters">
+                        <input type="text" id="orders-search" class="filter-input" placeholder="Поиск по ID, email или имени...">
+                        <button class="btn-export" onclick="exportEventOrders()">CSV</button>
+                    </div>
+                    <div id="orders-container">
+                        <div class="loading">Загрузка заказов...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Details Modal (wraps the form when in edit mode) -->
+        <div id="edit-details-modal" class="edit-details-modal">
+            <div class="edit-details-modal-content">
+                <div class="edit-details-modal-header">
+                    <h2>Редактирование события</h2>
+                    <button class="edit-modal-close-btn" onclick="closeEditDetailsModal()">&times;</button>
+                </div>
+                <div id="edit-form-container"></div>
+            </div>
+        </div>
+
+        <!-- Bulk Resend Modal -->
+        <div id="bulk-resend-modal" class="bulk-resend-modal">
+            <div class="bulk-resend-content">
+                <div class="bulk-resend-header">
+                    <h2>Перевыпуск билетов</h2>
+                    <button class="edit-modal-close-btn" onclick="closeBulkResendModal()">&times;</button>
+                </div>
+                <div class="bulk-resend-body">
+                    <div class="bulk-resend-toolbar">
+                        <button class="btn" style="padding:6px 14px;font-size:13px" onclick="bulkSelectAll(true)">Выбрать все</button>
+                        <button class="btn" style="padding:6px 14px;font-size:13px" onclick="bulkSelectAll(false)">Сбросить все</button>
+                        <span class="bulk-count" id="bulk-selected-count">0 выбрано</span>
+                    </div>
+                    <div class="bulk-resend-list" id="bulk-resend-list"></div>
+                    <div class="bulk-resend-message">
+                        <label>Сообщение для получателей (будет в письме)</label>
+                        <textarea id="bulk-resend-message" placeholder="Например: Мероприятие перенесено на 15 марта. Ваши билеты действительны."></textarea>
+                    </div>
+                </div>
+                <div class="bulk-resend-footer">
+                    <span class="bulk-progress" id="bulk-progress"></span>
+                    <button class="btn" onclick="closeBulkResendModal()">Отмена</button>
+                    <button class="btn-bulk-send" id="bulk-send-btn" onclick="executeBulkResend()" disabled>Отправить</button>
+                </div>
+            </div>
         </div>
 
         <form id="event-form">
@@ -616,13 +1319,6 @@
             </div>
         </form>
 
-        <!-- Orders section - only visible when editing existing event -->
-        <div id="orders-section" class="orders-section" style="display: none;">
-            <h2>Заказы на это событие</h2>
-            <div id="orders-container">
-                <div class="loading">Загрузка заказов...</div>
-            </div>
-        </div>
     </div>
 
     <!-- Seat Allocation Modal -->
@@ -708,6 +1404,8 @@
         let imageUrls = [];
         let locations = []; // Store locations for capacity validation
         let slugManuallyEdited = false;
+        let allEventOrders = []; // All orders for search filtering
+        let currentEventData = null; // Cached event data for dashboard
 
         // Seat allocation variables
         let currentVenueMap = null;  // Venue map configuration from location
@@ -801,10 +1499,18 @@
             eventId = urlParams.get('id');
 
             if (eventId) {
-                document.getElementById('page-title').textContent = 'Редактирование события';
+                // Management mode: show hub, hide create header, hide form
+                document.getElementById('create-header').style.display = 'none';
+                document.getElementById('management-view').style.display = '';
+                document.getElementById('event-form').style.display = 'none';
+                document.getElementById('main-container').classList.add('management-mode');
+
+                // Wire up orders search
+                document.getElementById('orders-search').addEventListener('input', filterOrders);
+
                 await loadEvent(eventId);
             } else {
-                // Add one default ticket type for new events
+                // Create mode: show form as-is
                 addTicketType();
             }
         }
@@ -832,6 +1538,10 @@
             try {
                 const data = await API.getEvent(id);
                 const event = data.event;
+                currentEventData = event;
+
+                // Update management header
+                updateManagementHeader(event);
 
                 // Fill form
                 document.getElementById('title').value = event.title;
@@ -1055,14 +1765,22 @@
                 if (eventId) {
                     await API.updateEvent(eventId, eventData);
                     showToast('Событие успешно обновлено', 'success');
+
+                    // Refresh event data and dashboard instead of redirecting
+                    const refreshed = await API.getEvent(eventId);
+                    currentEventData = refreshed.event;
+                    updateManagementHeader(currentEventData);
+                    renderDashboard();
+                    closeEditDetailsModal();
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Сохранить';
                 } else {
                     await API.createEvent(eventData);
                     showToast('Событие успешно создано', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'events.html';
+                    }, 1500);
                 }
-
-                setTimeout(() => {
-                    window.location.href = 'events.html';
-                }, 1500);
 
             } catch (error) {
                 handleError(error, 'Ошибка сохранения события');
@@ -1079,6 +1797,9 @@
 
                 // Sort orders by created_at (newest first)
                 orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                // Store for search filtering
+                allEventOrders = orders;
 
                 // Analyze sales
                 totalSoldTickets = 0;
@@ -1109,8 +1830,10 @@
 
                 displayOrders(orders);
 
-                // Show orders section
-                document.getElementById('orders-section').style.display = 'block';
+                // Render dashboard if in management mode
+                if (currentEventData) {
+                    renderDashboard();
+                }
             } catch (error) {
                 console.error('Error loading orders:', error);
                 document.getElementById('orders-container').innerHTML =
@@ -1186,6 +1909,398 @@
             `;
 
             container.innerHTML = html;
+        }
+
+        // ===== MANAGEMENT HUB FUNCTIONS =====
+
+        function switchManagementTab(tab, btn) {
+            document.querySelectorAll('.management-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.management-tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        function openEditDetailsModal() {
+            const modal = document.getElementById('edit-details-modal');
+            const container = document.getElementById('edit-form-container');
+            const form = document.getElementById('event-form');
+            container.appendChild(form);
+            form.style.display = '';
+            modal.classList.add('show');
+        }
+
+        function closeEditDetailsModal() {
+            const modal = document.getElementById('edit-details-modal');
+            const form = document.getElementById('event-form');
+            // Move form back to main container (hidden)
+            document.getElementById('main-container').appendChild(form);
+            form.style.display = 'none';
+            modal.classList.remove('show');
+        }
+
+        function updateManagementHeader(eventData) {
+            document.getElementById('management-title').textContent = eventData.title;
+            const badge = document.getElementById('management-status-badge');
+            const statusLabels = { active: 'Активно', sold_out: 'Распродано', cancelled: 'Отменено' };
+            badge.textContent = statusLabels[eventData.status] || eventData.status;
+            badge.className = 'event-status-badge event-status-' + eventData.status;
+
+            const dateTime = eventData.date.replace('Z', '');
+            const [datePart, timePart] = dateTime.split('T');
+            document.getElementById('management-date').textContent = datePart + ' ' + (timePart || '').slice(0, 5);
+
+            const loc = locations.find(l => l.location_id === eventData.location_id);
+            document.getElementById('management-location').textContent = loc ? loc.name : '';
+        }
+
+        function filterOrders() {
+            const search = document.getElementById('orders-search').value.toLowerCase();
+            if (!search) {
+                displayOrders(allEventOrders);
+                return;
+            }
+            const filtered = allEventOrders.filter(o => {
+                const customer = o.customer || {};
+                return (
+                    o.order_id.toLowerCase().includes(search) ||
+                    (customer.email || '').toLowerCase().includes(search) ||
+                    (customer.name || '').toLowerCase().includes(search)
+                );
+            });
+            displayOrders(filtered);
+        }
+
+        function exportEventOrders() {
+            if (allEventOrders.length === 0) {
+                showToast('Нет заказов для экспорта', 'error');
+                return;
+            }
+            const csvData = allEventOrders.map(o => ({
+                order_id: o.order_id,
+                customer_name: o.customer?.name || '',
+                customer_email: o.customer?.email || '',
+                tickets: (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0),
+                total_amount: o.total_amount,
+                coupon_code: o.coupon_code || '',
+                discount_amount: o.discount_amount || 0,
+                status: o.payment?.status || '',
+                created_at: o.created_at
+            }));
+            exportToCSV(csvData, 'event-orders.csv');
+        }
+
+        // ===== DASHBOARD =====
+
+        function computeDashboardMetrics(eventData, ordersArr) {
+            const completedOrders = ordersArr.filter(o => o.payment?.status === 'completed');
+            const refundedOrders = ordersArr.filter(o => o.payment?.status === 'refunded');
+
+            // Current earnings: sum of completed order amounts minus refunded amounts
+            const completedRevenue = completedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+            const refundedAmount = refundedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+            const currentEarnings = completedRevenue - refundedAmount;
+
+            // Tickets sold
+            let ticketsSold = 0;
+            completedOrders.forEach(o => {
+                (o.tickets || []).forEach(t => { ticketsSold += (t.quantity || 0); });
+            });
+
+            // Total tickets and potential
+            let totalTickets = 0;
+            let potentialRemaining = 0;
+            (eventData.ticket_types || []).forEach(tt => {
+                totalTickets += tt.total || 0;
+                potentialRemaining += (tt.available || 0) * (tt.price || 0);
+            });
+
+            const potentialFull = currentEarnings + potentialRemaining;
+            const ticketsRemaining = totalTickets - ticketsSold;
+
+            // Avg order value
+            const avgOrder = completedOrders.length > 0 ? currentEarnings / completedOrders.length : 0;
+
+            return {
+                currentEarnings,
+                potentialFull,
+                ticketsSold,
+                ticketsRemaining,
+                totalTickets,
+                avgOrder,
+                completedOrders,
+                completedCount: completedOrders.length
+            };
+        }
+
+        function computeSalesByDay(completedOrders, days) {
+            const now = new Date();
+            const result = [];
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                const key = d.toISOString().slice(0, 10);
+                result.push({ date: key, label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }), count: 0 });
+            }
+
+            completedOrders.forEach(o => {
+                const dateStr = (o.payment?.paid_at || o.created_at || '').slice(0, 10);
+                const entry = result.find(r => r.date === dateStr);
+                if (entry) {
+                    (o.tickets || []).forEach(t => { entry.count += (t.quantity || 0); });
+                }
+            });
+
+            return result;
+        }
+
+        function computeTicketTypeBreakdown(eventData, completedOrders) {
+            const types = (eventData.ticket_types || []).map(tt => ({
+                id: tt.id,
+                name: tt.name,
+                price: tt.price,
+                total: tt.total,
+                available: tt.available,
+                sold: tt.total - tt.available,
+                revenue: 0
+            }));
+
+            // Calculate revenue per type from actual orders
+            completedOrders.forEach(o => {
+                (o.tickets || []).forEach(t => {
+                    const entry = types.find(x => x.id === t.type_id);
+                    if (entry) {
+                        entry.revenue += (t.quantity || 0) * (t.price_per_ticket || entry.price || 0);
+                    }
+                });
+            });
+
+            return types;
+        }
+
+        function renderDashboard() {
+            if (!currentEventData || !allEventOrders) return;
+
+            const metrics = computeDashboardMetrics(currentEventData, allEventOrders);
+
+            // Stat cards
+            document.getElementById('stat-earnings').textContent = formatCurrency(metrics.currentEarnings);
+            document.getElementById('stat-earnings-label').textContent = metrics.completedCount + ' оплаченных заказов';
+            document.getElementById('stat-potential').textContent = formatCurrency(metrics.potentialFull);
+            document.getElementById('stat-tickets-sold').textContent = metrics.ticketsSold;
+            document.getElementById('stat-tickets-remaining').textContent = 'осталось ' + metrics.ticketsRemaining + ' из ' + metrics.totalTickets;
+            document.getElementById('stat-avg-order').textContent = formatCurrency(metrics.avgOrder);
+
+            // Sales chart
+            const salesData = computeSalesByDay(metrics.completedOrders, 14);
+            renderSalesChart(salesData);
+
+            // Ticket type breakdown
+            const breakdown = computeTicketTypeBreakdown(currentEventData, metrics.completedOrders);
+            renderTicketBreakdown(breakdown);
+
+            // Coupon usage
+            renderCouponUsage(metrics.completedOrders);
+        }
+
+        function renderSalesChart(data) {
+            const container = document.getElementById('sales-chart');
+            const maxVal = Math.max(...data.map(d => d.count), 1);
+
+            if (data.every(d => d.count === 0)) {
+                container.innerHTML = '<div class="chart-empty">Нет продаж за последние 14 дней</div>';
+                container.classList.remove('bar-chart');
+                return;
+            }
+
+            container.classList.add('bar-chart');
+            container.innerHTML = data.map(d => {
+                const pct = (d.count / maxVal) * 100;
+                return `
+                    <div class="chart-bar-wrapper">
+                        <div class="chart-bar-value">${d.count || ''}</div>
+                        <div class="chart-bar" style="height: ${Math.max(pct, 2)}%"></div>
+                        <div class="chart-bar-label">${d.label}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTicketBreakdown(types) {
+            const container = document.getElementById('ticket-breakdown');
+            if (types.length === 0) {
+                container.innerHTML = '<div class="chart-empty">Нет типов билетов</div>';
+                return;
+            }
+
+            container.innerHTML = types.map(t => {
+                const pct = t.total > 0 ? (t.sold / t.total) * 100 : 0;
+                const highClass = pct > 80 ? ' high' : '';
+                return `
+                    <div class="breakdown-item">
+                        <div class="breakdown-name">
+                            ${t.name}
+                            <small>${formatCurrency(t.price)} за билет</small>
+                        </div>
+                        <div class="breakdown-sold">${t.sold} / ${t.total}</div>
+                        <div class="breakdown-progress">
+                            <div class="breakdown-progress-bar${highClass}" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="breakdown-revenue">${formatCurrency(t.revenue)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderCouponUsage(completedOrders) {
+            const couponMap = {};
+            completedOrders.forEach(o => {
+                const code = o.coupon_code;
+                if (!code) return;
+                if (!couponMap[code]) {
+                    couponMap[code] = { count: 0, revenue: 0, discount: 0 };
+                }
+                couponMap[code].count++;
+                couponMap[code].revenue += (o.total_amount || 0);
+                couponMap[code].discount += (o.discount_amount || 0);
+            });
+
+            const codes = Object.keys(couponMap);
+            const section = document.getElementById('coupon-usage-section');
+            if (codes.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            document.getElementById('coupon-usage').innerHTML = `
+                <table class="coupon-table">
+                    <thead>
+                        <tr>
+                            <th>Купон</th>
+                            <th>Использований</th>
+                            <th>Выручка</th>
+                            <th>Сумма скидок</th>
+                            <th>Чистый эффект</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${codes.map(code => {
+                            const c = couponMap[code];
+                            const net = c.revenue - c.discount;
+                            return `
+                                <tr>
+                                    <td><strong>${code}</strong></td>
+                                    <td>${c.count}</td>
+                                    <td>${formatCurrency(c.revenue)}</td>
+                                    <td style="color: #f44336;">-${formatCurrency(c.discount)}</td>
+                                    <td><strong>${formatCurrency(net)}</strong></td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // ===== BULK RESEND =====
+
+        function openBulkResendModal() {
+            const modal = document.getElementById('bulk-resend-modal');
+            const list = document.getElementById('bulk-resend-list');
+
+            // Only completed orders
+            const completedOrders = allEventOrders.filter(o => o.payment?.status === 'completed');
+
+            if (completedOrders.length === 0) {
+                showToast('Нет оплаченных заказов для рассылки', 'error');
+                return;
+            }
+
+            list.innerHTML = completedOrders.map(o => {
+                const customer = o.customer || {};
+                const ticketCount = (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0);
+                return `
+                    <div class="bulk-resend-item">
+                        <label>
+                            <input type="checkbox" class="bulk-order-cb" data-order-id="${o.order_id}" checked>
+                            <div class="order-info">
+                                <strong>${customer.name || '-'}</strong>
+                                <small>${customer.email || '-'}</small>
+                            </div>
+                            <span class="order-tickets">${ticketCount} шт</span>
+                        </label>
+                    </div>
+                `;
+            }).join('');
+
+            // Wire up change listeners
+            list.querySelectorAll('.bulk-order-cb').forEach(cb => {
+                cb.addEventListener('change', updateBulkCount);
+            });
+
+            document.getElementById('bulk-resend-message').value = '';
+            document.getElementById('bulk-progress').textContent = '';
+            document.getElementById('bulk-send-btn').disabled = false;
+            document.getElementById('bulk-send-btn').textContent = 'Отправить';
+            updateBulkCount();
+            modal.classList.add('show');
+        }
+
+        function closeBulkResendModal() {
+            document.getElementById('bulk-resend-modal').classList.remove('show');
+        }
+
+        function bulkSelectAll(checked) {
+            document.querySelectorAll('.bulk-order-cb').forEach(cb => { cb.checked = checked; });
+            updateBulkCount();
+        }
+
+        function updateBulkCount() {
+            const total = document.querySelectorAll('.bulk-order-cb').length;
+            const selected = document.querySelectorAll('.bulk-order-cb:checked').length;
+            document.getElementById('bulk-selected-count').textContent = selected + ' из ' + total + ' выбрано';
+            document.getElementById('bulk-send-btn').disabled = selected === 0;
+        }
+
+        async function executeBulkResend() {
+            const checkboxes = document.querySelectorAll('.bulk-order-cb:checked');
+            if (checkboxes.length === 0) return;
+
+            const orderIds = Array.from(checkboxes).map(cb => cb.dataset.orderId);
+            const customMessage = document.getElementById('bulk-resend-message').value.trim();
+
+            const btn = document.getElementById('bulk-send-btn');
+            const progress = document.getElementById('bulk-progress');
+            btn.disabled = true;
+            btn.textContent = 'Отправка...';
+
+            // Disable all checkboxes during send
+            document.querySelectorAll('.bulk-order-cb').forEach(cb => { cb.disabled = true; });
+
+            let sent = 0;
+            let failed = 0;
+
+            for (const orderId of orderIds) {
+                try {
+                    await API.resendEmail(orderId, { custom_message: customMessage });
+                    sent++;
+                } catch (err) {
+                    console.error('Failed to resend for order', orderId, err);
+                    failed++;
+                }
+                progress.textContent = `Отправлено ${sent}` + (failed > 0 ? `, ошибок ${failed}` : '') + ` из ${orderIds.length}`;
+            }
+
+            btn.textContent = 'Готово';
+            if (failed === 0) {
+                showToast(`Билеты отправлены: ${sent} заказов`, 'success');
+            } else {
+                showToast(`Отправлено ${sent}, ошибок ${failed}`, 'error');
+            }
+
+            setTimeout(() => {
+                closeBulkResendModal();
+            }, 1500);
         }
 
         // ===== SEAT ALLOCATION FUNCTIONS =====

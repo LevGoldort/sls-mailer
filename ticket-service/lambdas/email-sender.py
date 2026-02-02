@@ -58,7 +58,7 @@ def load_email_template() -> str:
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <p><strong>📅 Дата и время:</strong> {{ event_date_formatted }}</p>
             <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
-            <p><strong>🎫 Билеты:</strong> {% for ticket in order.tickets %}{{ ticket.quantity }}x {{ ticket.type_name }}{% if ticket.purchased_seats %} ({% for seat_id in ticket.purchased_seats %}{% set seat_parts = seat_id.split('-') %}Ряд {{ seat_parts[0] }}, Место {{ seat_parts[1] }}{% if not loop.last %}; {% endif %}{% endfor %}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+            <p><strong>🎫 Билеты:</strong> {% for ticket in order.tickets %}{{ ticket.quantity }}x {{ ticket.type_name }}{% if ticket.purchased_seats %} ({% for seat_id in ticket.purchased_seats %}{{ get_seat_display(seat_id) }}{% if not loop.last %}; {% endif %}{% endfor %}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
             <p><strong>💰 Сумма:</strong> {{ order.total_amount }} {{ order.currency }}</p>
             <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
         </div>
@@ -76,8 +76,7 @@ def load_email_template() -> str:
                         <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #667eea;">{{ event.title }}</p>
                         <p style="margin: 0 0 6px 0; font-size: 14px; color: #333;">🎫 {{ qr['ticket_type_name'] }}</p>
                         {% if qr['seat_id'] %}
-                        {% set seat_parts = qr['seat_id'].split('-') %}
-                        <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #667eea;">💺 Ряд {{ seat_parts[0] }}, Место {{ seat_parts[1] }}</p>
+                        <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #667eea;">💺 {{ qr['seat_display'] }}</p>
                         {% endif %}
                         <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">📍 <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a></p>
                         {% if location_address %}
@@ -124,6 +123,36 @@ def load_email_template() -> str:
 </body>
 </html>
 """
+
+
+def get_seat_display(seat_id: str, seating_map) -> str:
+    """
+    Converts internal seat ID like "0-14" to display label like "Ряд 1, Место 21".
+    Mirrors frontend getSeatDisplayNumber() logic.
+    """
+    parts = seat_id.split('-')
+    if len(parts) != 2:
+        return seat_id
+
+    row_index = int(parts[0])
+    seat_index = int(parts[1])
+    row_display = row_index + 1
+
+    if seating_map:
+        custom = seating_map.custom_numbers.get(seat_id)
+        if custom:
+            seat_display = int(custom.get('seat', seat_index + 1))
+            custom_row = custom.get('row')
+            if custom_row is not None:
+                row_display = int(custom_row)
+        elif seating_map.numbering_direction == 'right-to-left':
+            seat_display = int(seating_map.seats_per_row) - seat_index
+        else:
+            seat_display = seat_index + 1
+    else:
+        seat_display = seat_index + 1
+
+    return f"Ряд {row_display}, Место {seat_display}"
 
 
 def format_event_date(event_date: str) -> str:
@@ -207,6 +236,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         location_name = "Локация"
         location_address = ""
         location_id = event_obj.location_id
+        seating_map = None
         try:
             location_data = db.get_location(event_obj.location_id)
             if location_data:
@@ -216,6 +246,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Format address as "City, Street"
                 if location.address and location.address.city and location.address.street:
                     location_address = f"{location.address.city}, {location.address.street}"
+                # Extract seating map config for seat display labels
+                if location.venue_config and location.venue_config.seating_map:
+                    seating_map = location.venue_config.seating_map
         except Exception as e:
             print(f"Warning: Failed to load location: {e}")  # Log the error instead of silently ignoring
         
@@ -226,13 +259,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Calculate total tickets
         total_tickets = sum(t.quantity for t in order.tickets)
 
-        # Enrich QR codes with ticket type names
+        # Enrich QR codes with ticket type names and seat display labels
         try:
             ticket_type_map = {t.type_id: t.type_name for t in order.tickets}
             enriched_qr_codes = []
             for qr in order.qr_codes:
                 qr_dict = qr.to_dict()
                 qr_dict['ticket_type_name'] = ticket_type_map.get(qr.ticket_type, qr.ticket_type)
+                if qr.seat_id:
+                    qr_dict['seat_display'] = get_seat_display(qr.seat_id, seating_map)
                 enriched_qr_codes.append(qr_dict)
             print(f"Enriched {len(enriched_qr_codes)} QR codes")
         except Exception as e:
@@ -247,6 +282,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Render email HTML
         try:
+            # Pre-compute seat display labels for template use
+            seat_display_fn = lambda seat_id: get_seat_display(seat_id, seating_map)
+
             email_html = template.render(
                 order=order,
                 event=event_obj,
@@ -256,7 +294,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 location_id=location_id,
                 total_tickets=total_tickets,
                 enriched_qr_codes=enriched_qr_codes,
-                frontend_url=frontend_url
+                frontend_url=frontend_url,
+                get_seat_display=seat_display_fn
             )
             print(f"Email template rendered successfully")
         except Exception as e:

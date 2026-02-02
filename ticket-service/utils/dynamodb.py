@@ -169,17 +169,30 @@ class DynamoDBClient:
 
         return item
 
-    def get_orders_by_event(self, event_id: str, limit: int = 100) -> List[Dict]:
-        """Получает все заказы для события"""
-        response = self.orders_table.query(
-            IndexName='EventIndex',
-            KeyConditionExpression='event_id = :event_id',
-            ExpressionAttributeValues={
+    def get_orders_by_event(self, event_id: str, limit: int = None) -> List[Dict]:
+        """Получает все заказы для события (с пагинацией)"""
+        items = []
+        query_params = {
+            'IndexName': 'EventIndex',
+            'KeyConditionExpression': 'event_id = :event_id',
+            'ExpressionAttributeValues': {
                 ':event_id': event_id
-            },
-            Limit=limit
-        )
-        return response.get('Items', [])
+            }
+        }
+
+        while True:
+            response = self.orders_table.query(**query_params)
+            items.extend(response.get('Items', []))
+
+            if limit and len(items) >= limit:
+                return items[:limit]
+
+            last_key = response.get('LastEvaluatedKey')
+            if not last_key:
+                break
+            query_params['ExclusiveStartKey'] = last_key
+
+        return items
 
     def get_orders_by_email(self, email: str, limit: int = 50) -> List[Dict]:
         """Получает все заказы клиента по email"""
@@ -309,10 +322,24 @@ class DynamoDBClient:
             }
         )
 
-    def list_orders(self, limit: int = 100) -> List[Dict]:
-        """Получает список всех заказов"""
-        response = self.orders_table.scan(Limit=limit)
-        return response.get('Items', [])
+    def list_orders(self, limit: int = None) -> List[Dict]:
+        """Получает список всех заказов (с пагинацией)"""
+        items = []
+        scan_params = {}
+
+        while True:
+            response = self.orders_table.scan(**scan_params)
+            items.extend(response.get('Items', []))
+
+            if limit and len(items) >= limit:
+                return items[:limit]
+
+            last_key = response.get('LastEvaluatedKey')
+            if not last_key:
+                break
+            scan_params['ExclusiveStartKey'] = last_key
+
+        return items
 
     # ===== Coupons =====
     def put_coupon(self, coupon_item: Dict):

@@ -16,15 +16,13 @@
         .header {
             background: white;
             padding: 30px;
-            border-radius: 12px;
-            margin-bottom: 30px;
+            border-radius: 12px 12px 0 0;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         h1 { color: #667eea; margin-bottom: 20px; }
         .nav {
             display: flex;
             gap: 15px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
         }
         .nav-btn {
@@ -39,20 +37,65 @@
             cursor: pointer;
         }
         .nav-btn:hover { background: #5568d3; }
-        .btn-export { background: #4caf50; }
-        .btn-export:hover { background: #45a049; }
+
+        .tabs {
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 0 30px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #f0f0f0;
+            border-radius: 0 0 12px 12px;
+            margin-bottom: 30px;
+        }
+        .tab {
+            padding: 15px 24px;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab:hover { color: #667eea; }
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
         .filters {
             display: flex;
             gap: 15px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            align-items: center;
         }
-        .filter-input, .filter-select {
+        .filter-input {
+            flex: 1;
+            min-width: 200px;
             padding: 10px 15px;
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 14px;
         }
+        .btn-export {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .btn-export:hover { background: #5568d3; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
         .section {
             background: white;
             border-radius: 12px;
@@ -111,52 +154,65 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛒 Управление заказами</h1>
+            <h1>Заказы</h1>
             <div class="nav">
-                <a href="index.html" class="nav-btn">📊 Dashboard</a>
-                <a href="events.html" class="nav-btn">🎪 События</a>
-                <a href="locations.html" class="nav-btn">📍 Локации</a>
-                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
-                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
-                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+                <a href="index.html" class="nav-btn">Dashboard</a>
+                <a href="events.html" class="nav-btn">События</a>
+                <a href="locations.html" class="nav-btn">Локации</a>
+                <a href="orders.html" class="nav-btn">Заказы</a>
+                <a href="analytics.html" class="nav-btn">Аналитика</a>
+                <a href="coupons.html" class="nav-btn">Купоны</a>
             </div>
+        </div>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('active', this)">Активные события</button>
+            <button class="tab" onclick="switchTab('all', this)">Все заказы</button>
+        </div>
+
+        <!-- Active events orders tab -->
+        <div id="tab-active" class="tab-content active">
             <div class="filters">
-                <input type="text" id="search" class="filter-input" placeholder="🔍 Поиск по email или ID...">
-                <button class="nav-btn btn-export" onclick="exportOrders()">📥 Экспорт CSV</button>
+                <input type="text" id="search-active" class="filter-input" placeholder="Поиск по ID, email или имени...">
+                <button class="btn-export" onclick="exportActiveOrders()">CSV</button>
+            </div>
+            <div class="section">
+                <div id="active-orders-container">
+                    <div class="loading">Загрузка заказов...</div>
+                </div>
             </div>
         </div>
 
-        <div class="section">
-            <div id="orders-container">
-                <div class="loading">Загрузка заказов...</div>
+        <!-- All orders tab (lazy-loaded) -->
+        <div id="tab-all" class="tab-content">
+            <div class="filters">
+                <input type="text" id="search-all" class="filter-input" placeholder="Поиск по ID, email или имени...">
+                <button class="btn-export" onclick="exportAllOrders()">CSV</button>
+            </div>
+            <div class="section">
+                <div id="all-orders-container">
+                    <div class="loading">Загрузка заказов...</div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="shared.js?v=1764370571"></script>
     <script>
-        let allOrders = [];
         let events = [];
+        let activeOrders = [];
+        let allOrders = null; // null = not loaded yet
+        let currentTab = 'active';
 
-        async function loadOrders() {
-            try {
-                // Load both orders and events in parallel
-                const [ordersData, eventsData] = await Promise.all([
-                    API.getOrders(),
-                    API.getEvents()
-                ]);
+        function switchTab(tab, btn) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
 
-                allOrders = ordersData.orders || [];
-                events = eventsData.events || [];
-
-                // Sort orders by created_at (newest first)
-                allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-                displayOrders(allOrders);
-            } catch (error) {
-                handleError(error, 'Ошибка загрузки заказов');
-                document.getElementById('orders-container').innerHTML =
-                    '<div class="empty">Ошибка загрузки заказов</div>';
+            // Lazy-load all orders on first switch
+            if (tab === 'all' && allOrders === null) {
+                loadAllOrders();
             }
         }
 
@@ -165,15 +221,65 @@
             return event ? event.title : 'Неизвестное событие';
         }
 
-        function displayOrders(orders) {
-            const container = document.getElementById('orders-container');
+        // --- Active events orders (default tab) ---
+
+        async function loadActiveOrders() {
+            try {
+                const eventsData = await API.getEvents();
+                events = eventsData.events || [];
+
+                const activeEvents = events.filter(e => e.status === 'active');
+
+                if (activeEvents.length === 0) {
+                    activeOrders = [];
+                    displayOrders(activeOrders, 'active-orders-container');
+                    return;
+                }
+
+                // Parallel GSI queries per event
+                const results = await Promise.all(
+                    activeEvents.map(e => API.getOrdersByEvent(e.event_id))
+                );
+
+                activeOrders = results.flatMap(r => r.orders || []);
+                activeOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                displayOrders(activeOrders, 'active-orders-container');
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки заказов');
+                document.getElementById('active-orders-container').innerHTML =
+                    '<div class="empty">Ошибка загрузки заказов</div>';
+            }
+        }
+
+        // --- All orders (lazy-loaded) ---
+
+        async function loadAllOrders() {
+            try {
+                // Events already loaded from the active tab
+                const ordersData = await API.getOrders();
+                allOrders = ordersData.orders || [];
+                allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                displayOrders(allOrders, 'all-orders-container');
+            } catch (error) {
+                handleError(error, 'Ошибка загрузки заказов');
+                document.getElementById('all-orders-container').innerHTML =
+                    '<div class="empty">Ошибка загрузки заказов</div>';
+            }
+        }
+
+        // --- Shared display ---
+
+        function displayOrders(orders, containerId) {
+            const container = document.getElementById(containerId);
 
             if (orders.length === 0) {
                 container.innerHTML = '<div class="empty">Нет заказов</div>';
                 return;
             }
 
-            const html = `
+            container.innerHTML = `
                 <table class="orders-table">
                     <thead>
                         <tr>
@@ -211,13 +317,12 @@
                     </tbody>
                 </table>
             `;
-
-            container.innerHTML = html;
         }
 
-        document.getElementById('search').addEventListener('input', (e) => {
-            const search = e.target.value.toLowerCase();
-            const filtered = allOrders.filter(o => {
+        // --- Search ---
+
+        function filterList(source, search) {
+            return source.filter(o => {
                 const customer = o.customer || {};
                 return (
                     o.order_id.toLowerCase().includes(search) ||
@@ -225,29 +330,52 @@
                     (customer.name || '').toLowerCase().includes(search)
                 );
             });
-            displayOrders(filtered);
+        }
+
+        document.getElementById('search-active').addEventListener('input', (e) => {
+            const search = e.target.value.toLowerCase();
+            displayOrders(search ? filterList(activeOrders, search) : activeOrders, 'active-orders-container');
         });
 
-        function exportOrders() {
-            if (allOrders.length === 0) {
-                showToast('Нет заказов для экспорта', 'error');
-                return;
-            }
+        document.getElementById('search-all').addEventListener('input', (e) => {
+            if (allOrders === null) return;
+            const search = e.target.value.toLowerCase();
+            displayOrders(search ? filterList(allOrders, search) : allOrders, 'all-orders-container');
+        });
 
-            const csvData = allOrders.map(o => ({
+        // --- Export ---
+
+        function buildCSV(orders) {
+            return orders.map(o => ({
                 order_id: o.order_id,
                 event_name: getEventName(o.event_id),
                 customer_name: o.customer?.name || '',
                 customer_email: o.customer?.email || '',
                 total_amount: o.total_amount,
+                coupon_code: o.coupon_code || '',
+                discount_amount: o.discount_amount || 0,
                 status: o.payment?.status || '',
                 created_at: o.created_at
             }));
-
-            exportToCSV(csvData, 'orders.csv');
         }
 
-        loadOrders();
+        function exportActiveOrders() {
+            if (activeOrders.length === 0) {
+                showToast('Нет заказов для экспорта', 'error');
+                return;
+            }
+            exportToCSV(buildCSV(activeOrders), 'active-orders.csv');
+        }
+
+        function exportAllOrders() {
+            if (!allOrders || allOrders.length === 0) {
+                showToast('Нет заказов для экспорта', 'error');
+                return;
+            }
+            exportToCSV(buildCSV(allOrders), 'all-orders.csv');
+        }
+
+        loadActiveOrders();
     </script>
 </body>
 </html>

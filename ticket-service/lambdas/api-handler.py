@@ -1148,20 +1148,30 @@ def list_orders_by_event(event_id: str, request_event: Dict) -> Dict:
 
     try:
         items = db.get_orders_by_event(event_id)
+        print(f"[DEBUG] get_orders_by_event({event_id}): {len(items)} items from DB")
 
         orders = []
+        parse_errors = 0
         for item in items:
             try:
                 order = Order.from_dynamodb_item(item)
                 orders.append(order.to_dynamodb_item())
             except Exception as e:
-                print(f"Error parsing order: {e}")
+                parse_errors += 1
+                print(f"Error parsing order {item.get('order_id', 'unknown')}: {e}")
                 continue
+
+        print(f"[DEBUG] Parsed {len(orders)} orders, {parse_errors} errors")
 
         return success_response({
             'orders': orders,
             'count': len(orders),
-            'event_id': event_id
+            'event_id': event_id,
+            '_debug': {
+                'db_items': len(items),
+                'parsed': len(orders),
+                'parse_errors': parse_errors
+            }
         })
 
     except Exception as e:
@@ -1184,19 +1194,29 @@ def list_all_orders(request_event: Dict) -> Dict:
 
     try:
         items = db.list_orders()
+        print(f"[DEBUG] list_orders: {len(items)} items from DB")
 
         orders = []
+        parse_errors = 0
         for item in items:
             try:
                 order = Order.from_dynamodb_item(item)
                 orders.append(order.to_dynamodb_item())
             except Exception as e:
-                print(f"Error parsing order: {e}")
+                parse_errors += 1
+                print(f"Error parsing order {item.get('order_id', 'unknown')}: {e}")
                 continue
+
+        print(f"[DEBUG] Parsed {len(orders)} orders, {parse_errors} errors")
 
         return success_response({
             'orders': orders,
-            'count': len(orders)
+            'count': len(orders),
+            '_debug': {
+                'db_items': len(items),
+                'parsed': len(orders),
+                'parse_errors': parse_errors
+            }
         })
 
     except Exception as e:

@@ -119,6 +119,33 @@ function pollOrderStatus() {
         });
 }
 
+// Get seating map config from sessionStorage (set during checkout flow)
+let seatingMapConfig = null;
+try {
+    const orderData = JSON.parse(sessionStorage.getItem('orderData') || '{}');
+    seatingMapConfig = orderData.seating_map_config || null;
+} catch(e) {}
+
+function getSeatDisplayLabel(seatId) {
+    const parts = seatId.split('-');
+    if (parts.length !== 2) return seatId;
+    const rowIndex = parseInt(parts[0]);
+    const seatIndex = parseInt(parts[1]);
+    let rowDisplay = rowIndex + 1;
+    let seatDisplay = seatIndex + 1;
+
+    if (seatingMapConfig) {
+        const custom = seatingMapConfig.custom_numbers && seatingMapConfig.custom_numbers[seatId];
+        if (custom) {
+            seatDisplay = custom.seat;
+            if (custom.row !== undefined) rowDisplay = custom.row;
+        } else if (seatingMapConfig.numbering_direction === 'right-to-left') {
+            seatDisplay = seatingMapConfig.seats_per_row - seatIndex;
+        }
+    }
+    return `Ряд ${rowDisplay}, Место ${seatDisplay}`;
+}
+
 // Show success state
 function showSuccess(order) {
     document.getElementById('processing-state').style.display = 'none';
@@ -143,10 +170,7 @@ function showSuccess(order) {
             <span>${order.tickets.map(t => {
                 let result = `${t.quantity}x ${t.type_name}`;
                 if (t.purchased_seats && t.purchased_seats.length > 0) {
-                    const seats = t.purchased_seats.map(s => {
-                        const [row, seat] = s.split('-');
-                        return `Ряд ${row}, Место ${seat}`;
-                    }).join('; ');
+                    const seats = t.purchased_seats.map(s => getSeatDisplayLabel(s)).join('; ');
                     result += ` (${seats})`;
                 }
                 return result;
@@ -163,8 +187,7 @@ function showSuccess(order) {
                 ${order.qr_codes.map((qr, index) => {
                     let seatInfo = '';
                     if (qr.seat_id) {
-                        const [row, seat] = qr.seat_id.split('-');
-                        seatInfo = `<p style="font-weight: 600; color: var(--primary);">Ряд ${row}, Место ${seat}</p>`;
+                        seatInfo = `<p style="font-weight: 600; color: var(--primary);">${getSeatDisplayLabel(qr.seat_id)}</p>`;
                     }
                     return `
                         <div class="qr-item">
