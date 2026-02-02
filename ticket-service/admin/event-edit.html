@@ -241,6 +241,16 @@
             color: #e65100;
         }
 
+        .status-cancelled {
+            background: #fce4ec;
+            color: #c62828;
+        }
+
+        .status-partially_cancelled {
+            background: #fff8e1;
+            color: #f57f17;
+        }
+
         .empty-orders {
             text-align: center;
             padding: 40px;
@@ -700,6 +710,7 @@
     </div>
 
     <script src="shared.js?v=1764370571"></script>
+    <script src="order-modal.js?v=1770008382"></script>
     <script src="shared-image-upload.js"></script>
     <script src="seating-allocation-editor.js"></script>
     <script>
@@ -1232,6 +1243,24 @@
             });
         }
 
+        function getOrderDisplayStatus(order) {
+            const paymentStatus = (order.payment || {}).status || 'pending';
+            if (paymentStatus !== 'completed') {
+                return { label: paymentStatus, cls: 'status-pending' };
+            }
+            const qrCodes = order.qr_codes || [];
+            if (qrCodes.length > 0) {
+                const cancelledCount = qrCodes.filter(qr => qr.cancelled).length;
+                if (cancelledCount === qrCodes.length) {
+                    return { label: 'cancelled', cls: 'status-cancelled' };
+                }
+                if (cancelledCount > 0) {
+                    return { label: 'partially cancelled', cls: 'status-partially_cancelled' };
+                }
+            }
+            return { label: 'completed', cls: 'status-completed' };
+        }
+
         function displayOrders(orders) {
             const container = document.getElementById('orders-container');
 
@@ -1256,18 +1285,17 @@
                     <tbody>
                         ${orders.map(order => {
                             const customer = order.customer || {};
-                            const payment = order.payment || {};
                             const ticketCount = (order.tickets || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
-                            const statusClass = payment.status === 'completed' ? 'status-completed' : 'status-pending';
+                            const status = getOrderDisplayStatus(order);
 
                             return `
-                                <tr>
+                                <tr onclick="openOrderModal('${order.order_id}')" style="cursor: pointer;">
                                     <td><strong>${order.order_id}</strong></td>
                                     <td>${customer.name || '-'}</td>
                                     <td>${customer.email || '-'}</td>
                                     <td>${ticketCount} шт</td>
                                     <td><strong>${formatCurrency(order.total_amount)}</strong></td>
-                                    <td><span class="status-badge ${statusClass}">${payment.status || 'pending'}</span></td>
+                                    <td><span class="status-badge ${status.cls}">${status.label}</span></td>
                                     <td>${formatDate(order.created_at)}</td>
                                 </tr>
                             `;

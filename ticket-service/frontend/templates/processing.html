@@ -145,7 +145,7 @@ function showSuccess(order) {
                 if (t.purchased_seats && t.purchased_seats.length > 0) {
                     const seats = t.purchased_seats.map(s => {
                         const [row, seat] = s.split('-');
-                        return `Ряд ${row}, Место ${seat}`;
+                        return `Ряд ${parseInt(row) + 1}, Место ${parseInt(seat) + 1}`;
                     }).join('; ');
                     result += ` (${seats})`;
                 }
@@ -164,7 +164,7 @@ function showSuccess(order) {
                     let seatInfo = '';
                     if (qr.seat_id) {
                         const [row, seat] = qr.seat_id.split('-');
-                        seatInfo = `<p style="font-weight: 600; color: var(--primary);">Ряд ${row}, Место ${seat}</p>`;
+                        seatInfo = `<p style="font-weight: 600; color: var(--primary);">Ряд ${parseInt(row) + 1}, Место ${parseInt(seat) + 1}</p>`;
                     }
                     return `
                         <div class="qr-item">

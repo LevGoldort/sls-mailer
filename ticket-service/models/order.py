@@ -53,6 +53,8 @@ class QRCode:
     seat_id: Optional[str] = None  # NEW: "13-15" (row-seat) for seated events
     scanned: bool = False
     scanned_at: Optional[str] = None
+    cancelled: bool = False
+    cancelled_at: Optional[str] = None
 
     def to_dict(self):
         return asdict(self)

@@ -309,10 +309,17 @@ class DynamoDBClient:
             }
         )
 
-    def list_orders(self, limit: int = 100) -> List[Dict]:
-        """Получает список всех заказов"""
-        response = self.orders_table.scan(Limit=limit)
-        return response.get('Items', [])
+    def list_orders(self) -> List[Dict]:
+        """Получает список всех заказов (с пагинацией)"""
+        items = []
+        response = self.orders_table.scan()
+        items.extend(response.get('Items', []))
+        while 'LastEvaluatedKey' in response:
+            response = self.orders_table.scan(
+                ExclusiveStartKey=response['LastEvaluatedKey']
+            )
+            items.extend(response.get('Items', []))
+        return items
 
     # ===== Coupons =====
     def put_coupon(self, coupon_item: Dict):

@@ -37,7 +37,7 @@ def lambda_handler(event, context):
 
     try:
         # Получаем все заказы
-        all_orders = db.list_orders(limit=1000)
+        all_orders = db.list_orders()
 
         expired_count = 0
 
