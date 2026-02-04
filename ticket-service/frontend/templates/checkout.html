@@ -385,31 +385,25 @@ function renderCheckout() {
     fireInitiateCheckout();
 }
 
-// Calculate seat display number based on venue configuration
-// Same logic as seat-picker.js getSeatDisplayNumber()
-function getSeatDisplayNumber(rowId, seatId, seatingMapConfig) {
-    if (!seatingMapConfig) {
-        // Fallback to simple 1-indexed if config is missing
-        return parseInt(seatId) + 1;
+// Convert internal seat ID like "0-14" to display label like "Ряд 1, Место 21"
+function getSeatDisplayLabel(seatId, seatingMapConfig) {
+    const parts = seatId.split('-');
+    if (parts.length !== 2) return seatId;
+    const rowIndex = parseInt(parts[0]);
+    const seatIndex = parseInt(parts[1]);
+    let rowDisplay = rowIndex + 1;
+    let seatDisplay = seatIndex + 1;
+
+    if (seatingMapConfig) {
+        const custom = seatingMapConfig.custom_numbers && seatingMapConfig.custom_numbers[seatId];
+        if (custom) {
+            seatDisplay = custom.seat;
+            if (custom.row !== undefined) rowDisplay = custom.row;
+        } else if (seatingMapConfig.numbering_direction === 'right-to-left') {
+            seatDisplay = (seatingMapConfig.seats_per_row || 20) - seatIndex;
+        }
     }
-
-    const fullSeatId = `${rowId}-${seatId}`;
-
-    // Check custom numbers first
-    if (seatingMapConfig.custom_numbers && seatingMapConfig.custom_numbers[fullSeatId]) {
-        return seatingMapConfig.custom_numbers[fullSeatId].seat;
-    }
-
-    // Calculate based on numbering direction
-    const seatIndex = parseInt(seatId);
-    const numberingDirection = seatingMapConfig.numbering_direction || 'left-to-right';
-    const seatsPerRow = seatingMapConfig.seats_per_row || 20;
-
-    if (numberingDirection === 'right-to-left') {
-        return seatsPerRow - seatIndex;
-    } else {
-        return seatIndex + 1;  // 1-indexed
-    }
+    return `Ряд ${rowDisplay}, Место ${seatDisplay}`;
 }
 
 // Display selected seats (summary section - compact badges)
@@ -423,11 +417,9 @@ function displaySelectedSeats(seats) {
     const seatingMapConfig = orderDataFromSession?.seating_map_config;
 
     seats.forEach(seatId => {
-        const [row, seat] = seatId.split('-');
         const badge = document.createElement('span');
         badge.style.cssText = 'padding: 0.375rem 0.75rem; background: var(--primary); color: white; border-radius: 1rem; font-size: 0.875rem; font-weight: 500;';
-        const displaySeatNumber = getSeatDisplayNumber(row, seat, seatingMapConfig);
-        badge.textContent = `Ряд ${parseInt(row) + 1}, Место ${displaySeatNumber}`;
+        badge.textContent = getSeatDisplayLabel(seatId, seatingMapConfig);
         list.appendChild(badge);
     });
 }
@@ -461,10 +453,8 @@ function displayCheckoutSeats(orderData) {
         html += `<div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">`;
 
         typeInfo.seats.forEach(seatId => {
-            const [row, seat] = seatId.split('-');
-            const displaySeatNumber = getSeatDisplayNumber(row, seat, seatingMapConfig);
             html += `<span style="padding: 0.25rem 0.625rem; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 0.375rem; font-size: 0.875rem;">`;
-            html += `Ряд ${parseInt(row) + 1}, Место ${displaySeatNumber}`;
+            html += getSeatDisplayLabel(seatId, seatingMapConfig);
             html += `</span>`;
         });
 

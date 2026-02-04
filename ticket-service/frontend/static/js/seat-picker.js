@@ -1019,7 +1019,9 @@ class SeatPicker {
                     }
 
                     // Update aria-label
-                    seatElement.setAttribute('aria-label', `Место ${seatId}, ${this.getSeatStatusLabel(newStatus)}`);
+                    const [ariaRow, ariaSeat] = seatId.split('-');
+                    const ariaDisplaySeat = this.getSeatDisplayNumber(ariaRow, ariaSeat);
+                    seatElement.setAttribute('aria-label', `Ряд ${parseInt(ariaRow) + 1}, Место ${ariaDisplaySeat}, ${this.getSeatStatusLabel(newStatus)}`);
                 }
             });
         } catch (error) {
@@ -1049,7 +1051,21 @@ class SeatPicker {
         this.container.innerHTML = `<div class="seat-picker-error">${message}</div>`;
     }
 
+    translateSeatIdsInMessage(message) {
+        // Replace raw seat IDs like "0-14" with display labels like "Ряд 1, Место 21"
+        return message.replace(/\b(\d+)-(\d+)\b/g, (match, row, seat) => {
+            const seatId = `${row}-${seat}`;
+            // Only translate if it looks like a valid seat in this venue
+            if (this.seatingData && this.seatingData.allocation && seatId in this.seatingData.allocation) {
+                const displaySeat = this.getSeatDisplayNumber(row, seat);
+                return `Ряд ${parseInt(row) + 1}, Место ${displaySeat}`;
+            }
+            return match;
+        });
+    }
+
     showNotification(message, type = 'info') {
+        message = this.translateSeatIdsInMessage(message);
         // Create notification element
         const notification = document.createElement('div');
         notification.className = `seat-picker-notification notification-${type}`;

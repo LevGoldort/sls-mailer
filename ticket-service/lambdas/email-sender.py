@@ -192,7 +192,7 @@ def load_cancellation_template() -> str:
             <div style="border: 2px solid #ffcdd2; border-radius: 8px; padding: 15px; margin-top: 15px;">
                 <p style="margin: 0 0 6px 0; font-size: 16px; font-weight: 600; color: #e53935;">{{ qr['ticket_type_name'] }}</p>
                 {% if qr['seat_id'] %}
-                <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #333;">💺 Ряд {{ qr['display_row'] }}, Место {{ qr['display_seat'] }}</p>
+                <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #333;">💺 {{ qr['seat_display'] }}</p>
                 {% endif %}
                 <p style="margin: 0; font-size: 12px; color: #999;">ID билета: <span style="font-family: monospace; color: #666;">{{ qr['code'] }}</span></p>
             </div>
@@ -207,36 +207,6 @@ def load_cancellation_template() -> str:
 </html>
 """
 
-
-def get_seat_display(seat_id, seating_map_config):
-    """Convert 0-indexed seat_id ('row-seat') to display numbers (row, seat).
-
-    Uses seating_map_config for custom_numbers and numbering_direction,
-    falls back to simple +1 if config is unavailable.
-    """
-    parts = seat_id.split('-')
-    if len(parts) != 2:
-        return seat_id, seat_id
-
-    row_idx = int(parts[0])
-    seat_idx = int(parts[1])
-    display_row = row_idx + 1  # Rows are always 1-indexed
-
-    if seating_map_config:
-        # Check custom numbers first
-        custom_numbers = getattr(seating_map_config, 'custom_numbers', {}) or {}
-        if seat_id in custom_numbers:
-            custom = custom_numbers[seat_id]
-            if isinstance(custom, dict) and 'seat' in custom:
-                return display_row, custom['seat']
-
-        # Apply numbering direction
-        direction = getattr(seating_map_config, 'numbering_direction', 'left-to-right')
-        seats_per_row = getattr(seating_map_config, 'seats_per_row', 0)
-        if direction == 'right-to-left' and seats_per_row:
-            return display_row, seats_per_row - seat_idx
-
-    return display_row, seat_idx + 1
 
 
 def format_event_date(event_date: str) -> str:
@@ -353,9 +323,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     qr_dict = qr.to_dict()
                     qr_dict['ticket_type_name'] = ticket_type_map.get(qr.ticket_type, qr.ticket_type)
                     if qr_dict.get('seat_id'):
-                        d_row, d_seat = get_seat_display(qr_dict['seat_id'], seating_map_config)
-                        qr_dict['display_row'] = d_row
-                        qr_dict['display_seat'] = d_seat
+                        qr_dict['seat_display'] = get_seat_display(qr_dict['seat_id'], seating_map)
                     cancelled_qr_codes.append(qr_dict)
 
             frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
@@ -432,14 +400,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Fallback to empty list
             enriched_qr_codes = []
 
-        # Pre-compute seat display map for summary line
-        seat_display_map = {}
-        for ticket in order.tickets:
-            if ticket.purchased_seats:
-                for sid in ticket.purchased_seats:
-                    d_row, d_seat = get_seat_display(sid, seating_map_config)
-                    seat_display_map[sid] = {'row': d_row, 'seat': d_seat}
-
         # Get frontend URL from environment
         frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
 
@@ -458,7 +418,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 total_tickets=total_tickets,
                 enriched_qr_codes=enriched_qr_codes,
                 frontend_url=frontend_url,
-                get_seat_display=seat_display_fn
+                get_seat_display=seat_display_fn,
+                custom_message=custom_message
             )
             print(f"Email template rendered successfully")
         except Exception as e:

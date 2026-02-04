@@ -62,6 +62,7 @@ const API = {
     createEvent: (data) => apiCall('/api/events', 'POST', data),
     updateEvent: (id, data) => apiCall(`/api/events/${id}`, 'PUT', data),
     deleteEvent: (id) => apiCall(`/api/events/${id}`, 'DELETE'),
+    getSeatingMap: (eventId) => apiCall(`/api/events/${eventId}/seating-map`),
 
     // Locations
     getLocations: () => apiCall('/api/locations'),

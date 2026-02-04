@@ -374,10 +374,10 @@
 
                 allEvents.forEach(event => {
                     const eventDate = new Date(event.date);
-                    if (eventDate >= now || event.status === 'active') {
-                        upcomingEvents.push(event);
-                    } else {
+                    if (eventDate < now) {
                         pastEvents.push(event);
+                    } else {
+                        upcomingEvents.push(event);
                     }
                 });
 

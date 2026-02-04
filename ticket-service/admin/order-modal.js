@@ -191,11 +191,29 @@
         return { text: 'Active', cls: 'active' };
     }
 
+    // Seating map config cache per event
+    let seatingMapCache = {};
+
     function formatSeat(seatId) {
         if (!seatId) return '-';
         const parts = seatId.split('-');
-        if (parts.length === 2) return `Row ${parseInt(parts[0]) + 1}, Seat ${parseInt(parts[1]) + 1}`;
-        return seatId;
+        if (parts.length !== 2) return seatId;
+        const rowIndex = parseInt(parts[0]);
+        const seatIndex = parseInt(parts[1]);
+        let rowDisplay = rowIndex + 1;
+        let seatDisplay = seatIndex + 1;
+
+        if (window._currentSeatingMap) {
+            const cfg = window._currentSeatingMap;
+            const custom = cfg.custom_numbers && cfg.custom_numbers[seatId];
+            if (custom) {
+                seatDisplay = custom.seat;
+                if (custom.row !== undefined) rowDisplay = custom.row;
+            } else if (cfg.numbering_direction === 'right-to-left') {
+                seatDisplay = cfg.seats_per_row - seatIndex;
+            }
+        }
+        return `Ряд ${rowDisplay}, Место ${seatDisplay}`;
     }
 
     // ===== Open Modal =====
@@ -207,6 +225,19 @@
         try {
             const data = await API.getOrder(orderId);
             const order = data.order;
+
+            // Load seating map config (cached per event)
+            window._currentSeatingMap = null;
+            if (!seatingMapCache[order.event_id]) {
+                try {
+                    const smData = await API.getSeatingMap(order.event_id);
+                    seatingMapCache[order.event_id] = smData.seating_map || null;
+                } catch(e) {
+                    seatingMapCache[order.event_id] = null;
+                }
+            }
+            window._currentSeatingMap = seatingMapCache[order.event_id];
+
             renderOrder(order);
         } catch (err) {
             body.innerHTML = `

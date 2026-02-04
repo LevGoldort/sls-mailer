@@ -75,17 +75,15 @@ update_lambda() {
     zip -r -q "$SCRIPT_DIR/${function_name}.zip" .
     cd "$SCRIPT_DIR"
 
-    (cd "$abs_build_dir" && zip -r -q "$zip_file" .)
-
-    if [ ! -f "$zip_file" ]; then
-        echo "❌ Package not found: $zip_file"
+    if [ ! -f "$SCRIPT_DIR/${function_name}.zip" ]; then
+        echo "❌ Package not found: ${function_name}.zip"
         return 1
     fi
 
     # Update function code
     aws lambda update-function-code \
         --function-name "$function_name" \
-        --zip-file "fileb://$zip_file" \
+        --zip-file "fileb://$SCRIPT_DIR/${function_name}.zip" \
         --region eu-north-1 \
         --profile prod \
         --no-cli-pager > /dev/null
@@ -101,7 +99,7 @@ update_lambda() {
     echo "   ✓ Update complete"
 
     # Cleanup
-    rm -f "$zip_file"
+    rm -f "$SCRIPT_DIR/${function_name}.zip"
 }
 
 # Update TicketApiFunction
@@ -274,15 +272,22 @@ if [ -d "$SCRIPT_DIR/.aws-sam/build/EventStatusUpdaterFunction" ]; then
   }
 }
 EOF
+    aws lambda wait function-updated \
+        --function-name yallabalagan-event-status-updater \
+        --region eu-north-1 \
+        --profile prod
+
     aws lambda update-function-configuration \
         --function-name yallabalagan-event-status-updater \
+        --handler "lambdas/event-status-updater.lambda_handler" \
+        --runtime python3.12 \
         --environment file:///tmp/event-updater-env.json \
         --region eu-north-1 \
         --profile prod \
         --no-cli-pager > /dev/null
     rm -f /tmp/event-updater-env.json
 
-    echo "   ✓ Environment variables updated"
+    echo "   ✓ Handler, runtime, and environment variables updated"
 fi
 
 # Sync S3 files

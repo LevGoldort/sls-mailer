@@ -8,23 +8,22 @@ import os
 import json
 import boto3
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 dynamodb = boto3.resource('dynamodb')
-TABLE_NAME = os.environ.get('DYNAMODB_TABLE', 'yallabalagan-events')
+TABLE_NAME = os.environ.get('EVENTS_TABLE', 'yallabalagan-events')
 table = dynamodb.Table(TABLE_NAME)
+
+ISRAEL_TZ = ZoneInfo('Asia/Jerusalem')
 
 
 def is_event_past(event_date_str):
     """Check if event is past (event_date + 30 minutes < now)"""
     try:
-        import pytz
-
-        # Parse as naive datetime, then localize to Israel timezone
         naive_dt = datetime.fromisoformat(event_date_str.replace('Z', ''))
-        israel_tz = pytz.timezone('Asia/Jerusalem')
-        event_dt = israel_tz.localize(naive_dt)
-        event_end_time = event_dt + timedelta(minutes=30)  # Fixed: 30 minutes
-        now = datetime.now(israel_tz)
+        event_dt = naive_dt.replace(tzinfo=ISRAEL_TZ)
+        event_end_time = event_dt + timedelta(minutes=30)
+        now = datetime.now(ISRAEL_TZ)
         return event_end_time <= now
     except Exception as e:
         print(f"Error parsing date {event_date_str}: {e}")

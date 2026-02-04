@@ -290,7 +290,8 @@
                 allEvents = eventsData.events || [];
                 allOrders = ordersData.orders || [];
 
-                const activeEvents = allEvents.filter(e => e.status === 'active');
+                const now = new Date();
+                const activeEvents = allEvents.filter(e => new Date(e.date) >= now);
                 const activeEventIds = new Set(activeEvents.map(e => e.event_id));
                 const activeOrders = allOrders.filter(o => activeEventIds.has(o.event_id));
 

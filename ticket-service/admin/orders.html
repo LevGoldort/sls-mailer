@@ -292,8 +292,8 @@
             return { label: 'completed', cls: 'status-completed' };
         }
 
-        function displayOrders(orders) {
-            const container = document.getElementById('orders-container');
+        function displayOrders(orders, containerId) {
+            const container = document.getElementById(containerId || 'orders-container');
 
             if (orders.length === 0) {
                 container.innerHTML = '<div class="empty">Нет заказов</div>';
