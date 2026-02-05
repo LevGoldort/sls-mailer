@@ -50,63 +50,61 @@
         }
         .coupons-grid {
             display: grid;
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
         }
         .coupon-card {
-            padding: 25px;
+            padding: 18px;
             background: #f9f9f9;
             border-radius: 10px;
-            border-left: 5px solid #ec4899;
-            transition: all 0.3s;
+            border-left: 4px solid #ec4899;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
         }
         .coupon-card:hover {
             background: #f0f0f0;
-            transform: translateX(5px);
-        }
-        .coupon-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 15px;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .coupon-code {
-            font-size: 24px;
+            font-size: 17px;
             font-weight: bold;
             color: #ec4899;
             font-family: monospace;
+            margin-bottom: 6px;
         }
-        .coupon-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .action-btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn-delete {
-            background: #f44336;
-            color: white;
-        }
-        .btn-delete:hover { background: #da190b; }
-        .coupon-info {
-            color: #666;
+        .coupon-discount {
             font-size: 14px;
-            line-height: 1.6;
+            color: #555;
+            font-weight: 600;
         }
-        .coupon-info div {
-            margin-bottom: 8px;
+        .coupon-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .btn-delete-sm {
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .btn-delete-sm:hover {
+            color: #f44336;
+            background: #fce4ec;
         }
         .status-badge {
             display: inline-block;
-            padding: 5px 12px;
+            padding: 3px 10px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            margin-top: 10px;
         }
         .status-active { background: #e8f5e9; color: #2e7d32; }
         .status-inactive { background: #ffebee; color: #c62828; }
@@ -373,32 +371,16 @@
             container.innerHTML = coupons.map(coupon => {
                 const statusClass = `status-${coupon.status}`;
                 const discountText = coupon.discount_type === 'percentage' ?
-                    `${coupon.discount_value}% скидка` :
-                    `${coupon.discount_value}₪ скидка`;
-
+                    `${coupon.discount_value}%` :
+                    `${coupon.discount_value}₪`;
                 return `
-                    <div class="coupon-card">
-                        <div class="coupon-header">
-                            <div>
-                                <div class="coupon-code">${coupon.coupon_code}</div>
-                            </div>
-                            <div class="coupon-actions">
-                                <button class="action-btn btn-primary" onclick='editCoupon(${JSON.stringify(coupon)})'>
-                                    ✏️ Редактировать
-                                </button>
-                                <button class="action-btn btn-delete" onclick="deleteCoupon('${coupon.coupon_code}')">
-                                    🗑️ Удалить
-                                </button>
-                            </div>
+                    <div class="coupon-card" onclick='editCoupon(${JSON.stringify(coupon).replace(/'/g, "&#39;")})'>
+                        <div class="coupon-code">${coupon.coupon_code}</div>
+                        <div class="coupon-discount">${discountText} скидка</div>
+                        <div class="coupon-card-footer">
+                            <span class="status-badge ${statusClass}">${coupon.status}</span>
+                            <button class="btn-delete-sm" onclick="event.stopPropagation(); deleteCoupon('${coupon.coupon_code}')" title="Удалить">🗑️</button>
                         </div>
-                        <div class="coupon-info">
-                            <div>💰 ${discountText}</div>
-                            <div>🎪 Применяется к ${coupon.event_ids.length} событиям</div>
-                            <div>📅 ${coupon.valid_from && coupon.valid_until ? `${formatDateShort(coupon.valid_from)} - ${formatDateShort(coupon.valid_until)}` : '🔄 Постоянный купон (без ограничения по датам)'}</div>
-                            <div>🔢 Использований: ${coupon.current_uses}${coupon.max_uses ? `/${coupon.max_uses}` : ' (безлимит)'}</div>
-                            ${coupon.description ? `<div>📝 ${coupon.description}</div>` : ''}
-                        </div>
-                        <span class="status-badge ${statusClass}">${coupon.status}</span>
                     </div>
                 `;
             }).join('');

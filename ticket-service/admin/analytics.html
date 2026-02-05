@@ -219,6 +219,47 @@
         .status-active { background: #e8f5e9; color: #2e7d32; }
         .status-sold_out { background: #fff3e0; color: #e65100; }
         .status-cancelled { background: #fce4ec; color: #c62828; }
+
+        .event-filter {
+            background: white;
+            padding: 20px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .event-filter label {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+            white-space: nowrap;
+            padding-top: 6px;
+        }
+        .event-filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .event-chip {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 2px solid #667eea;
+            background: #667eea;
+            color: white;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .event-chip.inactive {
+            background: white;
+            color: #667eea;
+        }
+        .event-chip:hover {
+            opacity: 0.85;
+        }
     </style>
 </head>
 <body>
@@ -233,6 +274,11 @@
                 <a href="analytics.html" class="nav-btn">Аналитика</a>
                 <a href="coupons.html" class="nav-btn">Купоны</a>
             </div>
+        </div>
+
+        <div class="event-filter" id="event-filter" style="display:none">
+            <label>События:</label>
+            <div class="event-filter-chips" id="event-chips"></div>
         </div>
 
         <div class="stats-grid">
@@ -255,6 +301,13 @@
                 <h3>Средний чек</h3>
                 <div class="stat-number" id="stat-avg-order">-</div>
                 <div class="stat-label" id="stat-avg-label">на заказ</div>
+            </div>
+            <div class="stat-card">
+                <h3>Заполненность</h3>
+                <div class="stat-number" id="stat-occupancy">-</div>
+                <div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin-top:8px;">
+                    <div id="stat-occupancy-bar" style="height:100%;border-radius:4px;transition:width 0.5s ease;width:0%"></div>
+                </div>
             </div>
         </div>
 
@@ -279,6 +332,50 @@
     <script>
         let allEvents = [];
         let allOrders = [];
+        let activeEvents = [];
+        let activeOrders = [];
+        let selectedEventIds = new Set();
+
+        function getActiveRatio(order) {
+            const qrs = order.qr_codes || [];
+            if (qrs.length === 0) return 1;
+            const active = qrs.filter(qr => !qr.cancelled).length;
+            return active / qrs.length;
+        }
+
+        function renderEventFilter(events) {
+            const container = document.getElementById('event-chips');
+            const filterEl = document.getElementById('event-filter');
+            if (events.length === 0) { filterEl.style.display = 'none'; return; }
+            filterEl.style.display = '';
+
+            container.innerHTML = events.map(e => {
+                const dateStr = e.date ? e.date.replace('Z','').split('T')[0] : '';
+                const isActive = selectedEventIds.has(e.event_id);
+                return `<span class="event-chip${isActive ? '' : ' inactive'}" data-event-id="${e.event_id}" onclick="toggleEventChip(this)">${e.title} (${dateStr})</span>`;
+            }).join('');
+        }
+
+        function toggleEventChip(el) {
+            const id = el.dataset.eventId;
+            if (selectedEventIds.has(id)) {
+                selectedEventIds.delete(id);
+                el.classList.add('inactive');
+            } else {
+                selectedEventIds.add(id);
+                el.classList.remove('inactive');
+            }
+            applyFilter();
+        }
+
+        function applyFilter() {
+            const filteredEvents = activeEvents.filter(e => selectedEventIds.has(e.event_id));
+            const filteredOrders = activeOrders.filter(o => selectedEventIds.has(o.event_id));
+            renderStats(filteredEvents, filteredOrders);
+            renderSalesChart(filteredOrders);
+            renderEventsBreakdown(filteredEvents, filteredOrders);
+            renderCouponUsage(filteredOrders);
+        }
 
         async function loadAnalytics() {
             try {
@@ -291,9 +388,13 @@
                 allOrders = ordersData.orders || [];
 
                 const now = new Date();
-                const activeEvents = allEvents.filter(e => new Date(e.date) >= now);
+                activeEvents = allEvents.filter(e => new Date(e.date) >= now);
                 const activeEventIds = new Set(activeEvents.map(e => e.event_id));
-                const activeOrders = allOrders.filter(o => activeEventIds.has(o.event_id));
+                activeOrders = allOrders.filter(o => activeEventIds.has(o.event_id));
+
+                // Initialize filter: all selected
+                selectedEventIds = new Set(activeEvents.map(e => e.event_id));
+                renderEventFilter(activeEvents);
 
                 renderStats(activeEvents, activeOrders);
                 renderSalesChart(activeOrders);
@@ -308,13 +409,22 @@
             const completedOrders = orders.filter(o => o.payment?.status === 'completed');
             const refundedOrders = orders.filter(o => o.payment?.status === 'refunded');
 
-            const completedRevenue = completedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+            let completedRevenue = 0;
+            completedOrders.forEach(o => {
+                const ratio = getActiveRatio(o);
+                completedRevenue += (o.total_amount || 0) * ratio;
+            });
             const refundedAmount = refundedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
             const currentEarnings = completedRevenue - refundedAmount;
 
             let ticketsSold = 0;
             completedOrders.forEach(o => {
-                (o.tickets || []).forEach(t => { ticketsSold += (t.quantity || 0); });
+                const qrs = o.qr_codes || [];
+                if (qrs.length > 0) {
+                    ticketsSold += qrs.filter(qr => !qr.cancelled).length;
+                } else {
+                    (o.tickets || []).forEach(t => { ticketsSold += (t.quantity || 0); });
+                }
             });
 
             let totalTickets = 0;
@@ -336,6 +446,13 @@
             document.getElementById('stat-tickets-sold').textContent = ticketsSold;
             document.getElementById('stat-tickets-remaining').textContent = 'осталось ' + ticketsRemaining + ' из ' + totalTickets;
             document.getElementById('stat-avg-order').textContent = formatCurrency(avgOrder);
+
+            // Occupancy
+            const occupancyPct = totalTickets > 0 ? (ticketsSold / totalTickets) * 100 : 0;
+            document.getElementById('stat-occupancy').textContent = occupancyPct.toFixed(1) + '%';
+            const occBar = document.getElementById('stat-occupancy-bar');
+            occBar.style.width = Math.min(occupancyPct, 100) + '%';
+            occBar.style.background = occupancyPct > 90 ? '#f44336' : occupancyPct > 70 ? '#ff9800' : '#4caf50';
         }
 
         function renderSalesChart(orders) {
@@ -449,12 +566,14 @@
             completedOrders.forEach(o => {
                 const code = o.coupon_code;
                 if (!code) return;
+                const ratio = getActiveRatio(o);
+                if (ratio === 0) return; // fully cancelled order
                 if (!couponMap[code]) {
                     couponMap[code] = { count: 0, revenue: 0, discount: 0 };
                 }
                 couponMap[code].count++;
-                couponMap[code].revenue += (o.total_amount || 0);
-                couponMap[code].discount += (o.discount_amount || 0);
+                couponMap[code].revenue += (o.total_amount || 0) * ratio;
+                couponMap[code].discount += (o.discount_amount || 0) * ratio;
             });
 
             const codes = Object.keys(couponMap);

@@ -267,7 +267,9 @@ class AllPayProvider(PaymentProvider):
         tickets: list,
         expire_timestamp: int,
         discount_type: str = None,
-        discount_value: float = 0
+        discount_value: float = 0,
+        event_title: str = None,
+        seat_display_map: dict = None
     ) -> str:
         """
         Create payment via AllPay API v9.
@@ -291,9 +293,18 @@ class AllPayProvider(PaymentProvider):
 
         # Build items array from tickets
         items = []
+        _seat_map = seat_display_map or {}
         for ticket in tickets:
+            # Build descriptive item name: "Event - TicketType [Ряд 1 Место 1, ...]"
+            item_name = ticket.type_name
+            if event_title:
+                item_name = f"{event_title} - {ticket.type_name}"
+            if ticket.purchased_seats and _seat_map:
+                seat_labels = [_seat_map[s] for s in ticket.purchased_seats if s in _seat_map]
+                if seat_labels:
+                    item_name += f" [{'; '.join(seat_labels)}]"
             items.append({
-                "name": ticket.type_name,
+                "name": item_name,
                 "qty": ticket.quantity,  # AllPay API requires "qty" field as integer
                 "price": f"{ticket.price_per_ticket:.2f}",
                 "vat": "Y"  # All prices include VAT in Israel
@@ -384,7 +395,9 @@ class AllPayProvider(PaymentProvider):
         tickets: list = None,
         order_created_at: str = None,
         discount_type: str = None,
-        discount_value: float = 0
+        discount_value: float = 0,
+        event_title: str = None,
+        seat_display_map: dict = None
     ) -> str:
         """
         Create payment URL for AllPay redirect
@@ -419,7 +432,9 @@ class AllPayProvider(PaymentProvider):
                 tickets=tickets,
                 expire_timestamp=expire_timestamp,
                 discount_type=discount_type,
-                discount_value=discount_value
+                discount_value=discount_value,
+                event_title=event_title,
+                seat_display_map=seat_display_map
             )
 
         # Fallback to legacy payment link

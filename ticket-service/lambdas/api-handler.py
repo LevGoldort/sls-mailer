@@ -1271,6 +1271,11 @@ def create_order(request_event: Dict) -> Dict:
         if event_end_time <= now:
             return error_response(400, "This event has already ended. Ticket sales are closed.")
 
+        # Проверяем лимит билетов в одном заказе
+        total_quantity = sum(t.get('quantity', 0) for t in body['tickets'])
+        if total_quantity > 10:
+            return error_response(400, "Maximum 10 tickets per order")
+
         # Проверяем доступность билетов
         order_tickets = []
         for ticket_req in body['tickets']:
@@ -1318,11 +1323,30 @@ def create_order(request_event: Dict) -> Dict:
                             f"Seat {seat_id} is allocated to ticket type {expected_type}, "
                             f"not {ticket.type_id}")
 
-            # Check for seat conflicts with existing orders
+            # Check for seat conflicts with existing orders AND active reservations
             existing_purchased = get_purchased_seats_set(event_id)
+            import time as _time
+            _current_time = int(_time.time())
+            _reservations = db.get_seat_reservations(event_id)
+            _active_reserved = {r['seat_id'] for r in _reservations if r.get('expires_at', 0) > _current_time}
+
+            all_requested_seats = []
+            for ticket in order_tickets:
+                all_requested_seats.extend(ticket.purchased_seats or [])
+
+            print(f"[ORDER] Seat check for event {event_id}: "
+                  f"requested={all_requested_seats}, "
+                  f"purchased={existing_purchased}, "
+                  f"reserved={_active_reserved}")
+
             for ticket in order_tickets:
                 for seat_id in ticket.purchased_seats:
                     if seat_id in existing_purchased:
+                        print(f"[ORDER] ❌ Seat {seat_id} already PURCHASED")
+                        return error_response(400,
+                            f"Seat {seat_id} is already purchased")
+                    if seat_id in _active_reserved:
+                        print(f"[ORDER] ❌ Seat {seat_id} already RESERVED (active TTL)")
                         return error_response(400,
                             f"Seat {seat_id} is already reserved")
 
@@ -1465,6 +1489,39 @@ def create_order(request_event: Dict) -> Dict:
         else:
             print(f"[ERROR] ✗ Order {order.order_id} NOT FOUND after save!")
 
+        # Build human-readable seat labels for payment description
+        seat_display_map = {}
+        if evt.seat_allocation:
+            seating_map = None
+            try:
+                loc_data = db.get_location(evt.location_id)
+                if loc_data:
+                    from models import Location
+                    loc = Location.from_dynamodb_item(loc_data)
+                    if loc.venue_config and loc.venue_config.seating_map:
+                        seating_map = loc.venue_config.seating_map
+            except Exception as e:
+                print(f"[ORDER] Warning: Failed to load location {evt.location_id} for seat labels: {e}")
+
+            if seating_map:
+                for ticket in order_tickets:
+                    for sid in (ticket.purchased_seats or []):
+                        parts = sid.split('-')
+                        if len(parts) == 2:
+                            row_idx, seat_idx = int(parts[0]), int(parts[1])
+                            row_d = row_idx + 1
+                            seat_d = seat_idx + 1
+                            custom = (seating_map.custom_numbers or {}).get(sid)
+                            if custom:
+                                seat_d = int(custom.get('seat', seat_d))
+                                if custom.get('row') is not None:
+                                    row_d = int(custom['row'])
+                            elif getattr(seating_map, 'numbering_direction', None) == 'right-to-left':
+                                seat_d = int(getattr(seating_map, 'seats_per_row', 20)) - seat_idx
+                            seat_display_map[sid] = f"Ряд {row_d}, Место {seat_d}"
+            else:
+                print(f"[ORDER] No seating_map for location {evt.location_id}, skipping seat labels in payment")
+
         # Generate payment URL via payment provider
         payment_provider = get_payment_provider()
         try:
@@ -1478,7 +1535,9 @@ def create_order(request_event: Dict) -> Dict:
                 tickets=order_tickets,  # NEW: for API mode items array
                 order_created_at=order.created_at,  # NEW: for expire calculation
                 discount_type=coupon.discount_type if coupon and discount_amount > 0 else None,
-                discount_value=coupon.discount_value if coupon and discount_amount > 0 else 0
+                discount_value=coupon.discount_value if coupon and discount_amount > 0 else 0,
+                event_title=evt.title,
+                seat_display_map=seat_display_map
             )
         except Exception as e:
             print(f"Failed to create payment URL: {str(e)}")
@@ -1520,6 +1579,9 @@ def reserve_seats(request_event: Dict) -> Dict:
 
         if not isinstance(seat_ids, list) or len(seat_ids) == 0:
             return error_response(400, "seat_ids must be a non-empty array")
+
+        if len(seat_ids) > 10:
+            return error_response(400, "Maximum 10 tickets per order")
 
         # Get event
         event_item = db.get_event(event_id)
@@ -2557,10 +2619,21 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                         # Объединяем проданные и зарезервированные места
                         unavailable_seats = existing_purchased | reserved_seats
 
+                        print(f"[WEBHOOK] Seat check for order {order_id}: "
+                              f"order_seats={order_seats}, "
+                              f"purchased_by_others={existing_purchased}, "
+                              f"active_reservations={reserved_seats}, "
+                              f"total_unavailable={unavailable_seats}")
+
                         # Проверяем конфликты
                         conflicts = order_seats & unavailable_seats
+                        purchased_conflicts = order_seats & existing_purchased
+                        reservation_conflicts = order_seats & reserved_seats
                         if conflicts:
-                            print(f"❌ SEAT CONFLICT DETECTED: Order {order_id} seats {conflicts} already sold!")
+                            print(f"❌ SEAT CONFLICT DETECTED: Order {order_id} "
+                                  f"conflicts={conflicts}, "
+                                  f"purchased_conflicts={purchased_conflicts}, "
+                                  f"reservation_conflicts={reservation_conflicts}")
 
                             # Обновляем статус заказа на failed
                             db.update_order_payment_status(

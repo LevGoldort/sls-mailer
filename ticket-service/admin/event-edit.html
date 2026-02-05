@@ -1165,6 +1165,13 @@
                         <div class="stat-number" id="stat-avg-order">-</div>
                         <div class="stat-label" id="stat-avg-label">на заказ</div>
                     </div>
+                    <div class="stat-card">
+                        <h3>Заполненность</h3>
+                        <div class="stat-number" id="stat-occupancy">-</div>
+                        <div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin-top:8px;">
+                            <div id="stat-occupancy-bar" style="height:100%;border-radius:4px;transition:width 0.5s ease;width:0%"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="chart-section">
@@ -2110,19 +2117,35 @@
 
         // ===== DASHBOARD =====
 
+        function getActiveRatio(order) {
+            const qrs = order.qr_codes || [];
+            if (qrs.length === 0) return 1;
+            const active = qrs.filter(qr => !qr.cancelled).length;
+            return active / qrs.length;
+        }
+
         function computeDashboardMetrics(eventData, ordersArr) {
             const completedOrders = ordersArr.filter(o => o.payment?.status === 'completed');
             const refundedOrders = ordersArr.filter(o => o.payment?.status === 'refunded');
 
-            // Current earnings: sum of completed order amounts minus refunded amounts
-            const completedRevenue = completedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+            // Current earnings: prorate by active QR codes (cancelled tickets reduce revenue)
+            let completedRevenue = 0;
+            completedOrders.forEach(o => {
+                const ratio = getActiveRatio(o);
+                completedRevenue += (o.total_amount || 0) * ratio;
+            });
             const refundedAmount = refundedOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
             const currentEarnings = completedRevenue - refundedAmount;
 
-            // Tickets sold
+            // Tickets sold (only active QR codes)
             let ticketsSold = 0;
             completedOrders.forEach(o => {
-                (o.tickets || []).forEach(t => { ticketsSold += (t.quantity || 0); });
+                const qrs = o.qr_codes || [];
+                if (qrs.length > 0) {
+                    ticketsSold += qrs.filter(qr => !qr.cancelled).length;
+                } else {
+                    (o.tickets || []).forEach(t => { ticketsSold += (t.quantity || 0); });
+                }
             });
 
             // Total tickets and potential
@@ -2183,12 +2206,21 @@
                 revenue: 0
             }));
 
-            // Calculate revenue per type from actual orders
+            // Calculate revenue per type from actual orders, accounting for coupon discounts
             completedOrders.forEach(o => {
+                const ratio = getActiveRatio(o);
+                if (ratio === 0) return; // fully cancelled
+
+                // Compute order subtotal (full price before discount)
+                const subtotal = (o.tickets || []).reduce((s, t) =>
+                    s + (t.quantity || 0) * (t.price_per_ticket || 0), 0);
+                const discountRatio = subtotal > 0 ? (o.discount_amount || 0) / subtotal : 0;
+
                 (o.tickets || []).forEach(t => {
                     const entry = types.find(x => x.id === t.type_id);
                     if (entry) {
-                        entry.revenue += (t.quantity || 0) * (t.price_per_ticket || entry.price || 0);
+                        const fullPrice = (t.quantity || 0) * (t.price_per_ticket || entry.price || 0);
+                        entry.revenue += fullPrice * (1 - discountRatio) * ratio;
                     }
                 });
             });
@@ -2208,6 +2240,13 @@
             document.getElementById('stat-tickets-sold').textContent = metrics.ticketsSold;
             document.getElementById('stat-tickets-remaining').textContent = 'осталось ' + metrics.ticketsRemaining + ' из ' + metrics.totalTickets;
             document.getElementById('stat-avg-order').textContent = formatCurrency(metrics.avgOrder);
+
+            // Occupancy
+            const occupancyPct = metrics.totalTickets > 0 ? (metrics.ticketsSold / metrics.totalTickets) * 100 : 0;
+            document.getElementById('stat-occupancy').textContent = occupancyPct.toFixed(1) + '%';
+            const occBar = document.getElementById('stat-occupancy-bar');
+            occBar.style.width = Math.min(occupancyPct, 100) + '%';
+            occBar.style.background = occupancyPct > 90 ? '#f44336' : occupancyPct > 70 ? '#ff9800' : '#4caf50';
 
             // Sales chart
             const salesData = computeSalesByDay(metrics.completedOrders, 14);
@@ -2275,12 +2314,14 @@
             completedOrders.forEach(o => {
                 const code = o.coupon_code;
                 if (!code) return;
+                const ratio = getActiveRatio(o);
+                if (ratio === 0) return; // fully cancelled order
                 if (!couponMap[code]) {
                     couponMap[code] = { count: 0, revenue: 0, discount: 0 };
                 }
                 couponMap[code].count++;
-                couponMap[code].revenue += (o.total_amount || 0);
-                couponMap[code].discount += (o.discount_amount || 0);
+                couponMap[code].revenue += (o.total_amount || 0) * ratio;
+                couponMap[code].discount += (o.discount_amount || 0) * ratio;
             });
 
             const codes = Object.keys(couponMap);

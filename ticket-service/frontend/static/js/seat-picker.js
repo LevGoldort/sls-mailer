@@ -704,7 +704,11 @@ class SeatPicker {
             // Hide seat number when deselected
             if (text) text.style.display = 'none';
         } else {
-            // Select
+            // Select — enforce max 10 seats per order
+            if (this.selectedSeats.length >= 10) {
+                this.showNotification('Максимум 10 билетов в одном заказе', 'warning');
+                return;
+            }
             this.selectedSeats.push(seatId);
             seatElement.classList.remove('seat-available');
             seatElement.classList.add('seat-selected');
