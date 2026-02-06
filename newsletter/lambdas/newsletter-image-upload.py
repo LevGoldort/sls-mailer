@@ -5,6 +5,7 @@ Generates pre-signed URLs for uploading images to S3
 Environment Variables:
 - IMAGES_BUCKET: S3 bucket for storing images
 - REGION: AWS region
+- ADMIN_API_KEY: (Optional) API key for admin authentication
 
 Endpoints:
 - POST /images/upload-url - Generate pre-signed upload URL
@@ -97,6 +98,20 @@ def generate_upload_url(event):
         return cors_response(500, {'error': str(e)})
 
 
+def validate_api_key(event):
+    """Validate API key from request headers"""
+    admin_key = os.environ.get('ADMIN_API_KEY', '')
+    if not admin_key:
+        # No API key configured, skip validation
+        return True
+
+    headers = event.get('headers', {})
+    # Headers are lowercase in HTTP API
+    provided_key = headers.get('x-api-key', '') or headers.get('X-API-Key', '')
+
+    return provided_key == admin_key
+
+
 def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Event: {json.dumps(event)}")
@@ -104,6 +119,10 @@ def lambda_handler(event, context):
     # Handle OPTIONS for CORS
     if event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS':
         return cors_response(200, {})
+
+    # Validate API key
+    if not validate_api_key(event):
+        return cors_response(401, {'error': 'Unauthorized: Invalid or missing API key'})
 
     # Route based on path and method
     raw_path = event.get('rawPath', '')

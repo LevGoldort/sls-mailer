@@ -1110,6 +1110,274 @@
             display: flex;
             gap: 10px;
         }
+
+        /* Newsletter Import Modal */
+        .newsletter-import-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 6000;
+            display: none;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        .newsletter-import-modal.show {
+            display: flex;
+        }
+
+        .newsletter-import-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+        }
+
+        .newsletter-import-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .newsletter-import-header h2 {
+            color: #667eea;
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .newsletter-import-body {
+            padding: 20px 25px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .newsletter-import-info {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .newsletter-import-info .email-count {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .newsletter-import-info .email-label {
+            color: #555;
+            font-size: 14px;
+        }
+
+        .newsletter-tags-section {
+            margin-bottom: 20px;
+        }
+
+        .newsletter-tags-section label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .newsletter-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+            min-height: 36px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+
+        .newsletter-tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .newsletter-tag-chip .remove-tag {
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .newsletter-tag-chip .remove-tag:hover {
+            opacity: 1;
+        }
+
+        .newsletter-tag-dropdown-wrapper {
+            position: relative;
+        }
+
+        .newsletter-tag-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .newsletter-tag-input-row input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .newsletter-tag-input-row input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .newsletter-tag-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            margin-top: 4px;
+        }
+
+        .newsletter-tag-dropdown.show {
+            display: block;
+        }
+
+        .newsletter-tag-dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .newsletter-tag-dropdown-item:hover {
+            background: #f5f5f5;
+        }
+
+        .newsletter-tag-dropdown-item.selected {
+            background: #f0f5ff;
+            color: #667eea;
+        }
+
+        .newsletter-tag-dropdown-empty {
+            padding: 10px 12px;
+            color: #999;
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        .newsletter-new-tag-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .newsletter-import-footer {
+            padding: 15px 25px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .newsletter-import-results {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .newsletter-import-results.show {
+            display: block;
+        }
+
+        .newsletter-results-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .newsletter-result-card {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .newsletter-result-card .result-number {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .newsletter-result-card .result-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .newsletter-result-card.new .result-number {
+            color: #4caf50;
+        }
+
+        .newsletter-result-card.updated .result-number {
+            color: #667eea;
+        }
+
+        .newsletter-result-card.unsubscribed .result-number {
+            color: #ff9800;
+        }
+
+        .newsletter-result-card.invalid .result-number {
+            color: #f44336;
+        }
+
+        .btn-newsletter-import {
+            background: #667eea;
+            color: white;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-newsletter-import:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .btn-newsletter-import:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -1133,6 +1401,7 @@
                     </div>
                 </div>
                 <div class="management-header-actions">
+                    <button class="btn" onclick="openNewsletterImportModal()">Импортировать почты</button>
                     <button class="btn" onclick="openBulkResendModal()">Перевыпустить билеты</button>
                     <button class="btn btn-secondary" onclick="openEditDetailsModal()">Редактировать</button>
                 </div>
@@ -1238,6 +1507,63 @@
                     <span class="bulk-progress" id="bulk-progress"></span>
                     <button class="btn" onclick="closeBulkResendModal()">Отмена</button>
                     <button class="btn-bulk-send" id="bulk-send-btn" onclick="executeBulkResend()" disabled>Отправить</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Newsletter Import Modal -->
+        <div id="newsletter-import-modal" class="newsletter-import-modal">
+            <div class="newsletter-import-content">
+                <div class="newsletter-import-header">
+                    <h2>Импорт в рассылку</h2>
+                    <button class="edit-modal-close-btn" onclick="closeNewsletterImportModal()">&times;</button>
+                </div>
+                <div class="newsletter-import-body">
+                    <div class="newsletter-import-info">
+                        <div class="email-count" id="newsletter-email-count">0</div>
+                        <div class="email-label">уникальных email из оплаченных заказов</div>
+                    </div>
+
+                    <div class="newsletter-tags-section">
+                        <label>Теги для контактов</label>
+                        <div class="newsletter-tags-container" id="newsletter-selected-tags"></div>
+                        <div class="newsletter-tag-dropdown-wrapper">
+                            <div class="newsletter-tag-input-row">
+                                <input type="text" id="newsletter-tag-input" placeholder="Введите тег или выберите из списка"
+                                    onfocus="toggleNewsletterTagDropdown(true)"
+                                    oninput="filterNewsletterTags()">
+                                <button class="btn" style="padding:8px 16px" onclick="addNewsletterNewTag()">Добавить</button>
+                            </div>
+                            <div class="newsletter-tag-dropdown" id="newsletter-tag-dropdown"></div>
+                            <div class="newsletter-new-tag-hint">Новые теги: только латиница, цифры и дефисы (a-z, 0-9, -)</div>
+                        </div>
+                    </div>
+
+                    <div class="newsletter-import-results" id="newsletter-import-results">
+                        <h3 style="margin-bottom:15px;color:#333">Результаты импорта</h3>
+                        <div class="newsletter-results-grid">
+                            <div class="newsletter-result-card new">
+                                <div class="result-number" id="newsletter-result-new">0</div>
+                                <div class="result-label">Новых контактов</div>
+                            </div>
+                            <div class="newsletter-result-card updated">
+                                <div class="result-number" id="newsletter-result-updated">0</div>
+                                <div class="result-label">Обновлено тегов</div>
+                            </div>
+                            <div class="newsletter-result-card unsubscribed">
+                                <div class="result-number" id="newsletter-result-unsubscribed">0</div>
+                                <div class="result-label">Отписаны</div>
+                            </div>
+                            <div class="newsletter-result-card invalid">
+                                <div class="result-number" id="newsletter-result-invalid">0</div>
+                                <div class="result-label">Невалидных</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="newsletter-import-footer">
+                    <button class="btn" onclick="closeNewsletterImportModal()">Закрыть</button>
+                    <button class="btn-newsletter-import" id="newsletter-import-btn" onclick="executeNewsletterImport()" disabled>Импортировать</button>
                 </div>
             </div>
         </div>
@@ -2021,8 +2347,8 @@
                             return `
                                 <tr onclick="openOrderModal('${order.order_id}')" style="cursor: pointer;">
                                     <td><strong>${order.order_id}</strong></td>
-                                    <td>${customer.name || '-'}</td>
-                                    <td>${customer.email || '-'}</td>
+                                    <td>${escapeHtml(customer.name || '-')}</td>
+                                    <td>${escapeHtml(customer.email || '-')}</td>
                                     <td>${ticketCount} шт</td>
                                     <td><strong>${formatCurrency(order.total_amount)}</strong></td>
                                     <td><span class="status-badge ${status.cls}">${status.label}</span></td>
@@ -2349,7 +2675,7 @@
                             const net = c.revenue - c.discount;
                             return `
                                 <tr>
-                                    <td><strong>${code}</strong></td>
+                                    <td><strong>${escapeHtml(code)}</strong></td>
                                     <td>${c.count}</td>
                                     <td>${formatCurrency(c.revenue)}</td>
                                     <td style="color: #f44336;">-${formatCurrency(c.discount)}</td>
@@ -2384,8 +2710,8 @@
                         <label>
                             <input type="checkbox" class="bulk-order-cb" data-order-id="${o.order_id}" checked>
                             <div class="order-info">
-                                <strong>${customer.name || '-'}</strong>
-                                <small>${customer.email || '-'}</small>
+                                <strong>${escapeHtml(customer.name || '-')}</strong>
+                                <small>${escapeHtml(customer.email || '-')}</small>
                             </div>
                             <span class="order-tickets">${ticketCount} шт</span>
                         </label>
@@ -2462,6 +2788,229 @@
                 closeBulkResendModal();
             }, 1500);
         }
+
+        // ===== NEWSLETTER IMPORT =====
+        const NEWSLETTER_API_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
+        let newsletterAllTags = [];
+        let newsletterSelectedTags = [];
+        let newsletterEmails = [];
+
+        function openNewsletterImportModal() {
+            const modal = document.getElementById('newsletter-import-modal');
+
+            // Collect unique emails from completed orders
+            const completedOrders = allEventOrders.filter(o => o.payment?.status === 'completed');
+            const emailSet = new Set();
+            completedOrders.forEach(o => {
+                const email = o.customer?.email;
+                if (email && email.trim()) {
+                    emailSet.add(email.trim().toLowerCase());
+                }
+            });
+            newsletterEmails = Array.from(emailSet);
+
+            if (newsletterEmails.length === 0) {
+                showToast('Нет email-адресов из оплаченных заказов', 'error');
+                return;
+            }
+
+            document.getElementById('newsletter-email-count').textContent = newsletterEmails.length;
+
+            // Reset state
+            newsletterSelectedTags = [];
+            renderNewsletterTags();
+            document.getElementById('newsletter-tag-input').value = '';
+            document.getElementById('newsletter-import-results').classList.remove('show');
+            document.getElementById('newsletter-import-btn').disabled = true;
+            document.getElementById('newsletter-import-btn').textContent = 'Импортировать';
+
+            // Load existing tags
+            loadNewsletterTags();
+
+            modal.classList.add('show');
+        }
+
+        function closeNewsletterImportModal() {
+            document.getElementById('newsletter-import-modal').classList.remove('show');
+            document.getElementById('newsletter-tag-dropdown').classList.remove('show');
+        }
+
+        async function loadNewsletterTags() {
+            try {
+                const adminKey = localStorage.getItem('admin_api_key');
+                const response = await fetch(`${NEWSLETTER_API_URL}/contacts/preview`, {
+                    headers: adminKey ? { 'X-API-Key': adminKey } : {}
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    newsletterAllTags = data.all_tags || [];
+                    renderNewsletterTagDropdown();
+                }
+            } catch (error) {
+                console.error('Failed to load newsletter tags:', error);
+                newsletterAllTags = [];
+            }
+        }
+
+        function renderNewsletterTagDropdown(filter = '') {
+            const dropdown = document.getElementById('newsletter-tag-dropdown');
+            const filterLower = filter.toLowerCase();
+
+            // Filter out already selected tags and apply search filter
+            const availableTags = newsletterAllTags.filter(tag =>
+                !newsletterSelectedTags.includes(tag) &&
+                (filterLower === '' || tag.toLowerCase().includes(filterLower))
+            );
+
+            if (availableTags.length === 0) {
+                dropdown.innerHTML = '<div class="newsletter-tag-dropdown-empty">Нет доступных тегов</div>';
+            } else {
+                dropdown.innerHTML = availableTags.map(tag =>
+                    `<div class="newsletter-tag-dropdown-item" onclick="addNewsletterTag('${escapeHtml(tag)}')">${escapeHtml(tag)}</div>`
+                ).join('');
+            }
+        }
+
+        function toggleNewsletterTagDropdown(show) {
+            const dropdown = document.getElementById('newsletter-tag-dropdown');
+            if (show) {
+                renderNewsletterTagDropdown(document.getElementById('newsletter-tag-input').value);
+                dropdown.classList.add('show');
+            } else {
+                // Delay hiding to allow click events on dropdown items
+                setTimeout(() => {
+                    dropdown.classList.remove('show');
+                }, 200);
+            }
+        }
+
+        function filterNewsletterTags() {
+            const filter = document.getElementById('newsletter-tag-input').value;
+            renderNewsletterTagDropdown(filter);
+        }
+
+        function addNewsletterTag(tag) {
+            if (!tag || newsletterSelectedTags.includes(tag)) return;
+
+            newsletterSelectedTags.push(tag);
+            renderNewsletterTags();
+            document.getElementById('newsletter-tag-input').value = '';
+            renderNewsletterTagDropdown();
+            updateNewsletterImportButton();
+        }
+
+        function removeNewsletterTag(tag) {
+            newsletterSelectedTags = newsletterSelectedTags.filter(t => t !== tag);
+            renderNewsletterTags();
+            renderNewsletterTagDropdown(document.getElementById('newsletter-tag-input').value);
+            updateNewsletterImportButton();
+        }
+
+        function renderNewsletterTags() {
+            const container = document.getElementById('newsletter-selected-tags');
+            if (newsletterSelectedTags.length === 0) {
+                container.innerHTML = '<span style="color:#999;font-size:13px">Выберите или создайте теги</span>';
+            } else {
+                container.innerHTML = newsletterSelectedTags.map(tag =>
+                    `<span class="newsletter-tag-chip">
+                        ${escapeHtml(tag)}
+                        <span class="remove-tag" onclick="removeNewsletterTag('${escapeHtml(tag)}')">&times;</span>
+                    </span>`
+                ).join('');
+            }
+        }
+
+        function addNewsletterNewTag() {
+            const input = document.getElementById('newsletter-tag-input');
+            const tag = input.value.trim().toLowerCase();
+
+            // Validate tag format: only lowercase letters, numbers, and hyphens
+            if (!tag) return;
+
+            if (!/^[a-z0-9-]+$/.test(tag)) {
+                showToast('Тег может содержать только латиницу, цифры и дефисы', 'error');
+                return;
+            }
+
+            if (newsletterSelectedTags.includes(tag)) {
+                showToast('Этот тег уже добавлен', 'error');
+                return;
+            }
+
+            newsletterSelectedTags.push(tag);
+
+            // Add to allTags if it's new
+            if (!newsletterAllTags.includes(tag)) {
+                newsletterAllTags.push(tag);
+            }
+
+            renderNewsletterTags();
+            input.value = '';
+            renderNewsletterTagDropdown();
+            updateNewsletterImportButton();
+        }
+
+        function updateNewsletterImportButton() {
+            const btn = document.getElementById('newsletter-import-btn');
+            btn.disabled = newsletterSelectedTags.length === 0 || newsletterEmails.length === 0;
+        }
+
+        async function executeNewsletterImport() {
+            const btn = document.getElementById('newsletter-import-btn');
+            btn.disabled = true;
+            btn.textContent = 'Импорт...';
+
+            try {
+                const adminKey = localStorage.getItem('admin_api_key');
+                const headers = { 'Content-Type': 'application/json' };
+                if (adminKey) {
+                    headers['X-API-Key'] = adminKey;
+                }
+
+                const response = await fetch(`${NEWSLETTER_API_URL}/contacts/import`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        emails: newsletterEmails,
+                        tags: newsletterSelectedTags
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Import failed');
+                }
+
+                const result = await response.json();
+                displayNewsletterResults(result);
+                showToast('Импорт завершён', 'success');
+            } catch (error) {
+                console.error('Newsletter import error:', error);
+                showToast('Ошибка импорта: ' + error.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Импортировать';
+            }
+        }
+
+        function displayNewsletterResults(result) {
+            const summary = result.summary || {};
+
+            document.getElementById('newsletter-result-new').textContent = summary.new_contacts_added || 0;
+            document.getElementById('newsletter-result-updated').textContent = summary.existing_active_updated || 0;
+            document.getElementById('newsletter-result-unsubscribed').textContent = summary.unsubscribed_contacts || 0;
+            document.getElementById('newsletter-result-invalid').textContent = summary.invalid_emails || 0;
+
+            document.getElementById('newsletter-import-results').classList.add('show');
+            document.getElementById('newsletter-import-btn').textContent = 'Готово';
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('newsletter-tag-dropdown');
+            const wrapper = document.querySelector('.newsletter-tag-dropdown-wrapper');
+            if (dropdown && wrapper && !wrapper.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
 
         // ===== SEAT ALLOCATION FUNCTIONS =====
 

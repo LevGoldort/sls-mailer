@@ -30,6 +30,13 @@ Parameters:
     Default: ""
     Description: Simple password for admin panel (optional)
 
+  # Admin API Key for API authentication
+  AdminApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: API key for admin API authentication (shared with ticket-service)
+
 Globals:
   Function:
     Runtime: python3.11
@@ -221,6 +228,7 @@ Resources:
           SES_FROM_EMAIL: !Ref SenderEmail
           TRACKING_BASE_URL: !Sub https://${NewsletterApi}.execute-api.${AWS::Region}.amazonaws.com
           SENDER_LAMBDA: !Ref NewsletterSenderFunction
+          ADMIN_API_KEY: !Ref AdminApiKey
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ContactsTable
@@ -335,6 +343,7 @@ Resources:
       Environment:
         Variables:
           IMAGES_BUCKET: !Ref ImagesBucket
+          ADMIN_API_KEY: !Ref AdminApiKey
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref ImagesBucket

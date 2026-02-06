@@ -284,8 +284,8 @@
         <div class="images-grid" id="images-grid"></div>
     </div>
 
+    <script src="shared.js"></script>
     <script>
-        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
 
         let totalUploads = 0;
         let successfulUploads = 0;
@@ -361,20 +361,10 @@
 
             try {
                 // Get pre-signed URL
-                const response = await fetch(`${API_BASE_URL}/images/upload-url`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        filename: file.name,
-                        contentType: file.type
-                    })
+                const data = await apiCall('/images/upload-url', 'POST', {
+                    filename: file.name,
+                    contentType: file.type
                 });
-
-                if (!response.ok) {
-                    throw new Error(`Failed to get upload URL: ${response.status}`);
-                }
-
-                const data = await response.json();
 
                 // Upload to S3
                 const uploadResponse = await fetch(data.uploadUrl, {

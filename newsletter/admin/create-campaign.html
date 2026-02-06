@@ -560,10 +560,8 @@
         </div>
     </div>
 
+    <script src="shared.js"></script>
     <script>
-        // API Configuration
-        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
-
         let createdCampaignId = null;
         let allTags = [];
         let selectedIncludeTags = [];
@@ -573,10 +571,7 @@
         // Load available tags
         async function loadTags() {
             try {
-                const response = await fetch(`${API_BASE_URL}/contacts/preview`);
-                if (!response.ok) throw new Error('Failed to load tags');
-
-                const data = await response.json();
+                const data = await apiCall('/contacts/preview');
                 allTags = data.all_tags || [];
                 renderTagDropdowns();
                 previewRecipients(); // Initial preview
@@ -719,10 +714,7 @@
             const queryString = params.toString() ? `?${params.toString()}` : '';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/contacts/preview${queryString}`);
-                if (!response.ok) throw new Error('Failed to preview');
-
-                const data = await response.json();
+                const data = await apiCall(`/contacts/preview${queryString}`);
 
                 document.getElementById('recipient-count').textContent =
                     `${data.count} recipients`;
@@ -769,31 +761,15 @@
             createBtn.textContent = 'Creating...';
 
             try {
-                console.log('Sending request to:', `${API_BASE_URL}/campaigns`);
-
                 // Create campaign
-                const response = await fetch(`${API_BASE_URL}/campaigns`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        subject,
-                        preview_text,
-                        html_body,
-                        tags_filter: selectedIncludeTags,
-                        tags_match_mode: matchMode,
-                        exclude_tags: selectedExcludeTags
-                    })
+                const data = await apiCall('/campaigns', 'POST', {
+                    subject,
+                    preview_text,
+                    html_body,
+                    tags_filter: selectedIncludeTags,
+                    tags_match_mode: matchMode,
+                    exclude_tags: selectedExcludeTags
                 });
-
-                console.log('Response status:', response.status);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('API Error Response:', errorText);
-                    throw new Error(`API Error ${response.status}: ${errorText}`);
-                }
-
-                const data = await response.json();
                 console.log('Campaign created:', data);
                 createdCampaignId = data.campaign_id;
 
@@ -819,12 +795,7 @@
         // Send campaign
         async function sendCampaign(campaignId) {
             try {
-                const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/send`, {
-                    method: 'POST'
-                });
-
-                if (!response.ok) throw new Error('Failed to send campaign');
-
+                await apiCall(`/campaigns/${campaignId}/send`, 'POST');
                 showAlert('Campaign is being sent!', 'success');
 
                 setTimeout(() => {

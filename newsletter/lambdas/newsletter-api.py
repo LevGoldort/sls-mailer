@@ -8,6 +8,7 @@ Environment Variables:
 - EVENTS_TABLE: DynamoDB table for events
 - NEWSLETTER_SENDER_LAMBDA: Name of sender Lambda function
 - SECRET_KEY: Secret key for HMAC token generation
+- ADMIN_API_KEY: (Optional) API key for admin endpoints authentication
 
 Endpoints:
 - POST /campaigns - Create campaign
@@ -508,6 +509,31 @@ def import_contacts(event):
         return cors_response(500, {'error': str(e)})
 
 
+def validate_api_key(event):
+    """Validate API key from request headers"""
+    admin_key = os.environ.get('ADMIN_API_KEY', '')
+    if not admin_key:
+        # No API key configured, skip validation
+        return True
+
+    headers = event.get('headers', {})
+    # Headers are lowercase in HTTP API
+    provided_key = headers.get('x-api-key', '') or headers.get('X-API-Key', '')
+
+    return provided_key == admin_key
+
+
+# Public endpoints that don't require API key
+PUBLIC_ENDPOINTS = [
+    ('POST', '/unsubscribe'),
+]
+
+
+def is_public_endpoint(method, path):
+    """Check if endpoint is public (no auth required)"""
+    return (method, path) in PUBLIC_ENDPOINTS
+
+
 def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Event: {json.dumps(event)}")
@@ -523,6 +549,10 @@ def lambda_handler(event, context):
     method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
 
     print(f"Method: {method}, Raw Path: {raw_path}, Normalized Path: {path}")
+
+    # Validate API key for protected endpoints
+    if not is_public_endpoint(method, path) and not validate_api_key(event):
+        return cors_response(401, {'error': 'Unauthorized: Invalid or missing API key'})
 
     try:
         if method == 'POST' and path == '/campaigns':

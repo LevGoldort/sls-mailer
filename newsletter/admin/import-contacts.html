@@ -443,19 +443,15 @@
         </div>
     </div>
 
+    <script src="shared.js"></script>
     <script>
-        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
-
         let allTags = [];
         let selectedTags = [];
 
         // Load tags on page load
         async function loadTags() {
             try {
-                const response = await fetch(`${API_BASE_URL}/contacts/preview`);
-                if (!response.ok) throw new Error('Failed to load tags');
-
-                const data = await response.json();
+                const data = await apiCall('/contacts/preview');
                 allTags = data.all_tags || [];
                 renderTagDropdown();
             } catch (error) {
@@ -625,21 +621,10 @@
             importBtn.textContent = 'Importing...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/contacts/import`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        emails: emailsArray,
-                        tags: selectedTags
-                    })
+                const result = await apiCall('/contacts/import', 'POST', {
+                    emails: emailsArray,
+                    tags: selectedTags
                 });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API Error ${response.status}: ${errorText}`);
-                }
-
-                const result = await response.json();
                 displayResults(result);
 
             } catch (error) {

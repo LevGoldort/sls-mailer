@@ -370,10 +370,8 @@
         </div>
     </div>
 
+    <script src="shared.js"></script>
     <script>
-        // API Configuration
-        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
-
         // Get campaign ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const campaignId = urlParams.get('id');
@@ -385,10 +383,7 @@
         // Load campaign details
         async function loadCampaign() {
             try {
-                const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`);
-                if (!response.ok) throw new Error('Failed to load campaign');
-
-                const campaign = await response.json();
+                const campaign = await apiCall(`/campaigns/${campaignId}`);
                 displayCampaign(campaign);
             } catch (error) {
                 console.error('Error loading campaign:', error);
@@ -556,12 +551,7 @@
             sendBtn.textContent = 'Sending...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/send`, {
-                    method: 'POST'
-                });
-
-                if (!response.ok) throw new Error('Failed to send campaign');
-
+                await apiCall(`/campaigns/${campaignId}/send`, 'POST');
                 showAlert('Campaign is being sent!', 'success');
                 sendBtn.style.display = 'none';
 
@@ -583,15 +573,7 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to delete campaign');
-                }
-
+                await apiCall(`/campaigns/${campaignId}`, 'DELETE');
                 showAlert('Campaign deleted successfully!', 'success');
 
                 // Redirect to home after 1.5 seconds

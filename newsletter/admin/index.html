@@ -215,17 +215,12 @@
         </div>
     </div>
 
+    <script src="shared.js"></script>
     <script>
-        // API Configuration
-        const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
-
         // Fetch campaigns
         async function loadCampaigns() {
             try {
-                const response = await fetch(`${API_BASE_URL}/campaigns`);
-                if (!response.ok) throw new Error('Failed to load campaigns');
-
-                const campaigns = await response.json();
+                const campaigns = await apiCall('/campaigns');
                 displayCampaigns(campaigns);
                 updateCampaignStats(campaigns);
             } catch (error) {
@@ -287,10 +282,7 @@
         // Fetch contact statistics
         async function loadContactStats() {
             try {
-                const response = await fetch(`${API_BASE_URL}/contacts/preview`);
-                if (!response.ok) throw new Error('Failed to load contact stats');
-
-                const data = await response.json();
+                const data = await apiCall('/contacts/preview');
                 document.getElementById('active-contacts').textContent = data.count || 0;
                 document.getElementById('total-contacts').textContent = data.total_contacts || 0;
                 document.getElementById('unsubscribed-contacts').textContent = data.unsubscribed_contacts || 0;
@@ -304,13 +296,6 @@
             const container = document.getElementById('error-container');
             container.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
-        }
-
-        // Escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
 
         // Load data on page load
