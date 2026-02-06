@@ -31,6 +31,7 @@ class SeatPicker {
         this.numberingDirection = seatingMapConfig.numbering_direction || 'left-to-right';
         this.customNumbers = seatingMapConfig.custom_numbers || {};
         this.seatsPerRow = seatingMapConfig.seats_per_row || 20;
+        this.disabledSeats = new Set(seatingMapConfig.disabled_seats || []);
 
         // Generate colors for ticket types
         this.ticketTypeColors = this.generateTicketTypeColors();
@@ -415,7 +416,7 @@ class SeatPicker {
 
     /**
      * Calculate seat display number based on venue configuration
-     * Same logic as in seating-allocation-editor.js
+     * Same logic as in seating-map-editor.js - counts only enabled seats
      */
     getSeatDisplayNumber(rowId, seatId) {
         const fullSeatId = `${rowId}-${seatId}`;
@@ -425,13 +426,33 @@ class SeatPicker {
             return this.customNumbers[fullSeatId].seat;
         }
 
-        // Calculate based on numbering direction
-        const seatIndex = parseInt(seatId);
+        // Count only enabled seats in this row to calculate display number
+        const row = parseInt(rowId);
+        const seat = parseInt(seatId);
+        let enabledSeatsCount = 0;
+
         if (this.numberingDirection === 'right-to-left') {
-            return this.seatsPerRow - seatIndex;
+            // Count from right to left
+            for (let s = this.seatsPerRow - 1; s >= 0; s--) {
+                const checkId = `${row}-${s}`;
+                if (!this.disabledSeats.has(checkId)) {
+                    enabledSeatsCount++;
+                    if (s === seat) {
+                        break;
+                    }
+                }
+            }
         } else {
-            return seatIndex + 1;  // 1-indexed
+            // Count from left to right
+            for (let s = 0; s <= seat; s++) {
+                const checkId = `${row}-${s}`;
+                if (!this.disabledSeats.has(checkId)) {
+                    enabledSeatsCount++;
+                }
+            }
         }
+
+        return enabledSeatsCount;
     }
 
     getSeatStatus(seatId) {

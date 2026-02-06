@@ -352,7 +352,7 @@
             container.innerHTML = events.map(e => {
                 const dateStr = e.date ? e.date.replace('Z','').split('T')[0] : '';
                 const isActive = selectedEventIds.has(e.event_id);
-                return `<span class="event-chip${isActive ? '' : ' inactive'}" data-event-id="${e.event_id}" onclick="toggleEventChip(this)">${e.title} (${dateStr})</span>`;
+                return `<span class="event-chip${isActive ? '' : ' inactive'}" data-event-id="${e.event_id}" onclick="toggleEventChip(this)">${escapeHtml(e.title)} (${dateStr})</span>`;
             }).join('');
         }
 
@@ -539,7 +539,7 @@
                             return `
                                 <tr onclick="window.location.href='event-edit.html?id=${r.event.event_id}'">
                                     <td class="event-name-cell">
-                                        ${r.event.title}
+                                        ${escapeHtml(r.event.title)}
                                         <small>${dateStr}</small>
                                     </td>
                                     <td>${r.stats.soldTickets} / ${r.stats.totalTickets}</td>
@@ -600,7 +600,7 @@
                             const c = couponMap[code];
                             return `
                                 <tr>
-                                    <td><strong>${code}</strong></td>
+                                    <td><strong>${escapeHtml(code)}</strong></td>
                                     <td>${c.count}</td>
                                     <td>${formatCurrency(c.revenue)}</td>
                                     <td style="color:#f44336">-${formatCurrency(c.discount)}</td>

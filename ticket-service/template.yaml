@@ -80,7 +80,7 @@ Parameters:
   AdminApiKeys:
     Type: String
     NoEcho: true
-    Default: "test,test2"
+    Default: ""
     Description: Comma-separated list of admin API keys
 
 Conditions:

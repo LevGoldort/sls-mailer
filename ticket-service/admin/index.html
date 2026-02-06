@@ -473,7 +473,7 @@
 
                 return `
                     <div class="event-item" onclick="navigateTo('event-edit.html?id=${event.event_id}')">
-                        <div class="event-title">${event.title}</div>
+                        <div class="event-title">${escapeHtml(event.title)}</div>
                         <div class="event-meta">
                             <span>📅 ${formatDate(event.date)}</span>
                             <span>🎫 Продано: ${stats.soldTickets}/${stats.totalTickets}</span>

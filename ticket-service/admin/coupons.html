@@ -369,17 +369,17 @@
             }
 
             container.innerHTML = coupons.map(coupon => {
-                const statusClass = `status-${coupon.status}`;
+                const statusClass = `status-${escapeHtml(coupon.status)}`;
                 const discountText = coupon.discount_type === 'percentage' ?
                     `${coupon.discount_value}%` :
                     `${coupon.discount_value}₪`;
                 return `
                     <div class="coupon-card" onclick='editCoupon(${JSON.stringify(coupon).replace(/'/g, "&#39;")})'>
-                        <div class="coupon-code">${coupon.coupon_code}</div>
+                        <div class="coupon-code">${escapeHtml(coupon.coupon_code)}</div>
                         <div class="coupon-discount">${discountText} скидка</div>
                         <div class="coupon-card-footer">
-                            <span class="status-badge ${statusClass}">${coupon.status}</span>
-                            <button class="btn-delete-sm" onclick="event.stopPropagation(); deleteCoupon('${coupon.coupon_code}')" title="Удалить">🗑️</button>
+                            <span class="status-badge ${statusClass}">${escapeHtml(coupon.status)}</span>
+                            <button class="btn-delete-sm" onclick="event.stopPropagation(); deleteCoupon('${escapeHtml(coupon.coupon_code)}')" title="Удалить">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -408,7 +408,7 @@
                 eventsList.innerHTML = allEvents.map(e => `
                     <label>
                         <input type="checkbox" value="${e.event_id}">
-                        ${e.title}
+                        ${escapeHtml(e.title)}
                     </label>
                 `).join('');
 
@@ -461,7 +461,7 @@
                     <label class="event-checkbox">
                         <input type="checkbox" value="${event.event_id}"
                             ${coupon.event_ids.includes(event.event_id) ? 'checked' : ''}>
-                        ${event.title} (${new Date(event.date).toLocaleDateString('ru')})
+                        ${escapeHtml(event.title)} (${new Date(event.date).toLocaleDateString('ru')})
                     </label>
                 `).join('');
 

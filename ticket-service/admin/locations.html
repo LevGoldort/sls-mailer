@@ -179,17 +179,17 @@
                 const address = loc.address || {};
                 return `
                     <div class="location-card">
-                        <div class="location-name">${loc.name}</div>
+                        <div class="location-name">${escapeHtml(loc.name)}</div>
                         <div class="location-info">
-                            <div>📍 ${address.street || ''}, ${address.city || ''}</div>
+                            <div>📍 ${escapeHtml(address.street || '')}, ${escapeHtml(address.city || '')}</div>
                             <div>👥 Вместимость: ${loc.capacity || '-'}</div>
-                            <div>📝 ${loc.description || 'Нет описания'}</div>
+                            <div>📝 ${escapeHtml(loc.description || 'Нет описания')}</div>
                         </div>
                         <div class="location-actions">
                             <button class="action-btn btn-edit" onclick="window.location.href='location-edit.html?id=${loc.location_id}'">
                                 ✏️ Редактировать
                             </button>
-                            <button class="action-btn btn-delete" onclick="deleteLocation('${loc.location_id}', '${loc.name}')">
+                            <button class="action-btn btn-delete" onclick="deleteLocation('${loc.location_id}', '${escapeHtml(loc.name).replace(/'/g, "\\&#039;")}')">
                                 🗑️ Удалить
                             </button>
                         </div>

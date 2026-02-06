@@ -346,14 +346,20 @@
         }
 
         .seat-disabled {
-            fill: #f5f5f5;
-            stroke: #ddd;
+            fill: #e0e0e0;
+            stroke: #bbb;
             stroke-width: 1;
         }
 
         .seat-selected {
             fill: #667eea;
             stroke: #5568d3;
+            stroke-width: 2;
+        }
+
+        .seat-disabled-selected {
+            fill: #9575cd;
+            stroke: #7e57c2;
             stroke-width: 2;
         }
 
@@ -1144,6 +1150,7 @@
                         <button id="undo-btn" onclick="seatingEditor.undo()" disabled>↶ Отменить</button>
                         <button id="redo-btn" onclick="seatingEditor.redo()" disabled>↷ Повторить</button>
                         <span class="toolbar-divider"></span>
+                        <button id="add-row-btn" onclick="seatingEditor.addRowAtBack()" style="background: #2196F3;">➕ Добавить ряд сзади</button>
                         <button id="center-rows-btn" onclick="seatingEditor.centerRows()" style="background: #4CAF50;">🎯 Центрировать</button>
                         <button id="select-row-btn" onclick="seatingEditor.selectEntireRow()" disabled>📏 Выбрать ряд</button>
                         <button id="select-col-btn" onclick="seatingEditor.selectEntireColumn()" disabled>📐 Выбрать колонку</button>
@@ -1160,7 +1167,8 @@
 
                     <div class="help-text">
                         💡 <strong>Выбор мест:</strong> Кликните на место для выбора, Shift+клик для множественного выбора<br>
-                        💡 <strong>Управление:</strong> Используйте кнопки выше для удаления мест или изменения номеров<br>
+                        💡 <strong>Disabled места:</strong> Серые места можно выбрать и восстановить кнопкой "Восстановить выбранные"<br>
+                        💡 <strong>Добавить ряд:</strong> Кнопка "Добавить ряд сзади" добавляет новый ряд с максимальной шириной зала<br>
                         💡 <strong>Навигация:</strong> Колесико мыши для масштабирования, перетаскивание для перемещения по карте
                     </div>
                 </div>

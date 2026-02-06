@@ -443,7 +443,7 @@
                     <div class="event-card">
                         <div class="event-header">
                             <div>
-                                <div class="event-title">${event.title}</div>
+                                <div class="event-title">${escapeHtml(event.title)}</div>
                                 <div class="event-date">📅 ${formatDate(event.date)}</div>
                                 <div class="event-date">🌐 <a href="${publicUrl}" target="_blank">${publicUrl}</a></div>
                                 <span class="status-badge ${statusClass}">${event.status}</span>
@@ -452,7 +452,7 @@
                                 <button class="action-btn btn-edit" onclick="editEvent('${event.event_id}')">
                                     ✏️ Редактировать
                                 </button>
-                                <button class="action-btn btn-delete" onclick="deleteEvent('${event.event_id}', '${event.title}')">
+                                <button class="action-btn btn-delete" onclick="deleteEvent('${event.event_id}', '${escapeHtml(event.title).replace(/'/g, "\\&#039;")}')">
                                     🗑️ Удалить
                                 </button>
                             </div>

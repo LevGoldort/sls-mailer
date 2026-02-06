@@ -359,7 +359,6 @@ class AllPayProvider(PaymentProvider):
 
         print(f"Creating AllPay API payment for order {order_id}, expires at {expire_timestamp}")
         print(f"Items: {len(items)} ticket types, total amount: {amount} {currency}")
-        print(f"AllPay request body: {json.dumps(request_body, ensure_ascii=False)}")
 
         try:
             response = requests.post(
@@ -529,10 +528,7 @@ class AllPayProvider(PaymentProvider):
             secret_to_use = self.api_key if self.api_key else self.webhook_secret
             base_string = ':'.join(chunks) + ':' + secret_to_use
 
-            print(f"[WEBHOOK VERIFY] Sorted keys: {sorted_keys}")
-            print(f"[WEBHOOK VERIFY] Values: {chunks}")
-            print(f"[WEBHOOK VERIFY] Using secret type: {'API_KEY' if self.api_key else 'WEBHOOK_SECRET'}")
-            print(f"[WEBHOOK VERIFY] Base string length: {len(base_string)}")
+            print(f"[WEBHOOK VERIFY] Verifying signature with {len(sorted_keys)} fields")
 
             # Calculate SHA256 hash
             calculated_signature = hashlib.sha256(base_string.encode('utf-8')).hexdigest()

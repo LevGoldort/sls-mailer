@@ -159,11 +159,13 @@ class SeatingMapEditor {
         circle.setAttribute('cy', y);
         circle.setAttribute('r', this.seatRadius);
         circle.setAttribute('class', 'seat');
-        circle.classList.add(
-            isDisabled ? 'seat-disabled' :
-            isSelected ? 'seat-selected' :
-            'seat-available'
-        );
+
+        // Apply classes - selected state takes priority for visibility
+        if (isSelected) {
+            circle.classList.add(isDisabled ? 'seat-disabled-selected' : 'seat-selected');
+        } else {
+            circle.classList.add(isDisabled ? 'seat-disabled' : 'seat-available');
+        }
 
         // Event listeners
         circle.addEventListener('click', (e) => this.handleSeatClick(seatId, e));
@@ -432,6 +434,24 @@ class SeatingMapEditor {
                 this.selectedSeats.add(seatId);
             }
         }
+
+        this.renderSeatingChart();
+        this.updateSelectionButtons();
+    }
+
+    /**
+     * Add a new row at the back of the venue
+     * Uses the maximum width (seats_per_row) of the venue
+     */
+    addRowAtBack() {
+        this.saveState(); // Save state before modification
+
+        // Add new row index
+        const newRowIndex = this.rows;
+        this.rows++;
+
+        // All seats in the new row are enabled by default (not in disabledSeats)
+        // No need to do anything special - seats not in disabledSeats are enabled
 
         this.renderSeatingChart();
         this.updateSelectionButtons();

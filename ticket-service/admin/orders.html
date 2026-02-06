@@ -324,9 +324,9 @@
                             return `
                                 <tr onclick="openOrderModal('${order.order_id}')" style="cursor: pointer;">
                                     <td><strong>${order.order_id}</strong></td>
-                                    <td>${eventName}</td>
-                                    <td>${customer.name || '-'}</td>
-                                    <td>${customer.email || '-'}</td>
+                                    <td>${escapeHtml(eventName)}</td>
+                                    <td>${escapeHtml(customer.name || '-')}</td>
+                                    <td>${escapeHtml(customer.email || '-')}</td>
                                     <td>${ticketCount} шт</td>
                                     <td><strong>${formatCurrency(order.total_amount)}</strong></td>
                                     <td><span class="status-badge ${status.cls}">${status.label}</span></td>

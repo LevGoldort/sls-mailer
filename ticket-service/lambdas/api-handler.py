@@ -86,11 +86,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Main handler для API Gateway requests
     """
-    print(f"Received event: {json.dumps(event)}")
-
-    # Извлекаем метод и путь
+    # Safe logging: only method, path, and source IP (no headers/body)
     http_method = event.get('httpMethod', event.get('requestContext', {}).get('http', {}).get('method'))
     path = event.get('path', event.get('rawPath', ''))
+    source_ip = get_client_identifier(event)
+    print(f"Request: {http_method} {path} from {source_ip}")
 
     # Remove stage from path for HTTP API v2.0
     stage = event.get('requestContext', {}).get('stage')
@@ -152,10 +152,10 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
     if method == 'POST' and path == '/api/events':
         return create_event(event)
 
-    # GET /api/events/{id}/purchased-seats - получить проданные места
+    # GET /api/events/{id}/purchased-seats - получить проданные места (admin)
     if method == 'GET' and path.endswith('/purchased-seats'):
         event_id = path.split('/')[-2]
-        return get_purchased_seats(event_id)
+        return get_purchased_seats(event_id, event)
 
     # GET /api/events/{id}/seating-map - получить карту мест
     if method == 'GET' and path.endswith('/seating-map'):
@@ -251,12 +251,23 @@ def get_event_by_slug(slug: str) -> Dict:
     })
 
 
-def get_purchased_seats(event_id: str) -> Dict:
+def get_purchased_seats(event_id: str, request_event: Dict = None) -> Dict:
     """
-    GET /api/events/{event_id}/purchased-seats
+    ADMIN ONLY - GET /api/events/{event_id}/purchased-seats
     Returns all purchased seats for an event with their ticket types
     Used by admin editor to lock sold seats
     """
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event) if request_event else None
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_purchased_seats_access', {
+            'event_id': event_id,
+            'ip': get_client_identifier(request_event) if request_event else 'unknown'
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Get all orders for this event
         orders = db.get_orders_by_event(event_id)
@@ -1112,15 +1123,15 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     if method == 'POST' and path == '/api/orders/release-seats':
         return release_seats(event)
 
-    # GET /api/orders/verify/{ticket_code} - проверить билет
-    if method == 'GET' and path.startswith('/api/orders/verify/'):
+    # POST /api/orders/verify/{ticket_code} - проверить билет (admin only)
+    if method == 'POST' and path.startswith('/api/orders/verify/'):
         ticket_code = path.split('/')[-1]
-        return verify_ticket(ticket_code)
+        return verify_ticket(ticket_code, event)
 
-    # GET /api/orders/{id}/can-refund - проверить возможность возврата
+    # GET /api/orders/{id}/can-refund - проверить возможность возврата (admin)
     if method == 'GET' and path.endswith('/can-refund'):
         order_id = path.split('/')[-2]  # /api/orders/{id}/can-refund
-        return check_can_refund(order_id)
+        return check_can_refund(order_id, event)
 
     # POST /api/orders/{id}/cancel-tickets - partial ticket cancellation
     if method == 'POST' and path.endswith('/cancel-tickets'):
@@ -1140,7 +1151,7 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     # GET /api/orders/{id} - детали заказа
     if method == 'GET' and path.startswith('/api/orders/'):
         order_id = path.split('/')[-1]
-        return get_order(order_id)
+        return get_order(order_id, event)
 
     return error_response(404, "Orders endpoint not found")
 
@@ -1179,12 +1190,7 @@ def list_orders_by_event(event_id: str, request_event: Dict) -> Dict:
         return success_response({
             'orders': orders,
             'count': len(orders),
-            'event_id': event_id,
-            '_debug': {
-                'db_items': len(items),
-                'parsed': len(orders),
-                'parse_errors': parse_errors
-            }
+            'event_id': event_id
         })
 
     except Exception as e:
@@ -1224,12 +1230,7 @@ def list_all_orders(request_event: Dict) -> Dict:
 
         return success_response({
             'orders': orders,
-            'count': len(orders),
-            '_debug': {
-                'db_items': len(items),
-                'parsed': len(orders),
-                'parse_errors': parse_errors
-            }
+            'count': len(orders)
         })
 
     except Exception as e:
@@ -1328,7 +1329,16 @@ def create_order(request_event: Dict) -> Dict:
             import time as _time
             _current_time = int(_time.time())
             _reservations = db.get_seat_reservations(event_id)
-            _active_reserved = {r['seat_id'] for r in _reservations if r.get('expires_at', 0) > _current_time}
+
+            # Get session_id from request body - exclude this user's own reservations
+            order_session_id = body.get('session_id')
+
+            # Only consider reservations from OTHER sessions as conflicts
+            _active_reserved = {
+                r['seat_id'] for r in _reservations
+                if r.get('expires_at', 0) > _current_time
+                and r.get('session_id') != order_session_id
+            }
 
             all_requested_seats = []
             for ticket in order_tickets:
@@ -1337,7 +1347,8 @@ def create_order(request_event: Dict) -> Dict:
             print(f"[ORDER] Seat check for event {event_id}: "
                   f"requested={all_requested_seats}, "
                   f"purchased={existing_purchased}, "
-                  f"reserved={_active_reserved}")
+                  f"reserved_by_others={_active_reserved}, "
+                  f"session_id={order_session_id}")
 
             for ticket in order_tickets:
                 for seat_id in ticket.purchased_seats:
@@ -1346,7 +1357,7 @@ def create_order(request_event: Dict) -> Dict:
                         return error_response(400,
                             f"Seat {seat_id} is already purchased")
                     if seat_id in _active_reserved:
-                        print(f"[ORDER] ❌ Seat {seat_id} already RESERVED (active TTL)")
+                        print(f"[ORDER] ❌ Seat {seat_id} already RESERVED by another session")
                         return error_response(400,
                             f"Seat {seat_id} is already reserved")
 
@@ -1679,8 +1690,12 @@ def release_seats(request_event: Dict) -> Dict:
         return error_response(500, f"Failed to release seats: {str(e)}")
 
 
-def get_order(order_id: str) -> Dict:
-    """GET /api/orders/{id}"""
+def get_order(order_id: str, request_event: Dict = None) -> Dict:
+    """GET /api/orders/{id}
+    Two-tier access:
+    - Admin API key: full access
+    - Public: requires matching email query param
+    """
     item = db.get_order(order_id)
 
     if not item:
@@ -1688,13 +1703,41 @@ def get_order(order_id: str) -> Dict:
 
     order = Order.from_dynamodb_item(item)
 
+    # Check admin auth first
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event) if request_event else None
+
+    if not auth.verify_admin_key(api_key):
+        # Public access: require email query param matching customer email
+        query_params = (request_event or {}).get('queryStringParameters', {}) or {}
+        email = query_params.get('email', '').strip().lower()
+
+        if not email:
+            return error_response(401, "Unauthorized: Admin key or email parameter required")
+
+        customer_email = (order.customer.email or '').strip().lower()
+        if email != customer_email:
+            return error_response(403, "Forbidden: Email does not match order")
+
     return success_response({
         'order': order.to_dynamodb_item()
     })
 
 
-def check_can_refund(order_id: str) -> Dict:
-    """GET /api/orders/{id}/can-refund - проверяет возможность возврата"""
+def check_can_refund(order_id: str, request_event: Dict = None) -> Dict:
+    """ADMIN ONLY - GET /api/orders/{id}/can-refund - проверяет возможность возврата"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event) if request_event else None
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_refund_check', {
+            'order_id': order_id,
+            'ip': get_client_identifier(request_event) if request_event else 'unknown'
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Load order
         order_data = db.get_order(order_id)
@@ -1975,8 +2018,20 @@ def process_refund(order_id: str, request_event: Dict) -> Dict:
         return error_response(500, f"Failed to process refund: {str(e)}")
 
 
-def verify_ticket(ticket_code: str) -> Dict:
-    """GET /api/orders/verify/{ticket_code} - проверяет билет"""
+def verify_ticket(ticket_code: str, request_event: Dict = None) -> Dict:
+    """POST /api/orders/verify/{ticket_code} - проверяет билет (admin only)"""
+
+    # SECURITY: Require admin authentication
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event) if request_event else None
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_ticket_verify', {
+            'ticket_code': ticket_code,
+            'ip': get_client_identifier(request_event) if request_event else 'unknown'
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
     try:
         # Find order by ticket code
         order_data = db.get_order_by_ticket_code(ticket_code)
@@ -2359,8 +2414,27 @@ def handle_image_upload(event: Dict) -> Dict:
         if not filename or not content_type or not base64_data:
             return error_response(400, 'Missing required fields: filename, contentType, data')
 
+        # SECURITY: Content-type whitelist
+        allowed_content_types = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+        if content_type not in allowed_content_types:
+            return error_response(400, f'Invalid content type. Allowed: {", ".join(allowed_content_types)}')
+
         # Decode base64 data
         image_data = base64.b64decode(base64_data)
+
+        # SECURITY: Size limit (5MB)
+        max_size = 5 * 1024 * 1024  # 5MB
+        if len(image_data) > max_size:
+            return error_response(400, f'Image too large. Maximum size: 5MB')
+
+        # SECURITY: Filename sanitization - strip path components, allow only safe chars, prefix with UUID
+        import uuid
+        # Extract just the filename (strip any path components)
+        safe_name = os.path.basename(filename)
+        # Remove any non-safe characters
+        safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', safe_name)
+        # Prefix with UUID to prevent collisions and path traversal
+        safe_filename = f"{uuid.uuid4().hex[:8]}_{safe_name}"
 
         # Initialize S3 client
         s3_client = boto3.client('s3', region_name='eu-north-1')
@@ -2369,21 +2443,21 @@ def handle_image_upload(event: Dict) -> Dict:
         # Upload to S3
         s3_client.put_object(
             Bucket=bucket_name,
-            Key=filename,
+            Key=safe_filename,
             Body=image_data,
             ContentType=content_type,
             CacheControl='max-age=31536000',  # 1 year cache
         )
 
         # Generate public URL
-        url = f"https://{bucket_name}.s3.eu-north-1.amazonaws.com/{filename}"
+        url = f"https://{bucket_name}.s3.eu-north-1.amazonaws.com/{safe_filename}"
 
         print(f"Image uploaded successfully: {url}")
 
         return success_response({
             'message': 'Image uploaded successfully',
             'url': url,
-            'filename': filename
+            'filename': safe_filename
         })
 
     except Exception as e:

@@ -1,5 +1,16 @@
 // shared.js - Shared utilities and API methods for Ticket Admin
 
+// ===== XSS Protection =====
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // Auto-detect environment based on hostname
 const isDev = window.location.hostname.includes('-dev');
 const API_BASE_URL = isDev
@@ -395,7 +406,7 @@ async function regenerateSite() {
                     ❌ Ошибка генерации
                 </div>
                 <div style="font-size: 13px; opacity: 0.9;">
-                    ${error.message}
+                    ${escapeHtml(error.message)}
                 </div>
             </div>
         `;

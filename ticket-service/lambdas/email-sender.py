@@ -63,7 +63,7 @@ def load_email_template() -> str:
 
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <p><strong>📅 Дата и время:</strong> {{ event_date_formatted }}</p>
-            <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
+            <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_slug }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
             <p><strong>🎫 Билеты:</strong> {% for ticket in order.tickets %}{{ ticket.quantity }}x {{ ticket.type_name }}{% if ticket.purchased_seats %} ({% for seat_id in ticket.purchased_seats %}{{ get_seat_display(seat_id) }}{% if not loop.last %}; {% endif %}{% endfor %}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
             <p><strong>💰 Сумма:</strong> {{ order.total_amount }} {{ order.currency }}</p>
             <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
@@ -84,7 +84,7 @@ def load_email_template() -> str:
                         {% if qr['seat_id'] %}
                         <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 600; color: #667eea;">💺 {{ qr['seat_display'] }}</p>
                         {% endif %}
-                        <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">📍 <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a></p>
+                        <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">📍 <a href="{{ frontend_url }}/locations/{{ location_slug }}.html" style="color: #667eea; text-decoration: none;">{{ location_name }}</a></p>
                         {% if location_address %}
                         <p style="margin: 0; font-size: 12px; color: #999;">{{ location_address }}</p>
                         {% endif %}
@@ -134,7 +134,7 @@ def load_email_template() -> str:
 def get_seat_display(seat_id: str, seating_map) -> str:
     """
     Converts internal seat ID like "0-14" to display label like "Ряд 1, Место 21".
-    Mirrors frontend getSeatDisplayNumber() logic.
+    Counts only enabled seats (skips disabled) - same logic as seating-map-editor.js
     """
     parts = seat_id.split('-')
     if len(parts) != 2:
@@ -151,10 +151,28 @@ def get_seat_display(seat_id: str, seating_map) -> str:
             custom_row = custom.get('row')
             if custom_row is not None:
                 row_display = int(custom_row)
-        elif seating_map.numbering_direction == 'right-to-left':
-            seat_display = int(seating_map.seats_per_row) - seat_index
         else:
-            seat_display = seat_index + 1
+            # Count only enabled seats to calculate display number
+            disabled_seats = set(seating_map.disabled_seats or [])
+            seats_per_row = int(seating_map.seats_per_row)
+            enabled_count = 0
+
+            if seating_map.numbering_direction == 'right-to-left':
+                # Count from right to left
+                for s in range(seats_per_row - 1, -1, -1):
+                    check_id = f"{row_index}-{s}"
+                    if check_id not in disabled_seats:
+                        enabled_count += 1
+                        if s == seat_index:
+                            break
+            else:
+                # Count from left to right
+                for s in range(seat_index + 1):
+                    check_id = f"{row_index}-{s}"
+                    if check_id not in disabled_seats:
+                        enabled_count += 1
+
+            seat_display = enabled_count
     else:
         seat_display = seat_index + 1
 
@@ -181,7 +199,7 @@ def load_cancellation_template() -> str:
 
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <p><strong>📅 Дата и время:</strong> {{ event_date_formatted }}</p>
-            <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_id }}.html" style="color: #e53935; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
+            <p><strong>📍 Локация:</strong> <a href="{{ frontend_url }}/locations/{{ location_slug }}.html" style="color: #e53935; text-decoration: none;">{{ location_name }}</a>{% if location_address %}, {{ location_address }}{% endif %}</p>
             <p><strong>📧 Номер заказа:</strong> {{ order.order_id }}</p>
         </div>
 
@@ -294,7 +312,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Load location (optional - for display)
         location_name = "Локация"
         location_address = ""
-        location_id = event_obj.location_id
+        location_slug = event_obj.location_id  # Fallback to ID if slug not available
         seating_map = None
         try:
             location_data = db.get_location(event_obj.location_id)
@@ -302,6 +320,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 from models import Location
                 location = Location.from_dynamodb_item(location_data)
                 location_name = location.name
+                location_slug = location.slug  # Use slug for URL
                 # Format address as "City, Street"
                 if location.address and location.address.city and location.address.street:
                     location_address = f"{location.address.city}, {location.address.street}"
@@ -334,7 +353,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 event_date_formatted=format_event_date(event_obj.date),
                 location_name=location_name,
                 location_address=location_address,
-                location_id=location_id,
+                location_slug=location_slug,
                 cancelled_qr_codes=cancelled_qr_codes,
                 frontend_url=frontend_url
             )
@@ -414,7 +433,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 event_date_formatted=format_event_date(event_obj.date),
                 location_name=location_name,
                 location_address=location_address,
-                location_id=location_id,
+                location_slug=location_slug,
                 total_tickets=total_tickets,
                 enriched_qr_codes=enriched_qr_codes,
                 frontend_url=frontend_url,

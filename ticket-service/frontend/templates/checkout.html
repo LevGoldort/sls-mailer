@@ -128,6 +128,10 @@
             <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">
                 Оплата заказа
             </h2>
+            <div id="payment-amount-display" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; margin-bottom: 1.5rem; text-align: center;">
+                <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.25rem;">Сумма к оплате:</div>
+                <div style="font-size: 2rem; font-weight: 700;" id="payment-total-amount">0₪</div>
+            </div>
             <p style="color: var(--gray-600); margin-bottom: 1.5rem;">
                 Заполните данные карты для завершения покупки. Все данные защищены и передаются по защищенному соединению.
             </p>
@@ -386,6 +390,7 @@ function renderCheckout() {
 }
 
 // Convert internal seat ID like "0-14" to display label like "Ряд 1, Место 21"
+// Counts only enabled seats (skips disabled) - same logic as seating-map-editor.js
 function getSeatDisplayLabel(seatId, seatingMapConfig) {
     const parts = seatId.split('-');
     if (parts.length !== 2) return seatId;
@@ -399,8 +404,31 @@ function getSeatDisplayLabel(seatId, seatingMapConfig) {
         if (custom) {
             seatDisplay = custom.seat;
             if (custom.row !== undefined) rowDisplay = custom.row;
-        } else if (seatingMapConfig.numbering_direction === 'right-to-left') {
-            seatDisplay = (seatingMapConfig.seats_per_row || 20) - seatIndex;
+        } else {
+            // Count only enabled seats to calculate display number
+            const disabledSeats = new Set(seatingMapConfig.disabled_seats || []);
+            const seatsPerRow = seatingMapConfig.seats_per_row || 20;
+            let enabledCount = 0;
+
+            if (seatingMapConfig.numbering_direction === 'right-to-left') {
+                // Count from right to left
+                for (let s = seatsPerRow - 1; s >= 0; s--) {
+                    const checkId = `${rowIndex}-${s}`;
+                    if (!disabledSeats.has(checkId)) {
+                        enabledCount++;
+                        if (s === seatIndex) break;
+                    }
+                }
+            } else {
+                // Count from left to right
+                for (let s = 0; s <= seatIndex; s++) {
+                    const checkId = `${rowIndex}-${s}`;
+                    if (!disabledSeats.has(checkId)) {
+                        enabledCount++;
+                    }
+                }
+            }
+            seatDisplay = enabledCount;
         }
     }
     return `Ряд ${rowDisplay}, Место ${seatDisplay}`;
@@ -519,28 +547,52 @@ function updateTotal() {
 
     // Apply coupon discount
     let discount = 0;
-    let discountedPrice = ticketPrice;
+    let discountedTotal = subtotal;
 
     if (appliedCoupon) {
-        // Calculate discount per ticket
-        let discountPerTicket;
-        if (appliedCoupon.coupon.discount_type === 'percentage') {
-            discountPerTicket = ticketPrice * (appliedCoupon.coupon.discount_value / 100);
-        } else {
-            discountPerTicket = Math.min(appliedCoupon.coupon.discount_value, ticketPrice);
-        }
-        discount = discountPerTicket * quantity;
-        discount = Math.round(discount * 100) / 100;
-        discountedPrice = ticketPrice - discountPerTicket;
-        discountedPrice = Math.round(discountedPrice * 100) / 100;
+        const discountType = appliedCoupon.coupon.discount_type;
+        const discountValue = appliedCoupon.coupon.discount_value;
 
-        // Update ticket price display with strikethrough
+        if (orderDataFromSession) {
+            // Seated venue: calculate discount for each ticket type separately
+            // Discount is applied PER TICKET, not per order
+            orderDataFromSession.tickets.forEach(ticket => {
+                const ticketType = eventData.ticket_types.find(t => t.id === ticket.type_id);
+                if (ticketType) {
+                    const pricePerTicket = ticketType.price;
+                    let discountPerTicket;
+                    if (discountType === 'percentage') {
+                        discountPerTicket = pricePerTicket * (discountValue / 100);
+                    } else {
+                        // Flat discount per ticket, capped at ticket price
+                        discountPerTicket = Math.min(discountValue, pricePerTicket);
+                    }
+                    discount += discountPerTicket * ticket.quantity;
+                }
+            });
+        } else {
+            // Unseated venue: single ticket type
+            let discountPerTicket;
+            if (discountType === 'percentage') {
+                discountPerTicket = ticketPrice * (discountValue / 100);
+            } else {
+                // Flat discount per ticket, capped at ticket price
+                discountPerTicket = Math.min(discountValue, ticketPrice);
+            }
+            discount = discountPerTicket * quantity;
+        }
+
+        discount = Math.round(discount * 100) / 100;
+        discountedTotal = subtotal - discount;
+        discountedTotal = Math.round(discountedTotal * 100) / 100;
+
+        // Update price display with strikethrough
         document.getElementById('ticket-price-display').innerHTML = `
             <div style="text-decoration: line-through; color: var(--gray-500); font-size: 0.875rem;">
-                ${ticketPrice}₪
+                ${subtotal}₪
             </div>
             <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">
-                ${discountedPrice}₪
+                ${discountedTotal}₪
             </div>
         `;
 
@@ -551,14 +603,17 @@ function updateTotal() {
         // Reset ticket price display
         document.getElementById('ticket-price-display').innerHTML = `
             <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">
-                ${ticketPrice}₪
+                ${subtotal}₪
             </div>
         `;
         document.getElementById('coupon-row').style.display = 'none';
     }
 
-    const total = subtotal - discount + (serviceFee * quantity);
+    const total = discountedTotal + (serviceFee * quantity);
     document.getElementById('summary-total').textContent = total + '₪';
+
+    // Store total for payment display
+    window.finalTotal = total;
 
     if (serviceFee > 0) {
         const totalFee = serviceFee * quantity;
@@ -687,7 +742,8 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
             sessionStorage.setItem('pending_order', JSON.stringify({
                 order_id: result.order_id,
                 event_id: eventId,
-                total_amount: totalValue
+                total_amount: totalValue,
+                customer_email: data.customer.email
             }));
 
             // Redirect to payment or success page
@@ -698,6 +754,10 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
                 // Show payment iframe container
                 const paymentContainer = document.getElementById('payment-container');
                 paymentContainer.style.display = 'block';
+
+                // Display payment amount
+                const paymentAmount = window.finalTotal || result.total_amount || totalValue;
+                document.getElementById('payment-total-amount').textContent = paymentAmount + '₪';
 
                 // Scroll to top
                 window.scrollTo(0, 0);

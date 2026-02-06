@@ -61,6 +61,15 @@ let progressInterval;
 const urlParams = new URLSearchParams(window.location.search);
 const orderId = urlParams.get('order_id');
 
+// Get customer email from sessionStorage (saved during checkout)
+let customerEmail = '';
+try {
+    const pendingOrder = JSON.parse(sessionStorage.getItem('pending_order') || '{}');
+    if (pendingOrder.order_id === orderId) {
+        customerEmail = pendingOrder.customer_email || '';
+    }
+} catch(e) {}
+
 if (!orderId) {
     showError('Заказ не найден');
 } else {
@@ -78,7 +87,8 @@ progressInterval = setInterval(() => {
 
 // Poll order status
 function pollOrderStatus() {
-    fetch(`${API_URL}/api/orders/${orderId}`)
+    const emailParam = customerEmail ? `?email=${encodeURIComponent(customerEmail)}` : '';
+    fetch(`${API_URL}/api/orders/${orderId}${emailParam}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -139,8 +149,31 @@ function getSeatDisplayLabel(seatId) {
         if (custom) {
             seatDisplay = custom.seat;
             if (custom.row !== undefined) rowDisplay = custom.row;
-        } else if (seatingMapConfig.numbering_direction === 'right-to-left') {
-            seatDisplay = seatingMapConfig.seats_per_row - seatIndex;
+        } else {
+            // Count only enabled seats to calculate display number
+            const disabledSeats = new Set(seatingMapConfig.disabled_seats || []);
+            const seatsPerRow = seatingMapConfig.seats_per_row || 20;
+            let enabledCount = 0;
+
+            if (seatingMapConfig.numbering_direction === 'right-to-left') {
+                // Count from right to left
+                for (let s = seatsPerRow - 1; s >= 0; s--) {
+                    const checkId = `${rowIndex}-${s}`;
+                    if (!disabledSeats.has(checkId)) {
+                        enabledCount++;
+                        if (s === seatIndex) break;
+                    }
+                }
+            } else {
+                // Count from left to right
+                for (let s = 0; s <= seatIndex; s++) {
+                    const checkId = `${rowIndex}-${s}`;
+                    if (!disabledSeats.has(checkId)) {
+                        enabledCount++;
+                    }
+                }
+            }
+            seatDisplay = enabledCount;
         }
     }
     return `Ряд ${rowDisplay}, Место ${seatDisplay}`;

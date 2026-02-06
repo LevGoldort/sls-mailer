@@ -242,7 +242,7 @@
         } catch (err) {
             body.innerHTML = `
                 <button class="order-modal-close" onclick="closeOrderModal()">&times;</button>
-                <p style="color: #ef4444; padding: 40px; text-align: center;">Failed to load order: ${err.message}</p>
+                <p style="color: #ef4444; padding: 40px; text-align: center;">Failed to load order: ${escapeHtml(err.message)}</p>
             `;
         }
     };
@@ -267,8 +267,8 @@
         // WhatsApp link
         const waLink = formatWhatsAppLink(customer.phone);
         const phoneHtml = waLink
-            ? `<a href="${waLink}" target="_blank" class="whatsapp-link">${customer.phone}</a>`
-            : (customer.phone || '-');
+            ? `<a href="${waLink}" target="_blank" class="whatsapp-link">${escapeHtml(customer.phone)}</a>`
+            : escapeHtml(customer.phone || '-');
 
         // Coupon info
         let couponHtml = '';
@@ -277,7 +277,7 @@
             couponHtml = `
                 <div>
                     <span class="label">Coupon</span>
-                    <p><span class="coupon-badge">${order.coupon_code}</span> -${formatCurrency(discountAmt)}</p>
+                    <p><span class="coupon-badge">${escapeHtml(order.coupon_code)}</span> -${formatCurrency(discountAmt)}</p>
                 </div>
             `;
         }
@@ -332,11 +332,11 @@
                 <div class="order-modal-info">
                     <div>
                         <span class="label">Name</span>
-                        <p>${customer.name || '-'}</p>
+                        <p>${escapeHtml(customer.name || '-')}</p>
                     </div>
                     <div>
                         <span class="label">Email</span>
-                        <p>${customer.email || '-'}</p>
+                        <p>${escapeHtml(customer.email || '-')}</p>
                     </div>
                     <div>
                         <span class="label">Phone</span>
