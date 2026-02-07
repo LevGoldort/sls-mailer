@@ -577,7 +577,10 @@ def create_event(request_event: Dict) -> Dict:
 def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
     """
     Helper function: Returns {seat_id: {ticket_type_id, order_id, status}}
-    for all purchased seats in an event
+    for all purchased seats in an event.
+
+    Использует ту же логику что и get_purchased_seats_set() - см. её docstring
+    для объяснения почему qr_codes является источником правды.
 
     NOTE: Only returns COMPLETED purchases. Pending orders are handled via seat reservations.
     Cancelled tickets are excluded so their seats can be re-purchased.
@@ -601,10 +604,29 @@ def get_purchased_seats_dict(event_id: str) -> Dict[str, Dict]:
 
 def get_purchased_seats_set(event_id: str) -> set:
     """
-    Helper function: Returns set of all purchased seat IDs for an event
+    ЕДИНСТВЕННЫЙ ИСТОЧНИК ПРАВДЫ для проданных мест!
 
-    NOTE: Only returns COMPLETED purchases. Pending orders are handled via seat reservations.
-    Cancelled tickets are excluded so their seats can be re-purchased.
+    Returns set of all purchased seat IDs for an event.
+
+    ВАЖНО: Эта функция используется во ВСЕХ местах системы:
+      - seat-availability (фронт видит какие места заняты)
+      - reserve-seats (проверка при резервации)
+      - create_order (проверка при создании заказа)
+      - webhook (проверка при подтверждении оплаты)
+
+    Источник данных: qr_codes[].seat_id (НЕ tickets[].purchased_seats!)
+
+    Причина: При отмене билета (cancel ticket):
+      - qr_codes[].cancelled = True (обновляется)
+      - tickets[].purchased_seats (НЕ очищается)
+
+    Поэтому qr_codes - единственный надёжный источник информации о том,
+    какие билеты реально действительны.
+
+    Условия для "занятого" места:
+      1. payment.status == 'completed'
+      2. qr_codes[].seat_id существует
+      3. qr_codes[].cancelled == False
     """
     orders = db.get_orders_by_event(event_id)
     purchased = set()
@@ -2667,20 +2689,36 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                                 # Continue even if reservation doesn't exist or delete fails
                                 print(f"Warning: Could not release reservation for seat {seat_id}: {str(e)}")
 
-                        # Получаем уже проданные места (исключая текущий заказ)
-                        # NOTE: Only check COMPLETED orders. Pending orders are handled via reservations.
-                        existing_purchased = set()
-                        all_orders = db.get_orders_by_event(order.event_id)
-                        for other_order in all_orders:
-                            # Пропускаем текущий заказ
-                            if other_order.get('order_id') == order_id:
-                                continue
-                            # Только завершенные оплаты считаются купленными
-                            if other_order.get('payment', {}).get('status') != 'completed':
-                                continue
+                        # ============================================================
+                        # CRITICAL FIX: Используем qr_codes вместо tickets.purchased_seats
+                        # ============================================================
+                        #
+                        # ПРОБЛЕМА (BUG-779f0330):
+                        # Раньше тут использовался tickets[].purchased_seats для проверки
+                        # проданных мест. Но когда билет отменяется (cancelled):
+                        #   - qr_codes[].cancelled = True  (правильно обновляется)
+                        #   - tickets[].purchased_seats    (НЕ очищается!)
+                        #
+                        # Это приводило к рассинхрону:
+                        #   - seat-availability (использует qr_codes) → место свободно
+                        #   - webhook (использовал tickets) → место занято → REFUND
+                        #
+                        # РЕШЕНИЕ:
+                        # Используем get_purchased_seats_set() которая проверяет qr_codes
+                        # с учётом cancelled флага. Это тот же источник данных что и
+                        # seat-availability, поэтому не будет рассинхрона.
+                        # ============================================================
 
-                            for ticket in other_order.get('tickets', []):
-                                existing_purchased.update(ticket.get('purchased_seats', []))
+                        # Получаем уже проданные места через единый источник правды (qr_codes)
+                        # NOTE: get_purchased_seats_set проверяет:
+                        #   1. payment.status == 'completed'
+                        #   2. qr_codes[].seat_id exists
+                        #   3. qr_codes[].cancelled == False (отменённые билеты не блокируют место)
+                        existing_purchased = get_purchased_seats_set(order.event_id)
+
+                        # Исключаем места текущего заказа (на случай если они уже есть в qr_codes)
+                        # В норме на этом этапе qr_codes ещё не сгенерированы, но для defensive coding
+                        existing_purchased = existing_purchased - order_seats
 
                         # ✅ ТАКЖЕ проверяем активные резервации (TTL не истек)
                         import time
