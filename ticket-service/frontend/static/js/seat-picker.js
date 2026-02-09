@@ -92,11 +92,23 @@ class SeatPicker {
         try {
             this.showLoading();
 
-            // Load seating map and availability
-            const [seatingMapData, availabilityData] = await Promise.all([
+            // Load seating map, availability, and fresh event data
+            const [seatingMapData, availabilityData, eventData] = await Promise.all([
                 this.fetchSeatingMap(),
-                this.fetchAvailability()
+                this.fetchAvailability(),
+                this.fetchEventData()
             ]);
+
+            // Update ticket types from fresh API data (overrides stale EVENT_DATA)
+            if (eventData && eventData.ticket_types) {
+                this.ticketTypes = eventData.ticket_types.map(tt => ({
+                    id: tt.id,
+                    name: tt.name,
+                    price: tt.price
+                }));
+                // Regenerate colors for updated ticket types
+                this.ticketTypeColors = this.generateTicketTypeColors();
+            }
 
             // Filter reserved seats to exclude current session's reservations
             const reservedSeatsDetails = availabilityData.reserved_seats_details || [];
@@ -111,6 +123,9 @@ class SeatPicker {
                 purchased: availabilityData.purchased_seats || [],
                 reserved: reservedByOthers  // Only seats reserved by OTHER sessions
             };
+
+            // Use fresh allocation data from API (overrides stale EVENT_DATA)
+            this.seatAllocation = this.seatingData.allocation;
 
             this.render();
             this.attachEventListeners();
@@ -141,6 +156,21 @@ class SeatPicker {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         return response.json();
+    }
+
+    async fetchEventData() {
+        try {
+            const url = `${this.options.apiUrl}/api/events/${this.eventId}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn('Could not fetch fresh event data, using initial data');
+                return null;
+            }
+            return response.json();
+        } catch (error) {
+            console.warn('Error fetching event data:', error);
+            return null;
+        }
     }
 
     /**
@@ -318,6 +348,12 @@ class SeatPicker {
         row.seats.forEach((seat, seatIndex) => {
             if (seat.enabled) {
                 const seatId = `${row.id}-${seat.id}`;
+
+                // Skip seats that are not allocated to any ticket type
+                if (!this.seatAllocation[seatId]) {
+                    return;
+                }
+
                 const x = 50 + seatIndex * (seatWidth + seatSpacing);
 
                 const seatElement = this.createSeatElement(seatId, x, y, seat, seatIndex);

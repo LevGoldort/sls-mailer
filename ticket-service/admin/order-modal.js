@@ -156,6 +156,51 @@
             font-size: 12px;
             font-weight: 500;
         }
+        .customer-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .customer-field-value {
+            flex: 1;
+        }
+        .customer-field-input {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-edit-field {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 14px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .btn-edit-field:hover { opacity: 1; }
+        .btn-save-field {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-save-field:hover { background: #059669; }
+        .btn-cancel-field {
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-cancel-field:hover { background: #4b5563; }
     `;
     document.head.appendChild(style);
 
@@ -332,15 +377,24 @@
                 <div class="order-modal-info">
                     <div>
                         <span class="label">Name</span>
-                        <p>${escapeHtml(customer.name || '-')}</p>
+                        <div class="customer-field" id="field-name">
+                            <span class="customer-field-value">${escapeHtml(customer.name || '-')}</span>
+                            <button class="btn-edit-field" onclick="startEditField('${order.order_id}', 'name', '${escapeHtml(customer.name || '')}')">✏️</button>
+                        </div>
                     </div>
                     <div>
                         <span class="label">Email</span>
-                        <p>${escapeHtml(customer.email || '-')}</p>
+                        <div class="customer-field" id="field-email">
+                            <span class="customer-field-value">${escapeHtml(customer.email || '-')}</span>
+                            <button class="btn-edit-field" onclick="startEditField('${order.order_id}', 'email', '${escapeHtml(customer.email || '')}')">✏️</button>
+                        </div>
                     </div>
                     <div>
                         <span class="label">Phone</span>
-                        <p>${phoneHtml}</p>
+                        <div class="customer-field" id="field-phone">
+                            <span class="customer-field-value">${phoneHtml}</span>
+                            <button class="btn-edit-field" onclick="startEditField('${order.order_id}', 'phone', '${escapeHtml(customer.phone || '')}')">✏️</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -431,6 +485,46 @@
             showToast('Failed to cancel tickets: ' + err.message, 'error');
             btn.disabled = false;
             btn.textContent = 'Cancel Selected Tickets';
+        }
+    };
+
+    // ===== Edit Customer Field =====
+    window.startEditField = function(orderId, field, currentValue) {
+        const container = document.getElementById(`field-${field}`);
+        const inputType = field === 'email' ? 'email' : 'text';
+        container.innerHTML = `
+            <input type="${inputType}" class="customer-field-input" id="input-${field}" value="${escapeHtml(currentValue)}">
+            <button class="btn-save-field" onclick="saveField('${orderId}', '${field}')">Save</button>
+            <button class="btn-cancel-field" onclick="openOrderModal('${orderId}')">Cancel</button>
+        `;
+        document.getElementById(`input-${field}`).focus();
+    };
+
+    window.saveField = async function(orderId, field) {
+        const input = document.getElementById(`input-${field}`);
+        const newValue = input.value.trim();
+
+        if (!newValue) {
+            showToast(`${field} cannot be empty`, 'error');
+            return;
+        }
+
+        const container = document.getElementById(`field-${field}`);
+        const saveBtn = container.querySelector('.btn-save-field');
+        saveBtn.disabled = true;
+        saveBtn.textContent = '...';
+
+        try {
+            const data = {};
+            data[field] = newValue;
+            await API.updateOrderCustomer(orderId, data);
+            showToast(`${field} updated successfully`);
+            // Reload modal to show updated data
+            await openOrderModal(orderId);
+        } catch (err) {
+            showToast(`Failed to update ${field}: ${err.message}`, 'error');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
         }
     };
 

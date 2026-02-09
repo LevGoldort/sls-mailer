@@ -104,7 +104,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'headers': {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
-                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+                'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
             },
             'body': ''
         }
@@ -757,6 +757,21 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
 
             evt.seat_allocation = seat_allocation
 
+            # Recalculate available for each ticket type based on seat allocation
+            # (same logic as save_seat_allocation)
+            purchased_seats = get_purchased_seats_dict(event_id)
+            sold_by_type = {}
+            for seat_id, details in purchased_seats.items():
+                tt_id = details.get('ticket_type_id')
+                if tt_id:
+                    sold_by_type[tt_id] = sold_by_type.get(tt_id, 0) + 1
+
+            for tt in evt.ticket_types:
+                allocated = allocation_counts.get(tt.id, 0)
+                sold = sold_by_type.get(tt.id, 0)
+                tt.available = max(0, allocated - sold)
+                print(f"Recalculated '{tt.name}': allocated={allocated}, sold={sold}, available={tt.available}")
+
         evt.updated_at = datetime.utcnow().isoformat()
 
         # Сохраняем
@@ -1169,6 +1184,11 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     if method == 'POST' and path.endswith('/refund'):
         order_id = path.split('/')[-2]  # /api/orders/{id}/refund
         return process_refund(order_id, event)
+
+    # PATCH /api/orders/{id}/customer - update customer info
+    if method == 'PATCH' and path.endswith('/customer'):
+        order_id = path.split('/')[-2]
+        return update_order_customer(order_id, event)
 
     # GET /api/orders/{id} - детали заказа
     if method == 'GET' and path.startswith('/api/orders/'):
@@ -1903,6 +1923,68 @@ def cancel_tickets(order_id: str, request_event: Dict) -> Dict:
         return error_response(500, f"Failed to cancel tickets: {str(e)}")
 
 
+def update_order_customer(order_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - PATCH /api/orders/{id}/customer - update customer info"""
+
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_update_customer', {
+            'order_id': order_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+
+        # Load order
+        order_data = db.get_order(order_id)
+        if not order_data:
+            return error_response(404, "Order not found")
+
+        order = Order.from_dynamodb_item(order_data)
+
+        # Update customer fields if provided
+        updated_fields = []
+        if 'name' in body:
+            order.customer.name = body['name'].strip()
+            updated_fields.append('name')
+        if 'email' in body:
+            order.customer.email = body['email'].strip().lower()
+            updated_fields.append('email')
+        if 'phone' in body:
+            order.customer.phone = body['phone'].strip()
+            updated_fields.append('phone')
+
+        if not updated_fields:
+            return error_response(400, "No fields to update. Provide name, email, or phone.")
+
+        order.updated_at = datetime.utcnow().isoformat()
+        db.put_order(order.to_dynamodb_item())
+
+        print(f"Updated customer info for order {order_id}: {updated_fields}")
+
+        return success_response({
+            'status': 'success',
+            'message': f"Updated: {', '.join(updated_fields)}",
+            'customer': {
+                'name': order.customer.name,
+                'email': order.customer.email,
+                'phone': order.customer.phone
+            }
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON in request body")
+    except Exception as e:
+        print(f"Error updating customer info: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to update customer: {str(e)}")
+
+
 def resend_order_email(order_id: str, request_event: Dict) -> Dict:
     """ADMIN ONLY - POST /api/orders/{id}/resend-email - resend confirmation email"""
 
@@ -2535,7 +2617,7 @@ def handle_regenerate_site(event: Dict) -> Dict:
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+                'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
             },
             'body': result_payload.get('body', '{}')
         }
@@ -2557,7 +2639,7 @@ def success_response(data: Dict, status_code: int = 200) -> Dict:
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',  # CORS
             'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+            'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
         },
         'body': json.dumps(data, ensure_ascii=False, cls=DecimalEncoder)
     }
@@ -2575,7 +2657,7 @@ def error_response(status_code: int, message: str, extra_data: Dict = None) -> D
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+            'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
         },
         'body': json.dumps(body_data, ensure_ascii=False, cls=DecimalEncoder)
     }

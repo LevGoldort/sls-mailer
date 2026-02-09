@@ -1738,8 +1738,8 @@
         </div>
     </div>
 
-    <script src="shared.js?v=1764370571"></script>
-    <script src="order-modal.js?v=1770008382"></script>
+    <script src="shared.js?v=1770602138"></script>
+    <script src="order-modal.js?v=1770602149"></script>
     <script src="shared-image-upload.js"></script>
     <script src="seating-allocation-editor.js"></script>
     <script>
@@ -1815,7 +1815,7 @@
         }
 
         // Initialize image upload component
-        function initImageUploadComponent() {
+        function initImageUploadComponent(existingImages = []) {
             initImageUpload(
                 'event-images-upload',
                 'events',
@@ -1826,14 +1826,18 @@
                 (error) => {
                     console.error('Image upload error:', error);
                     showToast('Ошибка загрузки фото', 'error');
+                },
+                {
+                    existingImages: existingImages,
+                    onRemove: (url) => {
+                        imageUrls = imageUrls.filter(u => u !== url);
+                        console.log('Image removed:', url, 'Remaining:', imageUrls);
+                    }
                 }
             );
         }
 
         async function init() {
-            // Initialize image upload component
-            initImageUploadComponent();
-
             initSlugHandlers();
 
             // Load locations
@@ -1856,6 +1860,7 @@
                 await loadEvent(eventId);
             } else {
                 // Create mode: show form as-is
+                initImageUploadComponent();
                 addTicketType();
             }
         }
@@ -1913,6 +1918,9 @@
                     imageUrls = event.images;
                     console.log('Loaded existing images:', imageUrls);
                 }
+
+                // Initialize image upload with existing images
+                initImageUploadComponent(imageUrls);
 
                 // Load location data FIRST to determine if seated venue (affects ticket type rendering)
                 if (event.location_id) {
@@ -3312,18 +3320,22 @@
          * Lock ticket types after allocation
          */
         function lockTicketTypes() {
-            // Disable add ticket type button
-            const addBtn = document.getElementById('add-ticket-type-btn');
-            if (addBtn) addBtn.disabled = true;
+            // NOTE: Add button is NOT disabled - new ticket types can be added
 
-            // Disable delete buttons
-            document.querySelectorAll('.ticket-type-item .btn-danger').forEach(btn => {
-                btn.disabled = true;
-            });
+            // Only lock ticket types that have allocated seats
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                const id = item.dataset.id;
+                const hasAllocation = seatAllocationData && Object.values(seatAllocationData).includes(id);
 
-            // Disable name inputs
-            document.querySelectorAll('.tt-name').forEach(input => {
-                input.disabled = true;
+                if (hasAllocation) {
+                    // Disable delete button
+                    const deleteBtn = item.querySelector('.btn-danger');
+                    if (deleteBtn) deleteBtn.disabled = true;
+
+                    // Disable name input
+                    const nameInput = item.querySelector('.tt-name');
+                    if (nameInput) nameInput.disabled = true;
+                }
             });
 
             // Show warning and clear button
@@ -3335,18 +3347,18 @@
          * Unlock ticket types
          */
         function unlockTicketTypes() {
-            // Enable add ticket type button
-            const addBtn = document.getElementById('add-ticket-type-btn');
-            if (addBtn) addBtn.disabled = false;
+            // Enable all ticket type controls
+            document.querySelectorAll('.ticket-type-item').forEach(item => {
+                // Enable delete button (unless has sales)
+                const deleteBtn = item.querySelector('.btn-danger');
+                const id = item.dataset.id;
+                if (deleteBtn && !checkTicketTypeHasSales(id)) {
+                    deleteBtn.disabled = false;
+                }
 
-            // Enable delete buttons
-            document.querySelectorAll('.ticket-type-item .btn-danger').forEach(btn => {
-                btn.disabled = false;
-            });
-
-            // Enable name inputs
-            document.querySelectorAll('.tt-name').forEach(input => {
-                input.disabled = false;
+                // Enable name input
+                const nameInput = item.querySelector('.tt-name');
+                if (nameInput) nameInput.disabled = false;
             });
 
             // Hide warning and clear button
@@ -3390,14 +3402,27 @@
 
         // ===== MODIFY EXISTING FUNCTIONS =====
 
-        // Override addTicketType to check lock
+        // Override addTicketType - allow adding new types even after allocation
         const originalAddTicketType = addTicketType;
         addTicketType = function(data = null) {
+            const result = originalAddTicketType(data);
+
+            // If allocation is done, lock the name field of existing types
+            // but keep the new type's name field enabled for editing
             if (isAllocationDone && !data) {
-                alert('Типы билетов заблокированы после распределения. Очистите распределение для добавления новых типов.');
-                return;
+                // New type was just added - its name field should stay enabled
+                // Only lock names of types that have sales or are in allocation
+                document.querySelectorAll('.ticket-type-item').forEach(item => {
+                    const id = item.dataset.id;
+                    const nameInput = item.querySelector('.tt-name');
+                    // Lock if this type has allocated seats
+                    if (seatAllocationData && Object.values(seatAllocationData).includes(id)) {
+                        nameInput.disabled = true;
+                    }
+                });
             }
-            return originalAddTicketType(data);
+
+            return result;
         };
 
         // Override removeTicketType to check lock

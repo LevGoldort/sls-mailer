@@ -156,8 +156,9 @@ if (!document.getElementById('image-upload-styles')) {
  * @param {string} folder - S3 folder (e.g., 'events' or 'locations')
  * @param {function} onUploadComplete - Callback with (url) when upload succeeds
  * @param {function} onUploadError - Callback with (error) when upload fails
+ * @param {object} options - Optional settings: { existingImages: [], onRemove: (url) => {} }
  */
-function initImageUpload(containerId, folder, onUploadComplete, onUploadError) {
+function initImageUpload(containerId, folder, onUploadComplete, onUploadError, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) {
         console.error(`Container #${containerId} not found`);
@@ -222,6 +223,52 @@ function initImageUpload(containerId, folder, onUploadComplete, onUploadError) {
             handleFiles(files, folder, uploadedContainer, onUploadComplete, onUploadError);
         }
     });
+
+    // Store options for remove callback
+    container._imageUploadOptions = options;
+
+    // Display existing images if provided
+    if (options.existingImages && options.existingImages.length > 0) {
+        options.existingImages.forEach(url => {
+            addExistingImageCard(uploadedContainer, url, containerId, options.onRemove);
+        });
+    }
+}
+
+/**
+ * Add a card for an existing image (already uploaded)
+ */
+function addExistingImageCard(container, url, containerId, onRemove) {
+    const cardId = `img-existing-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const card = document.createElement('div');
+    card.className = 'image-upload-card';
+    card.id = cardId;
+    card.dataset.url = url;
+
+    const preview = document.createElement('img');
+    preview.className = 'image-preview';
+    preview.src = url;
+    preview.onerror = () => {
+        preview.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50" x="50" text-anchor="middle" font-size="14">Image</text></svg>';
+    };
+
+    const status = document.createElement('div');
+    status.className = 'upload-status success';
+    status.textContent = '✓ Uploaded';
+
+    const urlDiv = document.createElement('div');
+    urlDiv.className = 'image-url-display';
+    urlDiv.innerHTML = `
+        <input type="text" class="url-input-display" value="${url}" readonly>
+        <button class="copy-url-btn" onclick="copyImageUrl('${url}', this)">Copy</button>
+        <button class="remove-img-btn" onclick="removeImageCardWithCallback('${cardId}', '${url}')">×</button>
+    `;
+
+    card.appendChild(preview);
+    card.appendChild(status);
+    card.appendChild(urlDiv);
+    container.appendChild(card);
 }
 
 async function handleFiles(files, folder, container, onSuccess, onError) {
@@ -333,6 +380,7 @@ function updateImageCard(cardId, url, state, errorMsg = '') {
     const status = card.querySelector('.upload-status');
 
     if (state === 'success') {
+        card.dataset.url = url;
         status.className = 'upload-status success';
         status.textContent = '✓ Uploaded';
 
@@ -341,7 +389,7 @@ function updateImageCard(cardId, url, state, errorMsg = '') {
         urlDiv.innerHTML = `
             <input type="text" class="url-input-display" value="${url}" readonly>
             <button class="copy-url-btn" onclick="copyImageUrl('${url}', this)">Copy</button>
-            <button class="remove-img-btn" onclick="removeImageCard('${cardId}')">×</button>
+            <button class="remove-img-btn" onclick="removeImageCardWithCallback('${cardId}', '${url}')">×</button>
         `;
         card.appendChild(urlDiv);
     } else {
@@ -362,7 +410,24 @@ function copyImageUrl(url, btn) {
 
 function removeImageCard(cardId) {
     const card = document.getElementById(cardId);
-    if (card) card.remove();
+    if (card) {
+        const url = card.dataset.url;
+        card.remove();
+        return url;
+    }
+    return null;
+}
+
+function removeImageCardWithCallback(cardId, url) {
+    const card = document.getElementById(cardId);
+    if (card) {
+        // Find the container and get onRemove callback
+        const container = card.closest('.uploaded-images');
+        if (container && container.parentElement._imageUploadOptions?.onRemove) {
+            container.parentElement._imageUploadOptions.onRemove(url);
+        }
+        card.remove();
+    }
 }
 
 // Google Maps URL parsing
