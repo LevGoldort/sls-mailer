@@ -340,6 +340,16 @@ else
     echo "   ⚠️  Could not verify site regeneration"
 fi
 
+# Invalidate CloudFront cache for admin panel
+echo ""
+echo "🔄 Invalidating CloudFront cache for admin panel..."
+aws cloudfront create-invalidation \
+    --distribution-id E1QVQ0JRE575WR \
+    --paths "/*" \
+    --profile prod \
+    --no-cli-pager > /dev/null
+echo "   ✓ CloudFront invalidation created"
+
 echo ""
 echo "✅ ✅ ✅ Deployment complete! ✅ ✅ ✅"
 echo ""

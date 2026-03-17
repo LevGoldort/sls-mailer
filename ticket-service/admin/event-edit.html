@@ -1568,7 +1568,7 @@
             </div>
         </div>
 
-        <form id="event-form">
+        <form id="event-form" novalidate>
             <div class="form-section">
                 <h2>Основная информация</h2>
 
@@ -2084,13 +2084,33 @@
             try {
                 // Collect ticket types
                 const ticketTypes = [];
+
+                // For seated venues, compute authoritative totals from seatAllocationData
+                // (DOM inputs may have stale DB values if seat modal wasn't reopened)
+                const seatedTotals = {};
+                if (seatAllocationData && Object.keys(seatAllocationData).length > 0) {
+                    for (const [seatId, ttId] of Object.entries(seatAllocationData)) {
+                        seatedTotals[ttId] = (seatedTotals[ttId] || 0) + 1;
+                    }
+                }
+                const isSeatedEvent = Object.keys(seatedTotals).length > 0;
+
                 document.querySelectorAll('.ticket-type-item').forEach(item => {
                     const id = item.dataset.id;
                     const name = item.querySelector('.tt-name').value;
                     const price = parseFloat(item.querySelector('.tt-price').value);
-                    const total = parseInt(item.querySelector('.tt-total').value);
-                    const availableInput = item.querySelector('.tt-available').value;
-                    const available = availableInput ? parseInt(availableInput) : total;
+                    let total, available;
+
+                    if (isSeatedEvent && seatedTotals[id] !== undefined) {
+                        // Seated venue: total = allocated seats, available = total - sold
+                        total = seatedTotals[id];
+                        const sold = soldTicketsByType[id] || 0;
+                        available = Math.max(0, total - sold);
+                    } else {
+                        total = parseInt(item.querySelector('.tt-total').value);
+                        const availableInput = item.querySelector('.tt-available').value;
+                        available = availableInput ? parseInt(availableInput) : total;
+                    }
 
                     ticketTypes.push({ id, name, price, total, available });
                 });
@@ -2202,12 +2222,30 @@
                 orders.forEach(order => {
                     const status = order.payment.status;
                     if (status === 'completed') {
+                        // Count active (non-cancelled) QR codes per ticket type
+                        // This correctly excludes individually cancelled tickets
+                        const activeQrByType = {};
+                        (order.qr_codes || []).forEach(qr => {
+                            // Initialize to 0 so fully-cancelled types don't fall back to ticket.quantity
+                            if (activeQrByType[qr.ticket_type] === undefined) {
+                                activeQrByType[qr.ticket_type] = 0;
+                            }
+                            if (!qr.cancelled) {
+                                activeQrByType[qr.ticket_type]++;
+                            }
+                        });
+
                         order.tickets.forEach(ticket => {
-                            totalSoldTickets += ticket.quantity;
+                            // Use active QR count if available, otherwise fall back to quantity
+                            const activeCount = activeQrByType[ticket.type_id] !== undefined
+                                ? activeQrByType[ticket.type_id]
+                                : ticket.quantity;
+
+                            totalSoldTickets += activeCount;
 
                             // Track completed sales by type (used for available calculation)
                             soldTicketsByType[ticket.type_id] =
-                                (soldTicketsByType[ticket.type_id] || 0) + ticket.quantity;
+                                (soldTicketsByType[ticket.type_id] || 0) + activeCount;
 
                             if (ticket.purchased_seats && ticket.purchased_seats.length > 0) {
                                 hasSalesWithSeats = true;
