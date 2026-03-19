@@ -83,6 +83,17 @@ Parameters:
     Default: ""
     Description: Comma-separated list of admin API keys
 
+  ActiveTrailApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Active Trail API key for SMS sending
+
+  ActiveTrailSenderId:
+    Type: String
+    Default: "Yalla"
+    Description: Active Trail SMS sender ID (pre-registered name)
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
 
@@ -102,6 +113,13 @@ Globals:
           - yallabalagan-email-sender
 
           - !Sub yallabalagan-email-sender-${Environment}
+        SMS_SENDER_LAMBDA: !If
+
+          - IsProd
+
+          - yallabalagan-sms-sender
+
+          - !Sub yallabalagan-sms-sender-${Environment}
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
@@ -513,6 +531,7 @@ Resources:
               Resource:
                 - !GetAtt SiteRegeneratorFunction.Arn
                 - !GetAtt EmailSenderFunction.Arn
+                - !GetAtt SmsSenderFunction.Arn
 
   # Site Regenerator
   SiteRegeneratorFunction:
@@ -579,6 +598,31 @@ Resources:
             TableName: !Ref OrdersTable
         - SESCrudPolicy:
             IdentityName: !Ref SenderEmail
+
+  # SMS Sender
+  SmsSenderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !If
+
+        - IsProd
+
+        - yallabalagan-sms-sender
+
+        - !Sub yallabalagan-sms-sender-${Environment}
+      CodeUri: .
+      Handler: lambdas/sms-sender.lambda_handler
+      Description: Sends SMS notifications via Active Trail
+      MemorySize: 256
+      Environment:
+        Variables:
+          ACTIVETRAIL_API_KEY: !Ref ActiveTrailApiKey
+          ACTIVETRAIL_SENDER_ID: !Ref ActiveTrailSenderId
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
 
   # Event Status Updater
   EventStatusUpdaterFunction:

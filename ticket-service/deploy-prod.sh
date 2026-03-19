@@ -80,13 +80,35 @@ update_lambda() {
         return 1
     fi
 
-    # Update function code
-    aws lambda update-function-code \
-        --function-name "$function_name" \
-        --zip-file "fileb://$SCRIPT_DIR/${function_name}.zip" \
-        --region eu-north-1 \
-        --profile prod \
-        --no-cli-pager > /dev/null
+    # Use S3 upload if zip exceeds 50MB direct-upload limit
+    local zip_size
+    zip_size=$(wc -c < "$SCRIPT_DIR/${function_name}.zip")
+    if [ "$zip_size" -gt 50000000 ]; then
+        echo "   📦 Package is large ($(( zip_size / 1024 / 1024 ))MB), uploading via S3..."
+        local s3_key="lambda-deploys/${function_name}.zip"
+        aws s3 cp "$SCRIPT_DIR/${function_name}.zip" "s3://yallabalagan-ticket-media/${s3_key}" \
+            --region eu-north-1 \
+            --profile prod \
+            --no-cli-pager > /dev/null
+        aws lambda update-function-code \
+            --function-name "$function_name" \
+            --s3-bucket yallabalagan-ticket-media \
+            --s3-key "$s3_key" \
+            --region eu-north-1 \
+            --profile prod \
+            --no-cli-pager > /dev/null
+        aws s3 rm "s3://yallabalagan-ticket-media/${s3_key}" \
+            --region eu-north-1 \
+            --profile prod \
+            --no-cli-pager > /dev/null
+    else
+        aws lambda update-function-code \
+            --function-name "$function_name" \
+            --zip-file "fileb://$SCRIPT_DIR/${function_name}.zip" \
+            --region eu-north-1 \
+            --profile prod \
+            --no-cli-pager > /dev/null
+    fi
 
     echo "   ✓ Code updated"
 
@@ -121,6 +143,7 @@ cat > /tmp/ticket-api-env.json <<EOF
     "ENVIRONMENT": "prod",
     "PAYMENT_MODE": "${PAYMENT_MODE}",
     "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "SMS_SENDER_LAMBDA": "yallabalagan-sms-sender",
     "EVENTS_TABLE": "yallabalagan-events",
     "LOCATIONS_TABLE": "yallabalagan-locations",
     "ORDERS_TABLE": "yallabalagan-orders",
@@ -227,6 +250,7 @@ if [ -d "$SCRIPT_DIR/.aws-sam/build/EmailSenderFunction" ]; then
 {
   "Variables": {
     "SENDER_EMAIL": "${SENDER_EMAIL}",
+    "FRONTEND_URL": "${FRONTEND_URL}",
     "ENVIRONMENT": "prod",
     "PAYMENT_MODE": "${PAYMENT_MODE}",
     "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
@@ -247,6 +271,34 @@ EOF
         --profile prod \
         --no-cli-pager > /dev/null
     rm -f /tmp/email-sender-env.json
+
+    echo "   ✓ Environment variables updated"
+fi
+
+# Update SmsSenderFunction
+if [ -d "$SCRIPT_DIR/.aws-sam/build/SmsSenderFunction" ]; then
+    update_lambda "yallabalagan-sms-sender" ".aws-sam/build/SmsSenderFunction" "lambdas/sms-sender.lambda_handler"
+
+    echo "   ⚙️  Updating environment variables..."
+    cat > /tmp/sms-sender-env.json <<EOF
+{
+  "Variables": {
+    "ACTIVETRAIL_API_KEY": "${ACTIVETRAIL_API_KEY}",
+    "ACTIVETRAIL_SENDER_ID": "${ACTIVETRAIL_SENDER_ID}",
+    "FRONTEND_URL": "${FRONTEND_URL}",
+    "ENVIRONMENT": "prod",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "ORDERS_TABLE": "yallabalagan-orders"
+  }
+}
+EOF
+    aws lambda update-function-configuration \
+        --function-name yallabalagan-sms-sender \
+        --environment file:///tmp/sms-sender-env.json \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+    rm -f /tmp/sms-sender-env.json
 
     echo "   ✓ Environment variables updated"
 fi

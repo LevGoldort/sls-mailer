@@ -1180,6 +1180,16 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
         order_id = path.split('/')[-2]
         return resend_order_email(order_id, event)
 
+    # POST /api/orders/{id}/resend-sms - resend SMS to individual order
+    if method == 'POST' and path.endswith('/resend-sms'):
+        order_id = path.split('/')[-2]
+        return resend_order_sms(order_id, event)
+
+    # POST /api/events/{id}/send-sms-blast - blast SMS to all buyers of event
+    if method == 'POST' and path.endswith('/send-sms-blast'):
+        event_id = path.split('/')[-2]
+        return send_event_sms_blast(event_id, event)
+
     # POST /api/orders/{id}/refund - обработать возврат
     if method == 'POST' and path.endswith('/refund'):
         order_id = path.split('/')[-2]  # /api/orders/{id}/refund
@@ -1189,6 +1199,11 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     if method == 'PATCH' and path.endswith('/customer'):
         order_id = path.split('/')[-2]
         return update_order_customer(order_id, event)
+
+    # GET /api/orders/{id}/ticket - public ticket view (no auth required)
+    if method == 'GET' and path.endswith('/ticket'):
+        order_id = path.split('/')[-2]
+        return get_order_public_ticket(order_id)
 
     # GET /api/orders/{id} - детали заказа
     if method == 'GET' and path.startswith('/api/orders/'):
@@ -1499,6 +1514,14 @@ def create_order(request_event: Dict) -> Dict:
                 )
                 print(f"Email Lambda triggered for free order {order.order_id}")
 
+                # Trigger SMS Lambda asynchronously
+                lambda_client.invoke(
+                    FunctionName=os.environ.get('SMS_SENDER_LAMBDA', 'yallabalagan-sms-sender'),
+                    InvocationType='Event',
+                    Payload=json.dumps({'order_id': order.order_id})
+                )
+                print(f"SMS Lambda triggered for free order {order.order_id}")
+
                 # Возвращаем успешный ответ БЕЗ payment_url
                 return success_response({
                     'message': 'Free order completed successfully',
@@ -1764,6 +1787,80 @@ def get_order(order_id: str, request_event: Dict = None) -> Dict:
     return success_response({
         'order': order.to_dynamodb_item()
     })
+
+
+def get_order_public_ticket(order_id: str) -> Dict:
+    """GET /api/orders/{id}/ticket - public ticket view, no auth required"""
+    item = db.get_order(order_id)
+    if not item:
+        return error_response(404, "Order not found")
+
+    order = Order.from_dynamodb_item(item)
+
+    if order.payment.status != 'completed':
+        return error_response(403, "Tickets not available: payment not completed")
+
+    # Load event
+    event_data = db.get_event(order.event_id)
+    if not event_data:
+        return error_response(404, "Event not found")
+    event = Event.from_dynamodb_item(event_data)
+
+    # Load location
+    location_name = ""
+    seating_map_config = None
+    try:
+        location_data = db.get_location(event.location_id)
+        if location_data:
+            location = Location.from_dynamodb_item(location_data)
+            location_name = location.name
+            if location.venue_config and location.venue_config.seating_map:
+                sm = location.venue_config.seating_map
+                seating_map_config = {
+                    'seats_per_row': int(sm.seats_per_row),
+                    'disabled_seats': list(sm.disabled_seats or []),
+                    'numbering_direction': sm.numbering_direction,
+                    'custom_numbers': dict(sm.custom_numbers or {})
+                }
+    except Exception as e:
+        print(f"Warning: Failed to load location: {e}")
+
+    # Build ticket list (strip sensitive fields)
+    tickets = [
+        {
+            'type_name': t.type_name,
+            'quantity': int(t.quantity),
+            'purchased_seats': list(t.purchased_seats or [])
+        }
+        for t in order.tickets
+    ]
+
+    # Filter out cancelled QR codes
+    qr_codes = [
+        {
+            'code': qr.code,
+            's3_url': qr.s3_url,
+            'seat_id': qr.seat_id
+        }
+        for qr in order.qr_codes
+        if not getattr(qr, 'cancelled', False)
+    ]
+
+    customer_first_name = (order.customer.name or '').split()[0] if order.customer and order.customer.name else ''
+
+    ticket_data = {
+        'order_id': order.order_id,
+        'event_title': event.title,
+        'event_date': event.date,
+        'location_name': location_name,
+        'customer_first_name': customer_first_name,
+        'tickets': tickets,
+        'qr_codes': qr_codes
+    }
+    if seating_map_config:
+        ticket_data['seating_map_config'] = seating_map_config
+
+    return success_response({'ticket': ticket_data})
 
 
 def check_can_refund(order_id: str, request_event: Dict = None) -> Dict:
@@ -2040,6 +2137,122 @@ def resend_order_email(order_id: str, request_event: Dict) -> Dict:
         import traceback
         traceback.print_exc()
         return error_response(500, f"Failed to resend email: {str(e)}")
+
+
+def resend_order_sms(order_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - POST /api/orders/{id}/resend-sms - resend SMS to individual order"""
+
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_resend_sms', {
+            'order_id': order_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        custom_message = body.get('custom_message', '')
+
+        order_data = db.get_order(order_id)
+        if not order_data:
+            return error_response(404, "Order not found")
+
+        order = Order.from_dynamodb_item(order_data)
+
+        if order.payment.status != 'completed':
+            return error_response(400, "Can only resend SMS for completed orders")
+
+        lambda_client = boto3.client('lambda')
+        payload = {
+            'order_id': order_id,
+            'force_resend': True,
+            'custom_message': custom_message
+        }
+        lambda_client.invoke(
+            FunctionName=os.environ.get('SMS_SENDER_LAMBDA', 'yallabalagan-sms-sender'),
+            InvocationType='Event',
+            Payload=json.dumps(payload)
+        )
+
+        print(f"SMS resend triggered for order {order_id}")
+
+        return success_response({
+            'status': 'success',
+            'message': 'SMS resend triggered',
+            'order_id': order_id
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+    except Exception as e:
+        print(f"Error resending SMS: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to resend SMS: {str(e)}")
+
+
+def send_event_sms_blast(event_id: str, request_event: Dict) -> Dict:
+    """ADMIN ONLY - POST /api/events/{id}/send-sms-blast - blast SMS to all buyers of event"""
+
+    auth = get_admin_authenticator()
+    api_key = auth.extract_api_key(request_event)
+
+    if not auth.verify_admin_key(api_key):
+        log_security_event('unauthorized_sms_blast', {
+            'event_id': event_id,
+            'ip': get_client_identifier(request_event)
+        })
+        return error_response(401, "Unauthorized: Admin access required")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        custom_message = body.get('custom_message', '')
+
+        # Load all completed orders for event
+        order_items = db.get_orders_by_event(event_id)
+        if not order_items:
+            return success_response({'triggered': 0, 'event_id': event_id, 'message': 'No orders found'})
+
+        lambda_client = boto3.client('lambda')
+        triggered = 0
+
+        for item in order_items:
+            order = Order.from_dynamodb_item(item)
+            if order.payment.status != 'completed':
+                continue
+            if not (order.customer and order.customer.phone):
+                continue
+
+            payload = {
+                'order_id': order.order_id,
+                'force_resend': True,
+                'custom_message': custom_message
+            }
+            lambda_client.invoke(
+                FunctionName=os.environ.get('SMS_SENDER_LAMBDA', 'yallabalagan-sms-sender'),
+                InvocationType='Event',
+                Payload=json.dumps(payload)
+            )
+            triggered += 1
+
+        print(f"SMS blast triggered for event {event_id}: {triggered} SMS queued")
+
+        return success_response({
+            'triggered': triggered,
+            'event_id': event_id,
+            'message': f'SMS blast triggered for {triggered} orders'
+        })
+
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+    except Exception as e:
+        print(f"Error in SMS blast: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, f"Failed to send SMS blast: {str(e)}")
 
 
 def process_refund(order_id: str, request_event: Dict) -> Dict:
@@ -2899,6 +3112,14 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                     })
                 )
                 print(f"Email Lambda triggered for order {order_id}")
+
+                # Trigger SMS Lambda asynchronously
+                lambda_client.invoke(
+                    FunctionName=os.environ.get('SMS_SENDER_LAMBDA', 'yallabalagan-sms-sender'),
+                    InvocationType='Event',
+                    Payload=json.dumps({'order_id': order_id})
+                )
+                print(f"SMS Lambda triggered for order {order_id}")
             except Exception as e:
                 # Don't fail webhook if processing fails - log it
                 print(f"Failed to finalize order {order_id}: {str(e)}")

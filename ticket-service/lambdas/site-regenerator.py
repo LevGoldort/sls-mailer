@@ -184,6 +184,12 @@ def generate_html_files(events, locations, output_dir, templates_dir):
     html = template.render()
     (output_dir / 'checkout.html').write_text(html, encoding='utf-8')
 
+    # Generate ticket.html (public ticket view, JS-driven)
+    print("Generating ticket.html...")
+    template = env.get_template('ticket.html')
+    html = template.render()
+    (output_dir / 'ticket.html').write_text(html, encoding='utf-8')
+
     # Generate accessibility.html
     print("Generating accessibility.html...")
     template = env.get_template('accessibility.html')
@@ -193,7 +199,7 @@ def generate_html_files(events, locations, output_dir, templates_dir):
     # Generate mock_payment.html (if in mock mode)
     payment_mode = os.environ.get('PAYMENT_MODE', 'mock').lower()
     slugged_events = sum(1 for event in events if event.get('slug'))
-    pages_generated = 1 + len(events) + slugged_events + len(locations) + 3  # +3 for processing.html, checkout.html, accessibility.html
+    pages_generated = 1 + len(events) + slugged_events + len(locations) + 4  # +4 for processing.html, checkout.html, ticket.html, accessibility.html
 
     if payment_mode == 'mock':
         print("Generating mock_payment.html...")

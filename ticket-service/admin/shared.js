@@ -88,6 +88,8 @@ const API = {
     getOrder: (id) => apiCall(`/api/orders/${id}`),
     cancelTickets: (orderId, data) => apiCall(`/api/orders/${orderId}/cancel-tickets`, 'POST', data),
     resendEmail: (orderId, data) => apiCall(`/api/orders/${orderId}/resend-email`, 'POST', data),
+    resendSms: (orderId, data) => apiCall(`/api/orders/${orderId}/resend-sms`, 'POST', data),
+    sendSmsBlast: (eventId, data) => apiCall(`/api/events/${eventId}/send-sms-blast`, 'POST', data),
     updateOrderCustomer: (orderId, data) => apiCall(`/api/orders/${orderId}/customer`, 'PATCH', data),
 
     // Coupons

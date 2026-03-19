@@ -116,7 +116,16 @@ def load_email_template() -> str:
                 <li>Сохраните это письмо до посещения события</li>
             </ul>
         </div>
-        
+
+        <div style="text-align: center; margin-bottom: 20px;">
+            <a href="{{ frontend_url }}/ticket.html?order_id={{ order.order_id }}"
+               style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white; padding: 14px 28px; text-decoration: none;
+                      border-radius: 8px; font-size: 16px; font-weight: 600;">
+                Посмотреть билеты онлайн
+            </a>
+        </div>
+
         <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
             <p style="color: #666; font-size: 12px; margin: 0 0 10px 0;">
                 Для отмены билетов напишите на <a href="mailto:yalla@yallabalagan.org" style="color: #667eea;">yalla@yallabalagan.org</a> и укажите айди билетов (можно переслать это сообщение просто).

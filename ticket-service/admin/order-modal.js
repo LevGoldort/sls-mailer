@@ -447,6 +447,16 @@
                     </button>
                 </div>
             </div>
+
+            <div class="order-modal-section">
+                <h3>Send SMS</h3>
+                <div class="resend-section">
+                    <textarea id="resend-sms-message" placeholder="Optional custom message for SMS..."></textarea>
+                    <button class="order-modal-btn btn-resend-sms" onclick="handleResendSms('${order.order_id}')">
+                        Send SMS
+                    </button>
+                </div>
+            </div>
         `;
 
         // Wire up checkbox change to enable/disable cancel button
@@ -525,6 +535,30 @@
             showToast(`Failed to update ${field}: ${err.message}`, 'error');
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
+        }
+    };
+
+    // ===== Resend SMS =====
+    window.handleResendSms = async function (orderId) {
+        const textarea = document.getElementById('resend-sms-message');
+        const customMessage = textarea ? textarea.value.trim() : '';
+
+        const btn = document.querySelector('.btn-resend-sms');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        try {
+            await API.resendSms(orderId, { custom_message: customMessage });
+            showToast('SMS sent successfully');
+            btn.textContent = 'Sent!';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = 'Send SMS';
+            }, 2000);
+        } catch (err) {
+            showToast('Failed to send SMS: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Send SMS';
         }
     };
 
