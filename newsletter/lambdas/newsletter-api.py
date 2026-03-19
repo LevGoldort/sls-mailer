@@ -14,6 +14,7 @@ Endpoints:
 - POST /campaigns - Create campaign
 - GET /campaigns - List campaigns
 - GET /campaigns/{campaign_id} - Get campaign details
+- GET /campaigns/{campaign_id}/view - Public HTML view of campaign (shareable link)
 - POST /campaigns/{campaign_id}/send - Send campaign
 - GET /contacts/preview - Preview contacts by tags
 - POST /unsubscribe - Unsubscribe contact
@@ -509,6 +510,77 @@ def import_contacts(event):
         return cors_response(500, {'error': str(e)})
 
 
+def view_campaign(event):
+    """GET /campaigns/{campaign_id}/view - Public HTML view of campaign (shareable link)"""
+    try:
+        # Extract campaign_id from path: /...campaigns/{campaign_id}/view
+        path_params = event.get('pathParameters') or {}
+        campaign_id = path_params.get('campaign_id')
+        if not campaign_id:
+            raw_path = event.get('rawPath', '')
+            parts = [p for p in raw_path.split('/') if p]
+            # path looks like [..., 'campaigns', '{id}', 'view']
+            try:
+                idx = parts.index('campaigns')
+                campaign_id = parts[idx + 1]
+            except (ValueError, IndexError):
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'text/html; charset=utf-8'},
+                    'body': '<html><body><h1>400 - Bad Request</h1></body></html>'
+                }
+
+        response = campaigns_table.get_item(Key={'campaign_id': campaign_id})
+        campaign = response.get('Item')
+
+        if not campaign:
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'text/html; charset=utf-8'},
+                'body': '<html><body><h1>404 - Campaign not found</h1></body></html>'
+            }
+
+        subject = campaign.get('subject', '')
+        html_body = campaign.get('html_body', '')
+
+        # Strip tracking pixels and replace {{UNSUBSCRIBE_LINK}} placeholder
+        html_body = html_body.replace('{{UNSUBSCRIBE_LINK}}', '#')
+
+        # Wrap in a minimal page if the body doesn't already have <html>
+        if '<html' not in html_body.lower():
+            page_html = f"""<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+</head>
+<body>
+{html_body}
+</body>
+</html>"""
+        else:
+            page_html = html_body
+
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'public, max-age=3600'
+            },
+            'body': page_html
+        }
+
+    except Exception as e:
+        print(f"Error viewing campaign: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'text/html; charset=utf-8'},
+            'body': '<html><body><h1>500 - Internal Server Error</h1></body></html>'
+        }
+
+
 def validate_api_key(event):
     """Validate API key from request headers"""
     admin_key = os.environ.get('ADMIN_API_KEY', '')
@@ -526,12 +598,18 @@ def validate_api_key(event):
 # Public endpoints that don't require API key
 PUBLIC_ENDPOINTS = [
     ('POST', '/unsubscribe'),
+    ('GET', '/view'),  # campaigns/{id}/view - checked by path prefix in is_public_endpoint
 ]
 
 
 def is_public_endpoint(method, path):
     """Check if endpoint is public (no auth required)"""
-    return (method, path) in PUBLIC_ENDPOINTS
+    if (method, path) in PUBLIC_ENDPOINTS:
+        return True
+    # /campaigns/{id}/view is public
+    if method == 'GET' and path.endswith('/view'):
+        return True
+    return False
 
 
 def lambda_handler(event, context):
@@ -560,6 +638,9 @@ def lambda_handler(event, context):
 
         elif method == 'GET' and path == '/campaigns':
             return list_campaigns(event)
+
+        elif method == 'GET' and path.endswith('/view'):
+            return view_campaign(event)
 
         elif method == 'GET' and path.startswith('/campaigns/') and not path.endswith('/send'):
             return get_campaign(event)

@@ -82,6 +82,16 @@
             background: #c72d94;
         }
 
+        .btn-secondary {
+            background: #636e72;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #2d3436;
+        }
+
         .btn-danger {
             background: #d63031;
             color: white;
@@ -299,6 +309,9 @@
                 <button class="btn btn-primary" id="send-btn" onclick="sendCampaign()" style="display: none;">
                     Send Campaign
                 </button>
+                <a class="btn btn-secondary" id="view-link" href="#" target="_blank" style="display: none;">
+                    🔗 View in Browser
+                </a>
                 <button class="btn btn-danger" onclick="deleteCampaign()">
                     Delete Campaign
                 </button>
@@ -403,6 +416,11 @@
             if (campaign.status === 'draft') {
                 document.getElementById('send-btn').style.display = 'block';
             }
+
+            // View in browser link (always visible)
+            const viewLink = document.getElementById('view-link');
+            viewLink.href = `https://newsletter.yallabalagan.org/campaign/${campaign.campaign_id}/view`;
+            viewLink.style.display = 'inline-block';
 
             // Statistics
             const sent = campaign.stats?.sent || 0;

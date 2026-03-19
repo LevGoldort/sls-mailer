@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: sans-serif; background: #f5f5f5; }
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #666;
+      font-size: 18px;
+    }
+    #content {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+    }
+    #error {
+      display: none;
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    #error h1 { color: #d63031; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <div id="error">
+    <h1>Campaign not found</h1>
+    <p>This campaign may have been deleted or the link is invalid.</p>
+  </div>
+  <div id="content"></div>
+
+  <script>
+    const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
+
+    // Try path first: /campaign/{id}/view
+    const pathMatch = window.location.pathname.match(/\/campaign\/([^\/]+)\/view/);
+    const params = new URLSearchParams(window.location.search);
+    const campaignId = pathMatch ? pathMatch[1] : params.get('id');
+
+    if (!campaignId) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+    } else {
+      fetch(`${API_BASE_URL}/campaigns/${campaignId}/view`)
+        .then(res => {
+          if (!res.ok) throw new Error('Not found');
+          return res.text();
+        })
+        .then(html => {
+          // Extract title from campaign HTML and set as page title
+          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          if (titleMatch) document.title = titleMatch[1];
+
+          document.getElementById('loading').style.display = 'none';
+          const content = document.getElementById('content');
+          content.style.display = 'block';
+          content.innerHTML = html;
+        })
+        .catch(() => {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').style.display = 'block';
+        });
+    }
+  </script>
+</body>
+</html>
