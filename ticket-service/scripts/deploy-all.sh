@@ -107,6 +107,10 @@ deploy_lambdas() {
     echo -e "${BLUE}📦 Deploying email sender...${NC}"
     "$SCRIPT_DIR/deploy-email-sender.sh" "$skip_deps"
 
+    # Deploy SMS sender
+    echo -e "${BLUE}📦 Deploying SMS sender...${NC}"
+    "$SCRIPT_DIR/deploy-sms-sender.sh" "$skip_deps"
+
     # Deploy event status updater (inline)
     deploy_event_status_updater "$skip_deps"
 

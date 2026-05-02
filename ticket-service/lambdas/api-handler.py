@@ -172,6 +172,11 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
         event_id = path.split('/')[-2]
         return save_seat_allocation(event_id, event)
 
+    # POST /api/events/{id}/send-sms-blast - blast SMS to all buyers of event
+    if method == 'POST' and path.endswith('/send-sms-blast'):
+        event_id = path.split('/')[-2]
+        return send_event_sms_blast(event_id, event)
+
     # GET /api/events/{id} - детали события
     if method == 'GET' and path.startswith('/api/events/'):
         event_id = path.split('/')[-1]
@@ -1185,11 +1190,6 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
         order_id = path.split('/')[-2]
         return resend_order_sms(order_id, event)
 
-    # POST /api/events/{id}/send-sms-blast - blast SMS to all buyers of event
-    if method == 'POST' and path.endswith('/send-sms-blast'):
-        event_id = path.split('/')[-2]
-        return send_event_sms_blast(event_id, event)
-
     # POST /api/orders/{id}/refund - обработать возврат
     if method == 'POST' and path.endswith('/refund'):
         order_id = path.split('/')[-2]  # /api/orders/{id}/refund
@@ -1835,15 +1835,14 @@ def get_order_public_ticket(order_id: str) -> Dict:
         for t in order.tickets
     ]
 
-    # Filter out cancelled QR codes
     qr_codes = [
         {
             'code': qr.code,
             's3_url': qr.s3_url,
-            'seat_id': qr.seat_id
+            'seat_id': qr.seat_id,
+            'cancelled': bool(getattr(qr, 'cancelled', False))
         }
         for qr in order.qr_codes
-        if not getattr(qr, 'cancelled', False)
     ]
 
     customer_first_name = (order.customer.name or '').split()[0] if order.customer and order.customer.name else ''
@@ -2210,6 +2209,7 @@ def send_event_sms_blast(event_id: str, request_event: Dict) -> Dict:
     try:
         body = json.loads(request_event.get('body', '{}'))
         custom_message = body.get('custom_message', '')
+        include_ticket_info = body.get('include_ticket_info', True)
 
         # Load all completed orders for event
         order_items = db.get_orders_by_event(event_id)
@@ -2225,11 +2225,14 @@ def send_event_sms_blast(event_id: str, request_event: Dict) -> Dict:
                 continue
             if not (order.customer and order.customer.phone):
                 continue
+            if order.qr_codes and all(getattr(qr, 'cancelled', False) for qr in order.qr_codes):
+                continue
 
             payload = {
                 'order_id': order.order_id,
                 'force_resend': True,
-                'custom_message': custom_message
+                'custom_message': custom_message,
+                'include_ticket_info': include_ticket_info
             }
             lambda_client.invoke(
                 FunctionName=os.environ.get('SMS_SENDER_LAMBDA', 'yallabalagan-sms-sender'),

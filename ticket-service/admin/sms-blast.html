@@ -152,6 +152,11 @@
                 <textarea id="custom-message" placeholder="Prepended to the automatic ticket message. Leave blank to send default ticket info only." oninput="updatePreview()"></textarea>
             </div>
 
+            <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+                <input type="checkbox" id="include-ticket-info" checked onchange="updatePreview()" style="width:18px;height:18px;cursor:pointer;">
+                <label for="include-ticket-info" style="margin-bottom:0;cursor:pointer;">Приложить билеты</label>
+            </div>
+
             <div class="form-group">
                 <label>Preview</label>
                 <div class="preview-box" id="preview-box">
@@ -189,6 +194,13 @@
                     opt.textContent = escapeHtml(ev.title || ev.name || opt.value);
                     select.appendChild(opt);
                 });
+                const params = new URLSearchParams(window.location.search);
+                const preselect = params.get('id');
+                if (preselect) {
+                    const select = document.getElementById('event-select');
+                    select.value = preselect;
+                    if (select.value === preselect) await onEventChange();
+                }
             } catch (err) {
                 document.getElementById('event-select').innerHTML = '<option value="">Error loading events</option>';
                 console.error('Failed to load events:', err);
@@ -224,17 +236,20 @@
 
         function updatePreview() {
             const custom = document.getElementById('custom-message').value.trim();
+            const includeTicketInfo = document.getElementById('include-ticket-info').checked;
             const box = document.getElementById('preview-box');
             const eventTitle = selectedEvent ? (selectedEvent.title || selectedEvent.name || '') : '[Event Name]';
             const eventDate = selectedEvent ? (selectedEvent.date || '') : '';
 
             let parts = [];
             if (custom) parts.push(custom);
-            parts.push(`Ваши билеты на ${eventTitle}`);
-            if (eventDate) parts.push(`Дата: ${eventDate}`);
-            parts.push('Билеты отправлены на email.');
+            if (includeTicketInfo) {
+                parts.push(`Ваши билеты на ${eventTitle}`);
+                if (eventDate) parts.push(`Дата: ${eventDate}`);
+                parts.push('Билеты отправлены на email.');
+            }
 
-            box.innerHTML = parts.map(p => escapeHtml(p)).join('<br>');
+            box.innerHTML = parts.length ? parts.map(p => escapeHtml(p)).join('<br>') : '<em>Сообщение пустое</em>';
         }
 
         async function sendBlast() {
@@ -244,6 +259,7 @@
             if (!confirm(`Send SMS to ${orderCount} buyer(s) for this event?\n\nThis cannot be undone.`)) return;
 
             const customMessage = document.getElementById('custom-message').value.trim();
+            const includeTicketInfo = document.getElementById('include-ticket-info').checked;
             const btn = document.getElementById('btn-send');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span>Sending...';
@@ -252,7 +268,7 @@
             resultBox.style.display = 'none';
 
             try {
-                const result = await API.sendSmsBlast(eventId, { custom_message: customMessage });
+                const result = await API.sendSmsBlast(eventId, { custom_message: customMessage, include_ticket_info: includeTicketInfo });
                 resultBox.className = 'result-box result-success';
                 resultBox.textContent = `SMS blast triggered for ${result.triggered || orderCount} orders.`;
                 resultBox.style.display = 'block';

@@ -34,21 +34,21 @@ def format_event_date(event_date: str) -> str:
         return event_date
 
 
-def build_sms_message(order: Order, event: Event, custom_message: str = None) -> str:
+def build_sms_message(order: Order, event: Event, custom_message: str = None, include_ticket_info: bool = True) -> str:
     """Build SMS message text"""
-    total_tickets = sum(t.quantity for t in order.tickets)
-
     parts = []
 
     if custom_message:
         parts.append(custom_message)
 
-    parts.append(f"Ваши билеты на {event.title}")
-    parts.append(f"Дата: {format_event_date(event.date)}")
-    parts.append(f"Билетов: {total_tickets}")
-    parts.append("Билеты отправлены на email.")
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
-    parts.append(f"Билеты онлайн: {frontend_url}/ticket.html?order_id={order.order_id}")
+    if include_ticket_info:
+        total_tickets = sum(t.quantity for t in order.tickets)
+        parts.append(f"Ваши билеты на {event.title}")
+        parts.append(f"Дата: {format_event_date(event.date)}")
+        parts.append(f"Билетов: {total_tickets}")
+        parts.append("Билеты отправлены на email.")
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
+        parts.append(f"Билеты онлайн: {frontend_url}/ticket.html?order_id={order.order_id}")
 
     return "\n".join(parts)
 
@@ -69,9 +69,19 @@ def send_active_trail_sms(phone: str, message: str) -> Dict:
     url = 'https://webapi.mymarketing.co.il/api/smscampaign/OperationalMessage'
 
     payload = {
-        "sms_phone": normalized,
-        "content": message,
-        "sender_id": sender_id
+        "details": {
+            "name": "ticket_notification",
+            "from_name": sender_id,
+            "content": message,
+            "can_unsubscribe": False,
+            "unsubscribe_text": ""
+        },
+        "scheduling": {
+            "send_now": True
+        },
+        "mobiles": [
+            {"phone_number": normalized}
+        ]
     }
 
     data = json.dumps(payload).encode('utf-8')
@@ -128,6 +138,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         order_id = payload.get('order_id')
         force_resend = payload.get('force_resend', False)
         custom_message = payload.get('custom_message', '')
+        include_ticket_info = payload.get('include_ticket_info', True)
 
         if not order_id:
             print("Error: order_id not provided")
@@ -178,7 +189,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         event_obj = Event.from_dynamodb_item(event_data)
 
         # Build and send SMS
-        message_text = build_sms_message(order, event_obj, custom_message or None)
+        message_text = build_sms_message(order, event_obj, custom_message or None, include_ticket_info)
         print(f"Sending SMS to {phone}: {message_text[:50]}...")
 
         result = send_active_trail_sms(phone, message_text)

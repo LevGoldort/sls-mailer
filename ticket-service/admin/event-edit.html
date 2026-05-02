@@ -1403,6 +1403,7 @@
                 <div class="management-header-actions">
                     <button class="btn" onclick="openNewsletterImportModal()">Импортировать почты</button>
                     <button class="btn" onclick="openBulkResendModal()">Перевыпустить билеты</button>
+                    <button class="btn" style="background:#9c27b0;color:white;" onclick="window.location.href='sms-blast.html?id='+eventId">📱 SMS</button>
                     <button class="btn btn-secondary" onclick="openEditDetailsModal()">Редактировать</button>
                 </div>
             </div>
@@ -2740,8 +2741,13 @@
             const modal = document.getElementById('bulk-resend-modal');
             const list = document.getElementById('bulk-resend-list');
 
-            // Only completed orders
-            const completedOrders = allEventOrders.filter(o => o.payment?.status === 'completed');
+            // Only completed orders where at least one ticket is not cancelled
+            const completedOrders = allEventOrders.filter(o => {
+                if (o.payment?.status !== 'completed') return false;
+                const qrs = o.qr_codes || [];
+                if (qrs.length === 0) return true;
+                return qrs.some(qr => !qr.cancelled);
+            });
 
             if (completedOrders.length === 0) {
                 showToast('Нет оплаченных заказов для рассылки', 'error');
@@ -2750,7 +2756,10 @@
 
             list.innerHTML = completedOrders.map(o => {
                 const customer = o.customer || {};
-                const ticketCount = (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0);
+                const qrs = o.qr_codes || [];
+                const activeCount = qrs.length ? qrs.filter(qr => !qr.cancelled).length : (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0);
+                const totalCount = qrs.length || (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0);
+                const partialCancel = qrs.length > 0 && activeCount < totalCount;
                 return `
                     <div class="bulk-resend-item">
                         <label>
@@ -2759,7 +2768,7 @@
                                 <strong>${escapeHtml(customer.name || '-')}</strong>
                                 <small>${escapeHtml(customer.email || '-')}</small>
                             </div>
-                            <span class="order-tickets">${ticketCount} шт</span>
+                            <span class="order-tickets">${activeCount} шт${partialCancel ? ` <span style="color:#dc2626;font-size:0.8em">(${totalCount - activeCount} отм.)</span>` : ''}</span>
                         </label>
                     </div>
                 `;

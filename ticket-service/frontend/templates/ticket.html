@@ -139,15 +139,19 @@ function showTicket(ticket) {
     `;
 
     if (ticket.qr_codes && ticket.qr_codes.length > 0) {
+        const allCancelled = ticket.qr_codes.every(qr => qr.cancelled);
+
         const qrHtml = `
-            <h3>QR-коды для входа:</h3>
+            ${allCancelled ? `<div class="cancelled-banner">❌ Все билеты отменены</div>` : ''}
+            <h3>${allCancelled ? 'Билеты:' : 'QR-коды для входа:'}</h3>
             <div class="qr-grid">
                 ${ticket.qr_codes.map((qr, index) => {
                     const seatLabel = qr.seat_id
                         ? `<p class="seat-label">${getSeatDisplayLabel(qr.seat_id, seatingMapConfig)}</p>`
                         : '';
                     return `
-                        <div class="qr-item">
+                        <div class="qr-item ${qr.cancelled ? 'qr-item-cancelled' : ''}">
+                            ${qr.cancelled ? `<div class="cancelled-overlay">ОТМЕНЁН</div>` : ''}
                             ${qr.s3_url
                                 ? `<img src="${qr.s3_url}" alt="QR Code ${qr.code}" class="qr-image">`
                                 : `<div class="qr-placeholder">📱</div>`
@@ -243,6 +247,39 @@ function showError(message) {
     background: var(--gray-50);
     padding: 1rem;
     border-radius: 0.5rem;
+    position: relative;
+}
+
+.qr-item-cancelled {
+    opacity: 0.5;
+}
+
+.cancelled-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-20deg);
+    background: rgba(220, 38, 38, 0.85);
+    color: white;
+    font-weight: 800;
+    font-size: 1rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    z-index: 1;
+    white-space: nowrap;
+}
+
+.cancelled-banner {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
 }
 
 .qr-placeholder {

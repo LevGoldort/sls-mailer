@@ -120,6 +120,22 @@ update_lambda() {
 
     echo "   ✓ Update complete"
 
+    # Update handler
+    aws lambda wait function-updated \
+        --function-name "$function_name" \
+        --region eu-north-1 \
+        --profile prod
+    aws lambda update-function-configuration \
+        --function-name "$function_name" \
+        --handler "$handler" \
+        --region eu-north-1 \
+        --profile prod \
+        --no-cli-pager > /dev/null
+    aws lambda wait function-updated \
+        --function-name "$function_name" \
+        --region eu-north-1 \
+        --profile prod
+
     # Cleanup
     rm -f "$SCRIPT_DIR/${function_name}.zip"
 }

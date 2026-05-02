@@ -317,11 +317,13 @@ def unsubscribe_contact(event):
         token = body.get('token')
 
         if not email or not token:
+            print(f"Unsubscribe rejected: missing email or token")
             return cors_response(400, {'error': 'Missing email or token'})
 
         # Validate token
         expected_token = generate_token(email)
         if token != expected_token:
+            print(f"Unsubscribe rejected: invalid token for {email}")
             return cors_response(403, {'error': 'Invalid token'})
 
         # Update contact status
@@ -335,10 +337,11 @@ def unsubscribe_contact(event):
             }
         )
 
+        print(f"Successfully unsubscribed: {email}")
         return cors_response(200, {'success': True})
 
     except Exception as e:
-        print(f"Error unsubscribing: {str(e)}")
+        print(f"Error unsubscribing {body.get('email', '?')}: {str(e)}")
         return cors_response(500, {'error': str(e)})
 
 

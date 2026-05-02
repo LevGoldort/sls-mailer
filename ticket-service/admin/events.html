@@ -452,6 +452,9 @@
                                 <button class="action-btn btn-edit" onclick="editEvent('${event.event_id}')">
                                     ✏️ Редактировать
                                 </button>
+                                <button class="action-btn" style="background:#9c27b0;color:white;" onclick="window.location.href='sms-blast.html?id=${event.event_id}'">
+                                    📱 SMS
+                                </button>
                                 <button class="action-btn btn-delete" onclick="deleteEvent('${event.event_id}', '${escapeHtml(event.title).replace(/'/g, "\\&#039;")}')">
                                     🗑️ Удалить
                                 </button>
