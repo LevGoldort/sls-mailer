@@ -254,8 +254,23 @@
             if (custom) {
                 seatDisplay = custom.seat;
                 if (custom.row !== undefined) rowDisplay = custom.row;
-            } else if (cfg.numbering_direction === 'right-to-left') {
-                seatDisplay = cfg.seats_per_row - seatIndex;
+            } else {
+                const disabledSeats = new Set(cfg.disabled_seats || []);
+                const seatsPerRow = parseInt(cfg.seats_per_row);
+                let enabledCount = 0;
+                if (cfg.numbering_direction === 'right-to-left') {
+                    for (let s = seatsPerRow - 1; s >= 0; s--) {
+                        if (!disabledSeats.has(`${rowIndex}-${s}`)) {
+                            enabledCount++;
+                            if (s === seatIndex) break;
+                        }
+                    }
+                } else {
+                    for (let s = 0; s <= seatIndex; s++) {
+                        if (!disabledSeats.has(`${rowIndex}-${s}`)) enabledCount++;
+                    }
+                }
+                seatDisplay = enabledCount;
             }
         }
         return `Ряд ${rowDisplay}, Место ${seatDisplay}`;

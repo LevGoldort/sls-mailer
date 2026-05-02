@@ -342,12 +342,19 @@
         // --- Search ---
 
         function filterList(source, search) {
+            const searchDigits = search.replace(/\D/g, '');
             return source.filter(o => {
                 const customer = o.customer || {};
+                const phoneDigits = (customer.phone || '').replace(/\D/g, '');
+                const hasQrMatch = (o.qr_codes || []).some(qr =>
+                    (qr.code || '').toLowerCase().includes(search)
+                );
                 return (
                     o.order_id.toLowerCase().includes(search) ||
                     (customer.email || '').toLowerCase().includes(search) ||
-                    (customer.name || '').toLowerCase().includes(search)
+                    (customer.name || '').toLowerCase().includes(search) ||
+                    (searchDigits.length >= 4 && phoneDigits.includes(searchDigits)) ||
+                    hasQrMatch
                 );
             });
         }
