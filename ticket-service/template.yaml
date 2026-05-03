@@ -709,7 +709,11 @@ Resources:
           - DELETE
           - OPTIONS
         AllowHeaders:
-          - '*'
+          - Content-Type
+          - X-API-Key
+          - Authorization
+          - X-Scanner-Token
+          - X-Scanner-Event
       Tags:
         Project: YallaBalagan-TicketService
         Environment: !Ref Environment
