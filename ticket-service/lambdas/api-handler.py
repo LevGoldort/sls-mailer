@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from models import Event, Location, Order, Customer, OrderTicket, TicketType, Coupon, Address, Coordinates, Parking, Media, Contact, SeatingMapConfig, VenueConfig
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
-from utils.auth import get_admin_authenticator
+from utils.auth import get_admin_authenticator, is_scanner_or_admin, verify_scanner_token
 from datetime import datetime, timezone
 
 
@@ -125,6 +125,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_regenerate_site(event)
         elif path == '/api/webhooks/allpay' and http_method == 'POST':
             return handle_allpay_webhook(event)
+        # ===== SCANNER ENDPOINTS =====
+        elif http_method == 'GET' and path == '/api/scanner/search':
+            return handle_scanner_search(event)
         else:
             return error_response(404, "Endpoint not found")
 
@@ -3140,6 +3143,64 @@ def handle_allpay_webhook(event: Dict) -> Dict:
         import traceback
         traceback.print_exc()
         return error_response(500, f"Webhook processing failed: {str(e)}")
+
+
+def handle_scanner_search(request_event: Dict) -> Dict:
+    """GET /api/scanner/search?event_id=&q= — minimal payload, no payment data."""
+    if not is_scanner_or_admin(request_event):
+        log_security_event('unauthorized_scanner_search', {'ip': get_client_identifier(request_event)})
+        return error_response(401, "Unauthorized")
+
+    params = request_event.get('queryStringParameters') or {}
+    event_id = (params.get('event_id') or '').strip()
+    q = (params.get('q') or '').strip()
+
+    if not event_id:
+        return error_response(400, "event_id is required")
+    if len(q) < 2:
+        return error_response(400, "q must be at least 2 characters")
+
+    # Scanner tokens are event-scoped: enforce event_id == X-Scanner-Event
+    headers = {k.lower(): v for k, v in (request_event.get('headers') or {}).items()}
+    scanner_token = headers.get('x-scanner-token', '')
+    if scanner_token:
+        scanner_event = headers.get('x-scanner-event', '')
+        if event_id != scanner_event:
+            return error_response(403, "event_id mismatch")
+
+    try:
+        raw_orders = db.get_orders_by_event(event_id)
+        q_lower = q.lower()
+        results = []
+        for raw in raw_orders:
+            order = Order.from_dynamodb_item(raw)
+            if (order.payment and order.payment.status) != 'completed':
+                continue
+            customer = order.customer or Customer()
+            name = (customer.name or '').lower()
+            email = (customer.email or '').lower()
+            phone = (customer.phone or '').lower()
+            if q_lower not in name and q_lower not in email and q_lower not in phone:
+                continue
+            tickets = [
+                {
+                    'code': qr.code,
+                    'ticket_type': qr.ticket_type,
+                    'seat_id': getattr(qr, 'seat_id', None),
+                    'scanned': qr.scanned,
+                    'scanned_at': qr.scanned_at,
+                    'cancelled': qr.cancelled,
+                }
+                for qr in (order.qr_codes or [])
+            ]
+            results.append({
+                'order_id': order.order_id,
+                'customer': {'name': customer.name, 'phone': customer.phone},
+                'tickets': tickets,
+            })
+        return success_response({'results': results})
+    except Exception as e:
+        return error_response(500, str(e))
 
 
 # For local testing
