@@ -286,24 +286,26 @@ class DynamoDBClient:
         
         return None
 
-    def update_ticket_scanned_status(self, order_id: str, ticket_code: str, scanned: bool = True):
+    def update_ticket_scanned_status(self, order_id: str, ticket_code: str, scanned: bool = True, scanned_by_event: str = None):
         """Обновляет статус сканирования билета"""
         from datetime import datetime
-        
+
         # Get order first
         order_data = self.get_order(order_id)
         if not order_data:
             return None
-        
+
         # Update the specific QR code in the list
         qr_codes = order_data.get('qr_codes', [])
         updated = False
-        
+
         for i, qr in enumerate(qr_codes):
             if qr.get('code') == ticket_code:
                 qr_codes[i]['scanned'] = scanned
                 if scanned:
                     qr_codes[i]['scanned_at'] = datetime.utcnow().isoformat()
+                    if scanned_by_event:
+                        qr_codes[i]['scanned_by_event'] = scanned_by_event
                 updated = True
                 break
         

@@ -2342,37 +2342,42 @@ def process_refund(order_id: str, request_event: Dict) -> Dict:
 
 
 def verify_ticket(ticket_code: str, request_event: Dict = None) -> Dict:
-    """POST /api/orders/verify/{ticket_code} - проверяет билет (admin only)"""
+    """POST /api/orders/verify/{ticket_code} - проверяет билет (admin or scanner)"""
 
-    # SECURITY: Require admin authentication
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(request_event) if request_event else None
-
-    if not auth.verify_admin_key(api_key):
+    if not is_scanner_or_admin(request_event):
         log_security_event('unauthorized_ticket_verify', {
             'ticket_code': ticket_code,
             'ip': get_client_identifier(request_event) if request_event else 'unknown'
         })
-        return error_response(401, "Unauthorized: Admin access required")
+        return error_response(401, "Unauthorized")
+
+    headers = {k.lower(): v for k, v in (request_event.get('headers') or {}).items()} if request_event else {}
+    scanner_token = headers.get('x-scanner-token', '')
+    scanner_event_id = headers.get('x-scanner-event', '')
+    scanned_by_event = scanner_event_id if scanner_token else 'admin'
 
     try:
         # Find order by ticket code
         order_data = db.get_order_by_ticket_code(ticket_code)
         if not order_data:
             return error_response(404, "Ticket not found")
-        
+
         order = Order.from_dynamodb_item(order_data)
-        
+
+        # Wrong-event check for scanner auth
+        if scanner_token and scanner_event_id and order.event_id != scanner_event_id:
+            return success_response({'valid': False, 'reason': 'wrong_event'})
+
         # Find the specific QR code
         qr_code = None
         for qr in order.qr_codes:
             if qr.code == ticket_code:
                 qr_code = qr
                 break
-        
+
         if not qr_code:
             return error_response(404, "Ticket code not found in order")
-        
+
         # Validate ticket
         if order.payment.status != "completed":
             return error_response(400, "Ticket payment not completed")
@@ -2384,37 +2389,35 @@ def verify_ticket(ticket_code: str, request_event: Dict = None) -> Dict:
             return error_response(400, "Ticket has been cancelled")
 
         if qr_code.scanned:
-            return error_response(400, "Ticket already scanned", extra_data={
-                'scanned_at': qr_code.scanned_at,
-                'order_id': order.order_id
-            })
-        
+            return success_response({'valid': False, 'reason': 'already_scanned', 'scanned_at': qr_code.scanned_at})
+
         # Load event for details
         event_data = db.get_event(order.event_id)
         event = None
         if event_data:
             event = Event.from_dynamodb_item(event_data)
-        
-        # Mark ticket as scanned
-        db.update_ticket_scanned_status(order.order_id, ticket_code, scanned=True)
-        
+
+        # Mark ticket as scanned with audit attribution
+        db.update_ticket_scanned_status(order.order_id, ticket_code, scanned=True, scanned_by_event=scanned_by_event)
+
         # Reload order to get updated scan status
         order_data = db.get_order(order.order_id)
         order = Order.from_dynamodb_item(order_data)
-        
-        # Find updated QR code
+
         for qr in order.qr_codes:
             if qr.code == ticket_code:
                 qr_code = qr
                 break
-        
+
         return success_response({
             'valid': True,
             'ticket': {
                 'code': ticket_code,
                 'ticket_type': qr_code.ticket_type,
                 'order_id': order.order_id,
+                'customer_name': (order.customer.name if order.customer else None),
                 'scanned_at': qr_code.scanned_at,
+                'seat_id': getattr(qr_code, 'seat_id', None),
                 'event': {
                     'event_id': order.event_id,
                     'title': event.title if event else None,
