@@ -1657,6 +1657,16 @@
                 </div>
             </div>
 
+            <div class="form-section">
+                <h2>Сканер (Ralphy)</h2>
+                <div class="form-group">
+                    <label for="scanner-password-input">Пароль для сканера</label>
+                    <input type="password" id="scanner-password-input" placeholder="Пароль для волонтёров на входе">
+                    <div class="help-text">Выдаётся волонтёрам для сканирования билетов. Оставьте пустым, чтобы отключить доступ.</div>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="saveScannerPassword()">Сохранить пароль</button>
+            </div>
+
             <div class="form-actions">
                 <button type="button" class="btn" onclick="window.location.href='events.html'">Отмена</button>
                 <button type="submit" class="btn btn-primary" id="submit-btn">Сохранить</button>
@@ -1949,6 +1959,9 @@
                     // Will trigger lockTicketTypes and updateAllocationSummary in init() override
                 }
 
+                // Load scanner password
+                document.getElementById('scanner-password-input').value = event.scanner_password || '';
+
                 // Load orders for this event
                 loadOrders(id);
 
@@ -2200,6 +2213,16 @@
                 submitBtn.textContent = 'Сохранить';
             }
         });
+
+        async function saveScannerPassword() {
+            const password = document.getElementById('scanner-password-input').value;
+            try {
+                await API.updateEvent(eventId, { scanner_password: password });
+                showToast('Пароль сканера сохранён', 'success');
+            } catch (error) {
+                showToast('Ошибка сохранения пароля', 'error');
+            }
+        }
 
         // Orders management
         async function loadOrders(eventId) {

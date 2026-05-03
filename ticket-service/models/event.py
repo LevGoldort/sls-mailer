@@ -57,6 +57,7 @@ class Event:
     refund_policy: RefundPolicy = field(default_factory=lambda: RefundPolicy())
     slug: Optional[str] = None  # Короткий URL /events/<slug>.html
     seat_allocation: Optional[Dict[str, str]] = None  # {"0-5": "tt-xxx", ...} - распределение мест по типам билетов
+    scanner_password: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -94,6 +95,9 @@ class Event:
         if self.seat_allocation:
             item["seat_allocation"] = self.seat_allocation
 
+        if self.scanner_password:
+            item["scanner_password"] = self.scanner_password
+
         return item
 
     @classmethod
@@ -127,6 +131,7 @@ class Event:
             refund_policy=refund_policy,
             slug=item.get("slug"),
             seat_allocation=item.get("seat_allocation"),
+            scanner_password=item.get("scanner_password"),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )
