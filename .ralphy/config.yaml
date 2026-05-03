@@ -1,0 +1,55 @@
+# Ralphy Configuration
+# https://github.com/michaelshimeles/ralphy
+
+project:
+  name: "yallabalagan"
+  language: "python"
+  framework: "AWS SAM + Lambda"
+  description: "Serverless event ticketing platform with admin panel, payment processing, SMS/email notifications"
+
+commands:
+  test: "cd ticket-service && pytest"
+  lint: "cd ticket-service && ruff check ."
+  build: "sam build"
+
+# Rules - instructions the AI MUST follow
+# These are injected into every prompt
+rules:
+  - "Admin panel is vanilla HTML/JS at ticket-service/admin/ — no React or build step"
+  - "Admin API auth uses X-API-Key header validated against ADMIN_API_KEY env var"
+  - "All Lambda handlers live in ticket-service/lambdas/api-handler.py — add new routes there"
+  - "DynamoDB table names always come from env vars (e.g. EVENTS_TABLE), never hardcode them"
+  - "Event URLs follow the pattern https://yallabalagan.org/events/{slug}.html"
+  - "Images are stored in S3 bucket yallabalagan-ticket-media and referenced by URL in event.images[]"
+  - "Image uploads go through POST /api/upload-image with multipart form data"
+  - "Admin JS uses localStorage for API key (key: adminApiKey) and API_BASE constant for endpoint base URL"
+  - "Lambda runtime is Python 3.12, region eu-north-1, timeout 30s, memory 512MB"
+  - "Payment integration is AllPay — webhook at /api/webhooks/allpay with signature verification"
+  - "SMS uses ActiveTrail API (https://webapi.mymarketing.co.il/api/smscampaign/OperationalMessage), sender ID from ACTIVETRAIL_SENDER_ID env var, email uses AWS SES from tickets@yallabalagan.org"
+  - "FB Pixel ID 738718761834602 is already configured and injected into the frontend"
+  - "FB Marketing API version is v21.0 (FB_API_BASE = https://graph.facebook.com/v21.0)"
+  - "FB ads require env vars FB_ACCESS_TOKEN (long-lived token with ads_management permission), FB_AD_ACCOUNT_ID (act_XXXXXXXXXX format), FB_PAGE_ID"
+  - "FB campaign naming convention is yallabalagan_{event_id}_{event_slug}; get_event_campaigns filters by this prefix"
+  - "FB ad set uses OUTCOME_SALES campaign objective, OFFSITE_CONVERSIONS optimization, PURCHASE pixel event, BUY_TICKETS CTA"
+  - "FB ad geo targeting uses 40km radius around event lat/lng, Russian locale ID 6, ages 18-55"
+  - "FB daily budget is entered in ILS and sent to the API as agorot (ILS × 100)"
+  - "FB admin endpoints (all require X-API-Key): GET /api/admin/facebook-ads/pixels, POST /api/admin/facebook-ads/launch (body: event_id, image_urls, daily_budget_ils, pixel_id), GET /api/admin/facebook-ads/campaigns?event_id=, POST /api/admin/facebook-ads/pause (body: campaign_id)"
+  - "POST /api/events/{id}/send-sms-blast is an admin endpoint that blasts SMS to all buyers of an event"
+  - "scanner_password is an optional string field on each Event DynamoDB record; door staff use it to authenticate with the scanner page"
+  - "Scanner auth uses two headers: X-Scanner-Token (the password value) and X-Scanner-Event (the event_id the token is issued for)"
+  - "verify_scanner_token(token, event_id) in utils/auth.py loads the event from DynamoDB, compares token with hmac.compare_digest against scanner_password, and returns False if event.date + 8h <= now(UTC) — fails closed on any error"
+  - "is_scanner_or_admin(request_event) in utils/auth.py returns True if X-API-Key passes admin auth OR if X-Scanner-Token + X-Scanner-Event pass verify_scanner_token"
+  - "Scanner tokens are event-scoped: a token issued for event A cannot authenticate requests for event B"
+  - "GET /api/scanner/search requires event_id and q (min 2 chars); when scanner auth is used, enforces event_id == X-Scanner-Event header; returns minimal payload with no payment data"
+  - "POST /api/orders/verify/{code} accepts both admin and scanner credentials via is_scanner_or_admin; returns {valid: false, reason: 'wrong_event'} if ticket belongs to a different event than X-Scanner-Event"
+  - "When marking a ticket scanned, scanned_by_event is written to the QR code record (value = X-Scanner-Event or 'admin') for audit attribution"
+  - "html5-qrcode@2.3.8 from unpkg CDN is used in scanner.html with sha384 SRI integrity attribute; always compute hash with: curl -s https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js | openssl dgst -sha384 -binary | openssl base64 -A"
+  - "scanner.html stores scannerToken and scannerEventId in sessionStorage (not localStorage) because tokens are event-scoped and short-lived"
+  - "All scanner API calls require HTTPS; X-Scanner-Token and X-Scanner-Event are listed in API Gateway CORS AllowHeaders in template.yaml"
+
+boundaries:
+  never_touch:
+    - "*.lock"
+    - "samconfig.toml"
+    - ".env.prod"
+    - ".ralphy/progress.txt"
