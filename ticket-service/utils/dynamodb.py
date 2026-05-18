@@ -287,42 +287,54 @@ class DynamoDBClient:
         return None
 
     def update_ticket_scanned_status(self, order_id: str, ticket_code: str, scanned: bool = True, scanned_by_event: str = None):
-        """Обновляет статус сканирования билета"""
-        from datetime import datetime
+        """Атомарно обновляет статус сканирования.
 
-        # Get order first
+        Returns 'already_scanned' if a concurrent device beat us to it
+        (ConditionalCheckFailedException), None if ticket not found, otherwise
+        the DynamoDB response dict.
+        """
+        from datetime import datetime
+        from botocore.exceptions import ClientError
+
         order_data = self.get_order(order_id)
         if not order_data:
             return None
 
-        # Update the specific QR code in the list
         qr_codes = order_data.get('qr_codes', [])
-        updated = False
-
+        index = None
         for i, qr in enumerate(qr_codes):
             if qr.get('code') == ticket_code:
-                qr_codes[i]['scanned'] = scanned
-                if scanned:
-                    qr_codes[i]['scanned_at'] = datetime.utcnow().isoformat()
-                    if scanned_by_event:
-                        qr_codes[i]['scanned_by_event'] = scanned_by_event
-                updated = True
+                index = i
                 break
-        
-        if not updated:
+
+        if index is None:
             return None
-        
-        # Update the order
-        return self.orders_table.update_item(
-            Key={
-                'PK': f'ORDER#{order_id}',
-                'SK': 'METADATA'
-            },
-            UpdateExpression='SET qr_codes = :qr_codes',
-            ExpressionAttributeValues={
-                ':qr_codes': qr_codes
-            }
+
+        now = datetime.utcnow().isoformat()
+        update_expr = (
+            f'SET qr_codes[{index}].scanned = :true'
+            f', qr_codes[{index}].scanned_at = :now'
         )
+        expr_values = {':true': True, ':false': False, ':now': now}
+
+        if scanned_by_event:
+            update_expr += f', qr_codes[{index}].scanned_by_event = :by'
+            expr_values[':by'] = scanned_by_event
+
+        try:
+            return self.orders_table.update_item(
+                Key={'PK': f'ORDER#{order_id}', 'SK': 'METADATA'},
+                UpdateExpression=update_expr,
+                ConditionExpression=(
+                    f'qr_codes[{index}].scanned = :false'
+                    f' OR attribute_not_exists(qr_codes[{index}].scanned)'
+                ),
+                ExpressionAttributeValues=expr_values,
+            )
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                return 'already_scanned'
+            raise
 
     def list_orders(self, limit: int = None) -> List[Dict]:
         """Получает список всех заказов (с пагинацией)"""

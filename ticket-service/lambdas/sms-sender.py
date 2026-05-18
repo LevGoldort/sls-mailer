@@ -15,7 +15,7 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from models import Order, Event
+from models import Order, Event, Location
 from utils.dynamodb import DynamoDBClient
 
 
@@ -34,7 +34,7 @@ def format_event_date(event_date: str) -> str:
         return event_date
 
 
-def build_sms_message(order: Order, event: Event, custom_message: str = None, include_ticket_info: bool = True) -> str:
+def build_sms_message(order: Order, event: Event, custom_message: str = None, include_ticket_info: bool = True, location: Location = None) -> str:
     """Build SMS message text"""
     parts = []
 
@@ -42,11 +42,9 @@ def build_sms_message(order: Order, event: Event, custom_message: str = None, in
         parts.append(custom_message)
 
     if include_ticket_info:
-        total_tickets = sum(t.quantity for t in order.tickets)
-        parts.append(f"Ваши билеты на {event.title}")
         parts.append(f"Дата: {format_event_date(event.date)}")
-        parts.append(f"Билетов: {total_tickets}")
-        parts.append("Билеты отправлены на email.")
+        if location:
+            parts.append(f"Место: {location.name}, {location.address.street}, {location.address.city}")
         frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
         parts.append(f"Билеты онлайн: {frontend_url}/ticket.html?order_id={order.order_id}")
 
@@ -188,8 +186,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         event_obj = Event.from_dynamodb_item(event_data)
 
+        location_obj = None
+        if event_obj.location_id:
+            location_data = db.get_location(event_obj.location_id)
+            if location_data:
+                location_obj = Location.from_dynamodb_item(location_data)
+
         # Build and send SMS
-        message_text = build_sms_message(order, event_obj, custom_message or None, include_ticket_info)
+        message_text = build_sms_message(order, event_obj, custom_message or None, include_ticket_info, location_obj)
         print(f"Sending SMS to {phone}: {message_text[:50]}...")
 
         result = send_active_trail_sms(phone, message_text)

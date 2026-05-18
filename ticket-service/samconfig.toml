@@ -28,21 +28,39 @@ lint = true
 
 ##############################################################################
 # DEVELOPMENT Environment
+#
+# Day-to-day deploys: ./deploy.sh dev
+#
+# First-time setup (new dev account):
+#   sam build
+#   sam package --s3-bucket yallabalagan-sam-artifacts-dev --s3-prefix yallabalagan-ticket-service \
+#     --region eu-north-1 --profile dev --output-template-file /tmp/packaged-dev.yaml
+#   aws cloudformation create-stack --stack-name yallabalagan-ticket-service-dev \
+#     --template-body file:///tmp/packaged-dev.yaml \
+#     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+#     --parameters ParameterKey=Environment,ParameterValue=dev ... --profile dev --region eu-north-1
+#   Then get API URL from stack outputs and set API_URL in .env.dev
+#
+# Note: sam deploy is NOT used because it triggers EarlyValidation::ResourceExistenceCheck
+# which conflicts with S3 bucket creation. Use create-stack/update-stack directly.
 ##############################################################################
 [dev.deploy.parameters]
 stack_name = "yallabalagan-ticket-service-dev"
 s3_bucket = "yallabalagan-sam-artifacts-dev"
 s3_prefix = "yallabalagan-ticket-service"
 region = "eu-north-1"
+profile = "dev"
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
     "Environment=dev",
     "SenderEmail=yalla@yallabalagan.org",
     "GA4Id=G-DEVDEVDEV",
-    "FBPixelId=000000000"
-    # AllPay credentials loaded from .env.dev via deploy script
+    "FBPixelId=000000000",
+    "PaymentMode=mock",
+    "AllPayUseApi=false",
+    "AllPayWebhookSecret=dev-secret"
 ]
-confirm_changeset = false  # Быстрее для dev
+confirm_changeset = false
 image_repositories = []
 
 [dev.build.parameters]

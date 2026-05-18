@@ -5,6 +5,18 @@ import boto3
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+_dynamodb = None
+_events_table = None
+
+
+def _get_events_table():
+    global _dynamodb, _events_table
+    if _events_table is None:
+        region = os.environ.get('AWS_REGION', 'eu-north-1')
+        _dynamodb = boto3.resource('dynamodb', region_name=region)
+        _events_table = _dynamodb.Table(os.environ.get('EVENTS_TABLE', 'yallabalagan-events'))
+    return _events_table
+
 
 class AdminAuthenticator:
     """Admin API key verification using environment variable"""
@@ -63,11 +75,7 @@ def verify_scanner_token(token: str, event_id: str) -> bool:
         if not token or not event_id:
             return False
 
-        table_name = os.environ.get('EVENTS_TABLE', 'yallabalagan-events')
-        dynamodb = boto3.resource('dynamodb', region_name='eu-north-1')
-        table = dynamodb.Table(table_name)
-
-        response = table.get_item(Key={'PK': f'EVENT#{event_id}', 'SK': 'METADATA'})
+        response = _get_events_table().get_item(Key={'PK': f'EVENT#{event_id}', 'SK': 'METADATA'})
         item = response.get('Item')
         if not item:
             return False

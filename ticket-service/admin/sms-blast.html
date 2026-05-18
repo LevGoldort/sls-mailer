@@ -222,10 +222,13 @@
             try {
                 const orders = await API.getOrdersByEvent(eventId);
                 const list = Array.isArray(orders) ? orders : (orders.orders || []);
-                orderCount = list.filter(o =>
-                    o.payment && o.payment.status === 'completed' &&
-                    o.customer && o.customer.phone
-                ).length;
+                orderCount = list.filter(o => {
+                    if (!o.payment || o.payment.status !== 'completed') return false;
+                    if (!o.customer || !o.customer.phone) return false;
+                    const qrs = o.qr_codes || [];
+                    if (qrs.length > 0 && qrs.every(q => q.cancelled)) return false;
+                    return true;
+                }).length;
                 document.getElementById('recipients-count').textContent = orderCount;
                 document.getElementById('btn-send').disabled = orderCount === 0;
             } catch (err) {
@@ -244,9 +247,9 @@
             let parts = [];
             if (custom) parts.push(custom);
             if (includeTicketInfo) {
-                parts.push(`Ваши билеты на ${eventTitle}`);
                 if (eventDate) parts.push(`Дата: ${eventDate}`);
-                parts.push('Билеты отправлены на email.');
+                parts.push('Место: [название и адрес площадки]');
+                parts.push('Билеты онлайн: https://events.yallabalagan.org/ticket.html?order_id=<order_id>');
             }
 
             box.innerHTML = parts.length ? parts.map(p => escapeHtml(p)).join('<br>') : '<em>Сообщение пустое</em>';

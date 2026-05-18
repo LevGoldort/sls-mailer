@@ -2186,6 +2186,9 @@
                     eventData.seat_allocation = seatAllocationData;
                 }
 
+                // Scanner password (always included so it can be set on create and cleared on update)
+                eventData.scanner_password = document.getElementById('scanner-password-input').value;
+
                 // Create or update
                 if (eventId) {
                     await API.updateEvent(eventId, eventData);

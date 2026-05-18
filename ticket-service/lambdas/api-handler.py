@@ -103,7 +103,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature,X-Scanner-Token,X-Scanner-Event',
                 'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
             },
             'body': ''
@@ -564,7 +564,8 @@ def create_event(request_event: Dict) -> Dict:
             currency=body.get('currency', 'ILS'),
             images=body.get('images', []),
             slug=slug_value,
-            seat_allocation=seat_allocation
+            seat_allocation=seat_allocation,
+            scanner_password=body.get('scanner_password') or None,
         )
 
         # Сохраняем в DynamoDB
@@ -732,6 +733,9 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
             evt.ticket_types = ticket_types
 
         # Валидация seat_allocation при обновлении
+        if 'scanner_password' in body:
+            evt.scanner_password = body['scanner_password'] or None
+
         if 'seat_allocation' in body:
             seat_allocation = body['seat_allocation']
 
@@ -2397,10 +2401,17 @@ def verify_ticket(ticket_code: str, request_event: Dict = None) -> Dict:
         if event_data:
             event = Event.from_dynamodb_item(event_data)
 
-        # Mark ticket as scanned with audit attribution
-        db.update_ticket_scanned_status(order.order_id, ticket_code, scanned=True, scanned_by_event=scanned_by_event)
+        # Atomic conditional write — returns 'already_scanned' if concurrent device won
+        scan_result = db.update_ticket_scanned_status(order.order_id, ticket_code, scanned=True, scanned_by_event=scanned_by_event)
+        if scan_result == 'already_scanned':
+            order_data = db.get_order(order.order_id)
+            order = Order.from_dynamodb_item(order_data)
+            for qr in order.qr_codes:
+                if qr.code == ticket_code:
+                    return success_response({'valid': False, 'reason': 'already_scanned', 'scanned_at': qr.scanned_at})
+            return success_response({'valid': False, 'reason': 'already_scanned'})
 
-        # Reload order to get updated scan status
+        # Reload to get written values (scanned_at)
         order_data = db.get_order(order.order_id)
         order = Order.from_dynamodb_item(order_data)
 
@@ -2811,14 +2822,7 @@ def handle_regenerate_site(event: Dict) -> Dict:
 
         lambda_client = boto3.client('lambda')
 
-        # Get environment to construct correct function name
-        environment = os.environ.get('ENVIRONMENT', 'prod')
-        if environment == 'prod':
-            # Prod function has no suffix
-            function_name = 'yallabalagan-site-regenerator'
-        else:
-            # Dev and other envs have suffix
-            function_name = f'yallabalagan-site-regenerator-{environment}'
+        function_name = 'yallabalagan-site-regenerator'
 
         # Invoke site regenerator Lambda synchronously
         response = lambda_client.invoke(
@@ -2860,7 +2864,7 @@ def success_response(data: Dict, status_code: int = 200) -> Dict:
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',  # CORS
-            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature,X-Scanner-Token,X-Scanner-Event',
             'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
         },
         'body': json.dumps(data, ensure_ascii=False, cls=DecimalEncoder)
@@ -2878,7 +2882,7 @@ def error_response(status_code: int, message: str, extra_data: Dict = None) -> D
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature,X-Scanner-Token,X-Scanner-Event',
             'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
         },
         'body': json.dumps(body_data, ensure_ascii=False, cls=DecimalEncoder)
@@ -3177,7 +3181,7 @@ def handle_scanner_search(request_event: Dict) -> Dict:
         results = []
         for raw in raw_orders:
             order = Order.from_dynamodb_item(raw)
-            if (order.payment and order.payment.status) != 'completed':
+            if not (order.payment and order.payment.status == 'completed'):
                 continue
             customer = order.customer or Customer()
             name = (customer.name or '').lower()

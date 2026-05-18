@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="ltr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -172,8 +172,17 @@
             justify-content: center;
             z-index: 1000;
             padding: 20px;
+            transition: background 0.15s;
         }
         .scan-overlay.hidden { display: none; }
+        .scan-overlay.result-success-bg {
+            background: #1b5e20;
+        }
+        @keyframes popIn {
+            0%   { transform: scale(0.7); opacity: 0; }
+            70%  { transform: scale(1.06); }
+            100% { transform: scale(1); opacity: 1; }
+        }
         .scan-result-card {
             background: white;
             border-radius: 16px;
@@ -181,11 +190,18 @@
             text-align: center;
             max-width: 320px;
             width: 100%;
+            animation: popIn 0.25s ease;
         }
+        .result-success-bg .scan-result-card {
+            background: #2e7d32;
+            color: white;
+        }
+        .result-success-bg .scan-result-card .result-title { color: white; font-size: 26px; }
+        .result-success-bg .scan-result-card .result-sub  { color: rgba(255,255,255,0.85); font-size: 16px; }
+        .result-success-bg .scan-result-card .icon { font-size: 72px; }
         .scan-result-card .icon { font-size: 52px; margin-bottom: 12px; }
         .scan-result-card .result-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
         .scan-result-card .result-sub { font-size: 14px; color: #666; }
-        .result-success .result-title { color: #2e7d32; }
         .result-warning .result-title { color: #e65100; }
         .result-error .result-title { color: #c62828; }
 
@@ -542,9 +558,10 @@
         const sub = document.getElementById('result-sub');
 
         card.className = 'scan-result-card';
+        overlay.classList.remove('result-success-bg');
 
         if (httpOk && data && data.valid) {
-            card.classList.add('result-success');
+            overlay.classList.add('result-success-bg');
             icon.textContent = '✅';
             title.textContent = data.ticket?.customer_name || 'Valid ticket';
             const parts = [data.ticket?.ticket_type];
@@ -725,8 +742,9 @@
     function formatTime(iso) {
         if (!iso) return '';
         try {
-            const d = new Date(iso);
-            return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            const s = iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z';
+            const d = new Date(s);
+            return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jerusalem' });
         } catch { return iso; }
     }
 
