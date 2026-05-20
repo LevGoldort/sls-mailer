@@ -120,7 +120,44 @@ const Auth = (() => {
         }
     }
 
-    return { login, logout, isAuthenticated, getAccessToken, getUser, getRole, isAdmin, refreshToken, requireAuth };
+    let _refreshInterval = null;
+
+    function startAutoRefresh() {
+        if (_refreshInterval) return;
+        _refreshInterval = setInterval(async () => {
+            const token = localStorage.getItem(KEYS.access);
+            if (!token) return;
+            if (_isTokenExpired(token)) {
+                try {
+                    await refreshToken();
+                } catch {
+                    // Refresh failed — requireAuth on next API call will redirect
+                }
+            }
+        }, 60_000); // check every minute
+    }
+
+    const _origLogout = logout;
+    async function logoutWithCleanup() {
+        if (_refreshInterval) {
+            clearInterval(_refreshInterval);
+            _refreshInterval = null;
+        }
+        await _origLogout();
+    }
+
+    return {
+        login,
+        logout: logoutWithCleanup,
+        isAuthenticated,
+        getAccessToken,
+        getUser,
+        getRole,
+        isAdmin,
+        refreshToken,
+        requireAuth,
+        startAutoRefresh,
+    };
 })();
 
 window.Auth = Auth;

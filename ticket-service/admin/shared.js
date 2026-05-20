@@ -456,6 +456,7 @@ function renderUserBar() {
 // ===== Init function to be called on page load =====
 async function initAdmin() {
     await Auth.requireAuth();
+    Auth.startAutoRefresh();
 
     // Add global error handler
     window.addEventListener('unhandledrejection', (event) => {
