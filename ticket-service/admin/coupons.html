@@ -211,7 +211,9 @@
                 <a href="orders.html" class="nav-btn">🛒 Заказы</a>
                 <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
                 <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+                <a href="users.html" class="nav-btn" data-admin-only>👥 Пользователи</a>
             </div>
+            <div id="user-bar" style="margin-top:14px;display:flex;align-items:center;gap:10px;font-size:14px;"></div>
             <button class="nav-btn btn-primary" onclick="showCreateModal()">+ Создать купон</button>
         </div>
 
@@ -343,6 +345,7 @@
         </div>
     </div>
 
+    <script src="auth.js"></script>
     <script src="shared.js?v=1770602138"></script>
     <script>
         let allEvents = [];
