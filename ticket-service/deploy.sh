@@ -186,6 +186,66 @@ aws lambda wait function-updated \
 rm -f /tmp/user-api-env.json
 echo "  Environment variables updated"
 
+# Wire user-api routes into the existing HTTP API (idempotent)
+echo "  Wiring API Gateway routes for user-api..."
+API_ID=$(aws apigatewayv2 get-apis \
+  --query "Items[?Name=='yallabalagan-ticket-api'].ApiId | [0]" \
+  --output text --profile "$PROFILE" --region "$REGION" --no-cli-pager)
+
+if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+  echo "  WARNING: Could not find yallabalagan-ticket-api HTTP API — skipping route wiring"
+else
+  USER_API_ARN="arn:aws:lambda:${REGION}:${ACTUAL_ACCOUNT}:function:yallabalagan-user-api"
+  INTEGRATION_URI="arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/${USER_API_ARN}/invocations"
+
+  # Create integration (or reuse existing)
+  INTEGRATION_ID=$(aws apigatewayv2 get-integrations \
+    --api-id "$API_ID" \
+    --query "Items[?IntegrationUri=='${INTEGRATION_URI}'].IntegrationId | [0]" \
+    --output text --profile "$PROFILE" --region "$REGION" --no-cli-pager 2>/dev/null)
+
+  if [ -z "$INTEGRATION_ID" ] || [ "$INTEGRATION_ID" = "None" ]; then
+    INTEGRATION_ID=$(aws apigatewayv2 create-integration \
+      --api-id "$API_ID" \
+      --integration-type AWS_PROXY \
+      --integration-uri "$INTEGRATION_URI" \
+      --payload-format-version "2.0" \
+      --query 'IntegrationId' --output text \
+      --profile "$PROFILE" --region "$REGION" --no-cli-pager)
+    echo "  Created integration: $INTEGRATION_ID"
+  else
+    echo "  Reusing integration: $INTEGRATION_ID"
+  fi
+
+  # Create routes (idempotent)
+  for ROUTE_KEY in "ANY /api/auth/{proxy+}" "ANY /api/users/{proxy+}"; do
+    EXISTING_ROUTE=$(aws apigatewayv2 get-routes \
+      --api-id "$API_ID" \
+      --query "Items[?RouteKey=='${ROUTE_KEY}'].RouteId | [0]" \
+      --output text --profile "$PROFILE" --region "$REGION" --no-cli-pager 2>/dev/null)
+    if [ -z "$EXISTING_ROUTE" ] || [ "$EXISTING_ROUTE" = "None" ]; then
+      aws apigatewayv2 create-route \
+        --api-id "$API_ID" \
+        --route-key "$ROUTE_KEY" \
+        --target "integrations/${INTEGRATION_ID}" \
+        --profile "$PROFILE" --region "$REGION" --no-cli-pager > /dev/null
+      echo "  Created route: $ROUTE_KEY"
+    else
+      echo "  Route exists: $ROUTE_KEY"
+    fi
+  done
+
+  # Allow API Gateway to invoke user-api (idempotent via 2>/dev/null)
+  aws lambda add-permission \
+    --function-name yallabalagan-user-api \
+    --statement-id allow-apigateway-user-api \
+    --action lambda:InvokeFunction \
+    --principal apigateway.amazonaws.com \
+    --source-arn "arn:aws:execute-api:${REGION}:${ACTUAL_ACCOUNT}:${API_ID}/*/*" \
+    --profile "$PROFILE" --region "$REGION" --no-cli-pager > /dev/null 2>&1 || true
+  echo "  Routes wired"
+fi
+
 # Update SiteTemplatesLayer
 echo ""
 echo "Updating SiteTemplatesLayer..."

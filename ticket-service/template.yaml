@@ -614,19 +614,8 @@ Resources:
         Variables:
           ADMIN_API_KEYS: !Ref AdminApiKeys
           JWT_SECRET: !Ref JwtSecret
-      Events:
-        AuthApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref TicketApi
-            Path: /api/auth/{proxy+}
-            Method: ANY
-        UsersApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref TicketApi
-            Path: /api/users/{proxy+}
-            Method: ANY
+      # Routes wired manually in deploy.sh to avoid CloudFormation circular
+      # dependency through TicketApi → ApiErrorAlarm → TicketApiFunctionRole.
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
