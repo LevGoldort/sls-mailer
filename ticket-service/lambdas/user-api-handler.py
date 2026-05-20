@@ -5,7 +5,12 @@ Routes:
   POST /api/auth/refresh
   POST /api/auth/logout
   POST /api/auth/change-password
-  /api/users/* — added in Task 9
+  GET    /api/users
+  POST   /api/users
+  GET    /api/users/{id}
+  PUT    /api/users/{id}
+  DELETE /api/users/{id}
+  POST   /api/users/{id}/reset-password
 """
 import json
 import os
@@ -22,12 +27,14 @@ from utils.auth_jwt import (
 )
 from utils.auth_middleware import authenticate, AuthError
 from utils.auth_password import hash_password, verify_password
+from utils.permissions import can_manage_users
 from utils.refresh_token_service import (
     store_refresh_token,
     validate_refresh_token,
     revoke_refresh_token,
 )
 from repositories import user_repository
+from models.user import User
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +175,157 @@ def handle_change_password(event: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# User management helpers
+# ---------------------------------------------------------------------------
+
+VALID_ROLES = {"admin", "organizer"}
+
+
+def _require_admin(event: dict):
+    """Authenticate and assert admin role. Returns ctx or raises AuthError."""
+    ctx = authenticate(event)
+    if not can_manage_users(ctx, ctx.get("tenant_id", "")):
+        raise AuthError("Admin access required", status_code=403)
+    return ctx
+
+
+def _tenant(ctx: dict) -> str:
+    return ctx.get("tenant_id") or os.environ.get("TENANT_ID", "yallabalagan")
+
+
+# ---------------------------------------------------------------------------
+# User management handlers
+# ---------------------------------------------------------------------------
+
+def handle_list_users(event: dict) -> dict:
+    try:
+        ctx = _require_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    users = user_repository.list_users_by_tenant(_tenant(ctx))
+    return ok({"users": [u.to_api_dict() for u in users]})
+
+
+def handle_get_user(event: dict, user_id: str) -> dict:
+    try:
+        ctx = _require_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    user = user_repository.get_user_by_id(user_id, _tenant(ctx))
+    if not user:
+        return err(404, "User not found")
+    return ok({"user": user.to_api_dict()})
+
+
+def handle_create_user(event: dict) -> dict:
+    try:
+        ctx = _require_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    body = parse_body(event)
+    email = (body.get("email") or "").strip().lower()
+    name = (body.get("name") or "").strip()
+    role = body.get("role") or ""
+    password = body.get("password") or ""
+
+    if not email or not name or not role or not password:
+        return err(400, "email, name, role, and password are required")
+    if role not in VALID_ROLES:
+        return err(400, f"role must be one of: {', '.join(sorted(VALID_ROLES))}")
+    if len(password) < 8:
+        return err(400, "password must be at least 8 characters")
+
+    tenant_id = _tenant(ctx)
+    if user_repository.get_user_by_email(email, tenant_id):
+        return err(409, "A user with this email already exists")
+
+    user = User.create(
+        email=email,
+        password_hash=hash_password(password),
+        name=name,
+        role=role,
+        tenant_id=tenant_id,
+    )
+    user_repository.create_user(user)
+    return ok({"user": user.to_api_dict()}, status=201)
+
+
+def handle_update_user(event: dict, user_id: str) -> dict:
+    try:
+        ctx = _require_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    user = user_repository.get_user_by_id(user_id, _tenant(ctx))
+    if not user:
+        return err(404, "User not found")
+
+    body = parse_body(event)
+    from datetime import datetime
+
+    if "name" in body:
+        user.name = (body["name"] or "").strip()
+        if not user.name:
+            return err(400, "name cannot be empty")
+    if "role" in body:
+        if body["role"] not in VALID_ROLES:
+            return err(400, f"role must be one of: {', '.join(sorted(VALID_ROLES))}")
+        user.role = body["role"]
+    if "status" in body:
+        if body["status"] not in {"active", "inactive"}:
+            return err(400, "status must be 'active' or 'inactive'")
+        user.status = body["status"]
+
+    user.updated_at = datetime.utcnow().isoformat()
+    user_repository.update_user(user)
+    return ok({"user": user.to_api_dict()})
+
+
+def handle_deactivate_user(event: dict, user_id: str) -> dict:
+    try:
+        ctx = _require_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    from botocore.exceptions import ClientError
+    try:
+        user = user_repository.deactivate_user(user_id, _tenant(ctx))
+    except ClientError:
+        return err(404, "User not found")
+
+    if not user:
+        return err(404, "User not found")
+    return ok({"user": user.to_api_dict()})
+
+
+def handle_reset_password(event: dict, user_id: str) -> dict:
+    try:
+        ctx = _require_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    body = parse_body(event)
+    new_password = body.get("new_password") or ""
+    if not new_password:
+        return err(400, "new_password is required")
+    if len(new_password) < 8:
+        return err(400, "new_password must be at least 8 characters")
+
+    user = user_repository.get_user_by_id(user_id, _tenant(ctx))
+    if not user:
+        return err(404, "User not found")
+
+    from datetime import datetime
+    user.password_hash = hash_password(new_password)
+    user.updated_at = datetime.utcnow().isoformat()
+    user_repository.update_user(user)
+    return ok({"message": "Password reset successfully"})
+
+
+# ---------------------------------------------------------------------------
 # Lambda entry point
 # ---------------------------------------------------------------------------
 
@@ -194,6 +352,27 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> dict:
             return handle_logout(event)
         if path == "/api/auth/change-password" and method == "POST":
             return handle_change_password(event)
+
+        # /api/users routing
+        if path == "/api/users":
+            if method == "GET":
+                return handle_list_users(event)
+            if method == "POST":
+                return handle_create_user(event)
+        if path.startswith("/api/users/"):
+            parts = path.split("/")  # ["", "api", "users", "<id>", ...]
+            if len(parts) >= 4:
+                uid = parts[3]
+                if len(parts) == 4:
+                    if method == "GET":
+                        return handle_get_user(event, uid)
+                    if method == "PUT":
+                        return handle_update_user(event, uid)
+                    if method == "DELETE":
+                        return handle_deactivate_user(event, uid)
+                if len(parts) == 5 and parts[4] == "reset-password" and method == "POST":
+                    return handle_reset_password(event, uid)
+
         return err(404, "Endpoint not found")
     except Exception as exc:
         print(f"[ERROR] {exc}")
