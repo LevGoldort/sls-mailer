@@ -101,13 +101,7 @@ Globals:
       Variables:
         ENVIRONMENT: !Ref Environment
         PAYMENT_MODE: !Ref PaymentMode
-        EMAIL_SENDER_LAMBDA: !If
-
-          - IsProd
-
-          - yallabalagan-email-sender
-
-          - !Sub yallabalagan-email-sender-${Environment}
+        EMAIL_SENDER_LAMBDA: yallabalagan-email-sender
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
@@ -556,13 +550,7 @@ Resources:
   TicketApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If
-
-        - IsProd
-
-        - yallabalagan-ticket-api
-
-        - !Sub yallabalagan-ticket-api-${Environment}
+      FunctionName: yallabalagan-ticket-api
       CodeUri: .
       Handler: lambdas/api-handler.lambda_handler
       Description: Main API handler for ticket service
@@ -626,13 +614,7 @@ Resources:
   SiteRegeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If
-
-        - IsProd
-
-        - yallabalagan-site-regenerator
-
-        - !Sub yallabalagan-site-regenerator-${Environment}
+      FunctionName: yallabalagan-site-regenerator
       CodeUri: .
       Handler: lambdas/site-regenerator.lambda_handler
       Description: Generates static site from DynamoDB data
@@ -664,13 +646,7 @@ Resources:
   EmailSenderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If
-
-        - IsProd
-
-        - yallabalagan-email-sender
-
-        - !Sub yallabalagan-email-sender-${Environment}
+      FunctionName: yallabalagan-email-sender
       CodeUri: .
       Handler: lambdas/email-sender.lambda_handler
       Description: Sends ticket confirmation emails
@@ -692,13 +668,7 @@ Resources:
   EventStatusUpdaterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If
-
-        - IsProd
-
-        - yallabalagan-event-status-updater
-
-        - !Sub yallabalagan-event-status-updater-${Environment}
+      FunctionName: yallabalagan-event-status-updater
       CodeUri: .
       Handler: lambdas/event-status-updater.lambda_handler
       Description: Updates event status based on date/time
@@ -715,13 +685,7 @@ Resources:
   PendingOrdersCleanerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If
-
-        - IsProd
-
-        - yallabalagan-pending-orders-cleaner
-
-        - !Sub yallabalagan-pending-orders-cleaner-${Environment}
+      FunctionName: yallabalagan-pending-orders-cleaner
       CodeUri: .
       Handler: lambdas/pending-orders-cleaner.lambda_handler
       Description: Cleans up expired pending orders
