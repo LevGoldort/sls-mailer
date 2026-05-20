@@ -120,13 +120,7 @@ Resources:
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-events
-
-        - !Sub yallabalagan-events-${Environment}
+      TableName: yallabalagan-events
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -186,13 +180,7 @@ Resources:
   LocationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-locations
-
-        - !Sub yallabalagan-locations-${Environment}
+      TableName: yallabalagan-locations
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -222,13 +210,7 @@ Resources:
   OrdersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-orders
-
-        - !Sub yallabalagan-orders-${Environment}
+      TableName: yallabalagan-orders
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -272,13 +254,7 @@ Resources:
   CouponsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-coupons
-
-        - !Sub yallabalagan-coupons-${Environment}
+      TableName: yallabalagan-coupons
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -312,13 +288,7 @@ Resources:
   SeatReservationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-seat-reservations
-
-        - !Sub yallabalagan-seat-reservations-${Environment}
+      TableName: yallabalagan-seat-reservations
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: event_id
@@ -353,13 +323,7 @@ Resources:
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-users
-
-        - !Sub yallabalagan-users-${Environment}
+      TableName: yallabalagan-users
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -400,13 +364,7 @@ Resources:
   RefreshTokensTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If
-
-        - IsProd
-
-        - yallabalagan-refresh-tokens
-
-        - !Sub yallabalagan-refresh-tokens-${Environment}
+      TableName: yallabalagan-refresh-tokens
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: token_hash
