@@ -83,6 +83,12 @@ Parameters:
     Default: ""
     Description: Comma-separated list of admin API keys
 
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Secret key for signing JWT tokens (min 32 chars recommended)
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
 
@@ -593,6 +599,39 @@ Resources:
               Resource:
                 - !GetAtt SiteRegeneratorFunction.Arn
                 - !GetAtt EmailSenderFunction.Arn
+
+  UserApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !If
+        - IsProd
+        - yallabalagan-user-api
+        - !Sub yallabalagan-user-api-${Environment}
+      CodeUri: .
+      Handler: lambdas/user-api-handler.lambda_handler
+      Description: Auth and user management endpoints
+      Environment:
+        Variables:
+          ADMIN_API_KEYS: !Ref AdminApiKeys
+          JWT_SECRET: !Ref JwtSecret
+      Events:
+        AuthApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketApi
+            Path: /api/auth/{proxy+}
+            Method: ANY
+        UsersApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketApi
+            Path: /api/users/{proxy+}
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RefreshTokensTable
 
   # Site Regenerator
   SiteRegeneratorFunction:
