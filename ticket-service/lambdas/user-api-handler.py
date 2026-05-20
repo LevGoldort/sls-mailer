@@ -35,6 +35,7 @@ from utils.refresh_token_service import (
 )
 from repositories import user_repository
 from models.user import User
+from utils.rate_limiter import is_rate_limited, reset_rate_limit
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +47,9 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type,Authorization,X-API-Key",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Content-Type": "application/json",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Strict-Transport-Security": "max-age=63072000",
 }
 
 
@@ -66,6 +70,14 @@ def parse_body(event: dict) -> dict:
 # Auth handlers
 # ---------------------------------------------------------------------------
 
+def _client_ip(event: dict) -> str:
+    return (
+        (event.get("requestContext") or {}).get("identity", {}).get("sourceIp")
+        or (event.get("requestContext") or {}).get("http", {}).get("sourceIp")
+        or "unknown"
+    )
+
+
 def handle_login(event: dict) -> dict:
     body = parse_body(event)
     email = (body.get("email") or "").strip().lower()
@@ -73,6 +85,10 @@ def handle_login(event: dict) -> dict:
 
     if not email or not password:
         return err(400, "email and password are required")
+
+    ip = _client_ip(event)
+    if is_rate_limited(ip):
+        return err(429, "Too many login attempts. Please try again later.")
 
     tenant_id = os.environ.get("TENANT_ID", "yallabalagan")
     user = user_repository.get_user_by_email(email, tenant_id)
@@ -82,6 +98,8 @@ def handle_login(event: dict) -> dict:
 
     if not verify_password(password, user.password_hash):
         return err(401, "Invalid email or password")
+
+    reset_rate_limit(ip)
 
     access_token = generate_access_token(
         user_id=user.user_id,

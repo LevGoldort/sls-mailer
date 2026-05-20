@@ -2653,16 +2653,22 @@ def handle_regenerate_site(event: Dict) -> Dict:
 
 
 # ===== Helper Functions =====
+_RESPONSE_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Strict-Transport-Security': 'max-age=63072000',
+}
+
+
 def success_response(data: Dict, status_code: int = 200) -> Dict:
     """Формирует успешный ответ"""
     return {
         'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',  # CORS
-            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
-        },
+        'headers': _RESPONSE_HEADERS,
         'body': json.dumps(data, ensure_ascii=False, cls=DecimalEncoder)
     }
 
@@ -2675,12 +2681,7 @@ def error_response(status_code: int, message: str, extra_data: Dict = None) -> D
 
     return {
         'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Webhook-Signature',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
-        },
+        'headers': _RESPONSE_HEADERS,
         'body': json.dumps(body_data, ensure_ascii=False, cls=DecimalEncoder)
     }
 

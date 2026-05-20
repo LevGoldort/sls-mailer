@@ -394,6 +394,9 @@ Resources:
               KeyType: HASH
           Projection:
             ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
