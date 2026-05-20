@@ -1,10 +1,12 @@
 #!/bin/bash
 # Deploy ticket-service to dev or prod
-# Usage: ./deploy.sh [dev|prod]
+# Usage: ./deploy.sh [dev|prod] [admin]
+#   admin — fast mode: only sync admin panel to S3, skip Lambda rebuilds
 
 set -e
 
-ENV=${1:?Usage: ./deploy.sh [dev|prod]}
+ENV=${1:?Usage: ./deploy.sh [dev|prod] [admin]}
+MODE=${2:-full}  # 'admin' for S3-only, anything else = full deploy
 
 if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
   echo "Error: environment must be 'dev' or 'prod'"
@@ -49,6 +51,17 @@ echo "=== Deploying Ticket Service to $ENV ==="
 echo "Account: $ACTUAL_ACCOUNT"
 echo "Region:  $REGION"
 echo ""
+
+# Fast admin-only mode: just sync admin panel to S3 and exit
+if [[ "$MODE" == "admin" ]]; then
+  echo "--- Admin-only mode: syncing admin panel to S3 ---"
+  aws s3 sync "$SCRIPT_DIR/admin/" "s3://$ADMIN_BUCKET/" \
+    --profile "$PROFILE" --region "$REGION" \
+    --exclude "*.md" --exclude ".DS_Store" \
+    --delete --no-cli-pager
+  echo "Done: http://$ADMIN_BUCKET.s3-website.$REGION.amazonaws.com"
+  exit 0
+fi
 
 if [[ "$ENV" == "prod" ]]; then
   echo "WARNING: This will update Lambda functions in PRODUCTION!"
