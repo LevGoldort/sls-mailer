@@ -1,4 +1,4 @@
-#!/bin/bash
+ыр#!/bin/bash
 #
 # Check if YallaBalagan is ready for deployment
 # Usage: ./check-deployment-readiness.sh [prod|dev]

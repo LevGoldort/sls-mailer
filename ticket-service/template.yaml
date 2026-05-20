@@ -107,6 +107,8 @@ Globals:
         ORDERS_TABLE: !Ref OrdersTable
         COUPONS_TABLE: !Ref CouponsTable
         SEAT_RESERVATIONS_TABLE: !Ref SeatReservationsTable
+        USERS_TABLE: !Ref UsersTable
+        REFRESH_TOKENS_TABLE: !Ref RefreshTokensTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -139,6 +141,8 @@ Resources:
           AttributeType: S
         - AttributeName: slug
           AttributeType: S
+        - AttributeName: owner_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
@@ -164,6 +168,12 @@ Resources:
         - IndexName: SlugIndex
           KeySchema:
             - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: OwnerIndex
+          KeySchema:
+            - AttributeName: owner_id
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -331,6 +341,76 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-users
+
+        - !Sub yallabalagan-users-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  RefreshTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !If
+
+        - IsProd
+
+        - yallabalagan-refresh-tokens
+
+        - !Sub yallabalagan-refresh-tokens-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token_hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token_hash
+          KeyType: HASH
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true

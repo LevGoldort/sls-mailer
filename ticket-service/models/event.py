@@ -57,6 +57,8 @@ class Event:
     refund_policy: RefundPolicy = field(default_factory=lambda: RefundPolicy())
     slug: Optional[str] = None  # Короткий URL /events/<slug>.html
     seat_allocation: Optional[Dict[str, str]] = None  # {"0-5": "tt-xxx", ...} - распределение мест по типам билетов
+    owner_id: Optional[str] = None   # user_id владельца; None для событий до миграции
+    tenant_id: Optional[str] = None  # 'yallabalagan' сейчас, динамически в SaaS-фазе; None до миграции
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -94,6 +96,14 @@ class Event:
         if self.seat_allocation:
             item["seat_allocation"] = self.seat_allocation
 
+        # owner_id и tenant_id добавляем только если заданы —
+        # None не попадает в OwnerIndex GSI (ожидаемое поведение для legacy событий до миграции)
+        if self.owner_id:
+            item["owner_id"] = self.owner_id
+
+        if self.tenant_id:
+            item["tenant_id"] = self.tenant_id
+
         return item
 
     @classmethod
@@ -127,6 +137,8 @@ class Event:
             refund_policy=refund_policy,
             slug=item.get("slug"),
             seat_allocation=item.get("seat_allocation"),
+            owner_id=item.get("owner_id"),
+            tenant_id=item.get("tenant_id"),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )
