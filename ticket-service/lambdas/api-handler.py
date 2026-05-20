@@ -18,7 +18,7 @@ from models import Event, Location, Order, Customer, OrderTicket, TicketType, Co
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
 from utils.auth import get_admin_authenticator
-from utils.auth_middleware import authenticate, AuthError
+from utils.auth_middleware import authenticate, AuthError, stamp_deprecation_header
 from utils.permissions import can_access_event, is_admin
 from datetime import datetime, timezone
 
@@ -111,24 +111,35 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': ''
         }
 
+    # Pre-authenticate to detect API key usage for deprecation header stamping.
+    _pre_ctx = None
+    try:
+        _pre_ctx = authenticate(event)
+    except AuthError:
+        pass
+
     # Routing
     try:
         if path.startswith('/api/events'):
-            return handle_events(event, http_method, path)
+            response = handle_events(event, http_method, path)
         elif path.startswith('/api/locations'):
-            return handle_locations(event, http_method, path)
+            response = handle_locations(event, http_method, path)
         elif path.startswith('/api/orders'):
-            return handle_orders(event, http_method, path)
+            response = handle_orders(event, http_method, path)
         elif path.startswith('/api/coupons'):
-            return handle_coupons(event, http_method, path)
+            response = handle_coupons(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
-            return handle_image_upload(event)
+            response = handle_image_upload(event)
         elif path == '/api/admin/regenerate-site' and http_method == 'POST':
-            return handle_regenerate_site(event)
+            response = handle_regenerate_site(event)
         elif path == '/api/webhooks/allpay' and http_method == 'POST':
-            return handle_allpay_webhook(event)
+            response = handle_allpay_webhook(event)
         else:
-            return error_response(404, "Endpoint not found")
+            response = error_response(404, "Endpoint not found")
+
+        if _pre_ctx:
+            response = stamp_deprecation_header(response, _pre_ctx)
+        return response
 
     except Exception as e:
         print(f"Error: {str(e)}")

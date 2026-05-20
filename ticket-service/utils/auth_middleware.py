@@ -72,3 +72,14 @@ def _api_key_auth(api_key: str) -> dict:
         "role": "admin",
         "auth_method": "api_key",
     }
+
+
+def stamp_deprecation_header(response: dict, ctx: dict) -> dict:
+    """Add X-Deprecated-Auth header to a Lambda response if API key auth was used."""
+    if ctx.get("auth_method") == "api_key":
+        headers = dict(response.get("headers") or {})
+        headers["X-Deprecated-Auth"] = (
+            "API key authentication is deprecated; migrate to JWT Bearer tokens"
+        )
+        response = {**response, "headers": headers}
+    return response

@@ -15,7 +15,7 @@ Routes:
 import json
 import os
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -25,7 +25,7 @@ from utils.auth_jwt import (
     TokenExpiredError,
     TokenInvalidError,
 )
-from utils.auth_middleware import authenticate, AuthError
+from utils.auth_middleware import authenticate, AuthError, stamp_deprecation_header
 from utils.auth_password import hash_password, verify_password
 from utils.permissions import can_manage_users
 from utils.refresh_token_service import (
@@ -343,37 +343,57 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> dict:
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
+    # Pre-authenticate to detect API key usage for deprecation header stamping.
+    # AuthError is expected for unauthenticated endpoints (login, refresh, etc.).
+    _pre_ctx: Optional[dict] = None
+    try:
+        _pre_ctx = authenticate(event)
+    except AuthError:
+        pass
+
     try:
         if path == "/api/auth/login" and method == "POST":
-            return handle_login(event)
-        if path == "/api/auth/refresh" and method == "POST":
-            return handle_refresh(event)
-        if path == "/api/auth/logout" and method == "POST":
-            return handle_logout(event)
-        if path == "/api/auth/change-password" and method == "POST":
-            return handle_change_password(event)
+            response = handle_login(event)
+        elif path == "/api/auth/refresh" and method == "POST":
+            response = handle_refresh(event)
+        elif path == "/api/auth/logout" and method == "POST":
+            response = handle_logout(event)
+        elif path == "/api/auth/change-password" and method == "POST":
+            response = handle_change_password(event)
 
         # /api/users routing
-        if path == "/api/users":
+        elif path == "/api/users":
             if method == "GET":
-                return handle_list_users(event)
-            if method == "POST":
-                return handle_create_user(event)
-        if path.startswith("/api/users/"):
+                response = handle_list_users(event)
+            elif method == "POST":
+                response = handle_create_user(event)
+            else:
+                response = err(405, "Method not allowed")
+        elif path.startswith("/api/users/"):
             parts = path.split("/")  # ["", "api", "users", "<id>", ...]
             if len(parts) >= 4:
                 uid = parts[3]
                 if len(parts) == 4:
                     if method == "GET":
-                        return handle_get_user(event, uid)
-                    if method == "PUT":
-                        return handle_update_user(event, uid)
-                    if method == "DELETE":
-                        return handle_deactivate_user(event, uid)
-                if len(parts) == 5 and parts[4] == "reset-password" and method == "POST":
-                    return handle_reset_password(event, uid)
+                        response = handle_get_user(event, uid)
+                    elif method == "PUT":
+                        response = handle_update_user(event, uid)
+                    elif method == "DELETE":
+                        response = handle_deactivate_user(event, uid)
+                    else:
+                        response = err(405, "Method not allowed")
+                elif len(parts) == 5 and parts[4] == "reset-password" and method == "POST":
+                    response = handle_reset_password(event, uid)
+                else:
+                    response = err(404, "Endpoint not found")
+            else:
+                response = err(404, "Endpoint not found")
+        else:
+            response = err(404, "Endpoint not found")
 
-        return err(404, "Endpoint not found")
+        if _pre_ctx:
+            response = stamp_deprecation_header(response, _pre_ctx)
+        return response
     except Exception as exc:
         print(f"[ERROR] {exc}")
         import traceback
