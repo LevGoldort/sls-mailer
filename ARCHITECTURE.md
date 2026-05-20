@@ -1,0 +1,158 @@
+# YallaBalagan — Architecture
+
+Serverless event ticketing platform on AWS. Four independent services sharing one AWS account per environment (prod/dev).
+
+---
+
+## Services Overview
+
+| Service | Directory | Purpose |
+|---------|-----------|---------|
+| **Ticket Service** | `ticket-service/` | Core product — events, tickets, payments, scanner |
+| **Events Site** | `events-site/` | Public-facing static site with event listings (Notion-driven) |
+| **Donate Site** | `donate-site/` | Crowdfunding/donations with All-Pay integration |
+| **Newsletter** | `newsletter/` | Email campaign management (Mailchimp alternative) |
+
+Each service has its own `template.yaml`, `samconfig.toml`, and is deployed independently.
+
+---
+
+## Ticket Service (Primary Product)
+
+### Lambda Functions
+
+| Function | Handler | Trigger | Purpose |
+|----------|---------|---------|---------|
+| `yallabalagan-ticket-api` | `api-handler.py` | API Gateway | All public + admin API endpoints |
+| `yallabalagan-site-regenerator` | `site-regenerator.py` | EventBridge / manual | Generates static HTML from DynamoDB |
+| `yallabalagan-email-sender` | `email-sender.py` | SQS / direct invoke | Sends ticket confirmation emails via SES |
+| `yallabalagan-sms-sender` | `sms-sender.py` | SQS / direct invoke | Sends SMS via Active Trail |
+| `yallabalagan-event-status-updater` | `event-status-updater.py` | EventBridge cron | Marks events as past, triggers reminders |
+| `yallabalagan-pending-orders-cleaner` | `pending-orders-cleaner.py` | EventBridge cron | Cancels unpaid orders, restores ticket counts |
+
+### DynamoDB Tables
+
+| Table | Key Schema | GSIs | Purpose |
+|-------|-----------|------|---------|
+| `yallabalagan-events` | PK, SK | GSI1, DateIndex, SlugIndex | Events with ticket types, seat allocation |
+| `yallabalagan-locations` | PK, SK | — | Venue data with coordinates, media |
+| `yallabalagan-orders` | PK, SK | EventIndex (event_id+created_at), EmailIndex (email+created_at) | Customer orders and QR codes |
+| `yallabalagan-coupons` | PK, SK | — | Discount/promo codes |
+| `yallabalagan-seat-reservations` | event_id (HASH), seat_id (RANGE) | ExpirationIndex | Temporary seat holds during checkout (TTL-based) |
+
+> Table names have no environment suffix — dev and prod are isolated via separate AWS accounts, not naming conventions.
+
+### S3 Buckets
+
+- **Media bucket** — event/location images uploaded by admin
+- **Frontend bucket** — generated static HTML site (public)
+- **Admin bucket** — admin panel HTML/JS files
+
+### Auth
+
+Two credential types, checked independently on every request:
+
+| Credential | Header | Scope |
+|-----------|--------|-------|
+| Admin API key | `X-API-Key` | All admin endpoints |
+| Scanner token | `X-Scanner-Token` + `X-Scanner-Event` | `/api/orders/verify/*` and `/api/scanner/search` only |
+
+Scanner tokens are event-scoped and expire 8 hours after event start time.
+
+### Key API Endpoints
+
+```
+# Public
+GET  /api/events
+GET  /api/events/{id}
+GET  /api/events/{slug}
+GET  /api/locations
+GET  /api/locations/{id}
+POST /api/orders                    — create order, returns All-Pay redirect URL
+GET  /api/orders/{id}
+POST /api/orders/webhook            — All-Pay payment webhook
+
+# Scanner (X-Scanner-Token or X-API-Key)
+POST /api/orders/verify/{code}      — scan QR code, mark as checked in
+GET  /api/scanner/search            — search orders by name/email/phone
+
+# Admin (X-API-Key)
+POST/PUT/DELETE /api/events/{id}
+POST/PUT/DELETE /api/locations/{id}
+GET  /api/orders                    — list all orders
+GET  /api/admin/facebook-ads/*      — Facebook Ads integration (feature branch)
+POST /api/users                     — user management (planned, not implemented)
+```
+
+### Admin Panel Pages
+
+Located in `ticket-service/admin/`, served from S3:
+
+| File | Purpose |
+|------|---------|
+| `index.html` | Dashboard |
+| `events.html` | Events list |
+| `event-edit.html` | Create/edit event, seating map, scanner password, FB ads |
+| `orders.html` | Orders list and management |
+| `locations.html` | Locations list |
+| `location-edit.html` | Create/edit location |
+| `coupons.html` | Coupon management |
+| `scanner.html` | **Ralphy** — door scanner for volunteers (mobile) |
+| `analytics.html` | Sales analytics |
+| `sms-blast.html` | Bulk SMS to event attendees |
+
+### Payment Flow
+
+1. Customer submits order form → `POST /api/orders` → order created with `status: pending`
+2. Response contains All-Pay payment URL → customer redirected
+3. All-Pay posts to `/api/orders/webhook` on completion
+4. Lambda: updates order status, generates QR codes, triggers email + SMS
+
+### Seat Reservation Flow (seated venues)
+
+1. Customer selects seats → `POST /api/seats/reserve` → DynamoDB conditional write
+2. Reservation held for 10-15 min via TTL
+3. On payment completion → seats permanently assigned to order
+4. `ConditionalCheckFailedException` = seat taken → return conflict error
+
+---
+
+## Environments
+
+| | Dev | Prod |
+|-|-----|------|
+| AWS Profile | `yallabalagan-dev` | `yallabalagan-prod` |
+| SAM config env | `dev` | `default` |
+| Resource naming | same names, isolated by account | same names, isolated by account |
+| Region | `eu-north-1` | `eu-north-1` |
+
+Deploy single service:
+```bash
+cd ticket-service
+sam build && sam deploy --config-env dev --profile yallabalagan-dev
+```
+
+Deploy all services:
+```bash
+./deploy-all.sh dev  # or prod
+```
+
+---
+
+## Integrations
+
+| Integration | Used by | Purpose |
+|------------|---------|---------|
+| **All-Pay** | Ticket, Donate | Payment processing and refunds |
+| **AWS SES** | Ticket, Newsletter | Transactional emails |
+| **Active Trail** | Ticket | SMS (ticket confirmation, reminders) |
+| **Notion** | Events Site | Content source for public event listings |
+| **Facebook Ads API** | Ticket (feature branch) | Launch ad campaigns from admin panel |
+
+---
+
+## Planned / In Progress
+
+- **User Management + RBAC** — JWT auth replacing API keys, Admin/Organizer roles, user CRUD. Tasks tracked in `.taskmaster/tasks/tasks.json`.
+- **Dev environment fix** — dev AWS account is currently broken; needs clean redeploy (see `ROADMAP.md` Phase 1).
+- **SaaS / multi-tenancy** — `tenant_id` prefix in DynamoDB, payment provider abstraction, per-tenant sub-users (see `ROADMAP.md` Phase 2).

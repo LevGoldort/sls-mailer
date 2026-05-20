@@ -1,0 +1,357 @@
+#!/bin/bash
+# Deploy ticket-service to dev or prod
+# Usage: ./deploy.sh [dev|prod]
+
+set -e
+
+ENV=${1:?Usage: ./deploy.sh [dev|prod]}
+
+if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
+  echo "Error: environment must be 'dev' or 'prod'"
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Load env file
+ENV_FILE="$SCRIPT_DIR/../.env.$ENV"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Error: $ENV_FILE not found"
+  exit 1
+fi
+export $(cat "$ENV_FILE" | grep -v '^#' | grep -v '^$' | xargs)
+
+PROFILE=$ENV
+REGION=eu-north-1
+
+# S3 bucket names include -dev suffix because S3 names are globally unique
+if [[ "$ENV" == "prod" ]]; then
+  MEDIA_BUCKET="yallabalagan-ticket-media"
+  FRONTEND_BUCKET="yallabalagan-tickets-frontend"
+  ADMIN_BUCKET="yallabalagan-ticket-admin"
+else
+  MEDIA_BUCKET="yallabalagan-ticket-media-dev"
+  FRONTEND_BUCKET="yallabalagan-tickets-frontend-dev"
+  ADMIN_BUCKET="yallabalagan-ticket-admin-dev"
+fi
+
+# Guard: verify AWS account matches expected
+EXPECTED_ACCOUNT=$([[ "$ENV" == "prod" ]] && echo "982534389905" || echo "521760247620")
+ACTUAL_ACCOUNT=$(aws sts get-caller-identity --profile "$PROFILE" --query Account --output text 2>&1)
+if [ "$ACTUAL_ACCOUNT" != "$EXPECTED_ACCOUNT" ]; then
+  echo "ERROR: profile '$PROFILE' points to account $ACTUAL_ACCOUNT, expected $EXPECTED_ACCOUNT"
+  echo "Check your AWS credentials."
+  exit 1
+fi
+
+echo "=== Deploying Ticket Service to $ENV ==="
+echo "Account: $ACTUAL_ACCOUNT"
+echo "Region:  $REGION"
+echo ""
+
+if [[ "$ENV" == "prod" ]]; then
+  echo "WARNING: This will update Lambda functions in PRODUCTION!"
+  echo "Press Ctrl+C to cancel, or Enter to continue..."
+  read
+fi
+
+# Build
+echo "Building SAM application..."
+sam build
+echo "Build complete"
+
+# Helper: update a single Lambda function
+update_lambda() {
+  local function_name=$1
+  local build_dir=$2
+  local handler=$3
+
+  echo ""
+  echo "Updating Lambda: $function_name..."
+
+  if [ ! -d "$SCRIPT_DIR/$build_dir" ]; then
+    echo "  Skipping — build dir not found: $build_dir"
+    return 0
+  fi
+
+  cd "$SCRIPT_DIR/$build_dir"
+  zip -r -q "$SCRIPT_DIR/${function_name}.zip" .
+  cd "$SCRIPT_DIR"
+
+  local zip_size
+  zip_size=$(wc -c < "$SCRIPT_DIR/${function_name}.zip")
+
+  if [ "$zip_size" -gt 50000000 ]; then
+    echo "  Package is large ($(( zip_size / 1024 / 1024 ))MB), uploading via S3..."
+    aws s3 cp "$SCRIPT_DIR/${function_name}.zip" \
+      "s3://$MEDIA_BUCKET/lambda-deploys/${function_name}.zip" \
+      --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+    aws lambda update-function-code \
+      --function-name "$function_name" \
+      --s3-bucket "$MEDIA_BUCKET" \
+      --s3-key "lambda-deploys/${function_name}.zip" \
+      --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+    aws s3 rm "s3://$MEDIA_BUCKET/lambda-deploys/${function_name}.zip" \
+      --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+  else
+    aws lambda update-function-code \
+      --function-name "$function_name" \
+      --zip-file "fileb://$SCRIPT_DIR/${function_name}.zip" \
+      --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+  fi
+
+  aws lambda wait function-updated \
+    --function-name "$function_name" \
+    --region "$REGION" --profile "$PROFILE"
+
+  aws lambda update-function-configuration \
+    --function-name "$function_name" \
+    --handler "$handler" \
+    --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+
+  aws lambda wait function-updated \
+    --function-name "$function_name" \
+    --region "$REGION" --profile "$PROFILE"
+
+  rm -f "$SCRIPT_DIR/${function_name}.zip"
+  echo "  Done"
+}
+
+# Update Lambda functions
+update_lambda "yallabalagan-ticket-api" \
+  ".aws-sam/build/TicketApiFunction" \
+  "lambdas/api-handler.lambda_handler"
+
+# Update ticket-api env vars
+echo "  Updating environment variables..."
+cat > /tmp/ticket-api-env.json <<EOF
+{
+  "Variables": {
+    "ALLPAY_LOGIN": "${ALLPAY_LOGIN}",
+    "ALLPAY_WEBHOOK_SECRET": "${ALLPAY_WEBHOOK_SECRET}",
+    "ALLPAY_API_KEY": "${ALLPAY_API_KEY}",
+    "ALLPAY_USE_API": "${ALLPAY_USE_API}",
+    "PAYMENT_EXPIRE_MINUTES": "${PAYMENT_EXPIRE_MINUTES}",
+    "ADMIN_API_KEYS": "${ADMIN_API_KEYS}",
+    "API_URL": "${API_URL}",
+    "FRONTEND_URL": "${FRONTEND_URL}",
+    "ENVIRONMENT": "${ENV}",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "SMS_SENDER_LAMBDA": "yallabalagan-sms-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "${MEDIA_BUCKET}",
+    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
+  }
+}
+EOF
+aws lambda update-function-configuration \
+  --function-name yallabalagan-ticket-api \
+  --environment file:///tmp/ticket-api-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/ticket-api-env.json
+echo "  Environment variables updated"
+
+# Update SiteTemplatesLayer
+echo ""
+echo "Updating SiteTemplatesLayer..."
+cd "$SCRIPT_DIR/frontend"
+zip -r -q "$SCRIPT_DIR/site-templates-layer.zip" templates static
+cd "$SCRIPT_DIR"
+
+LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
+  --layer-name yallabalagan-site-templates \
+  --description "Jinja2 templates for site generation" \
+  --zip-file "fileb://$SCRIPT_DIR/site-templates-layer.zip" \
+  --compatible-runtimes python3.12 \
+  --region "$REGION" --profile "$PROFILE" \
+  --query 'LayerVersionArn' --output text)
+rm -f "$SCRIPT_DIR/site-templates-layer.zip"
+echo "  Published: $LAYER_VERSION_ARN"
+
+update_lambda "yallabalagan-site-regenerator" \
+  ".aws-sam/build/SiteRegeneratorFunction" \
+  "lambdas/site-regenerator.lambda_handler"
+
+echo "  Attaching new layer version..."
+aws lambda update-function-configuration \
+  --function-name yallabalagan-site-regenerator \
+  --layers "$LAYER_VERSION_ARN" \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+aws lambda wait function-updated \
+  --function-name yallabalagan-site-regenerator \
+  --region "$REGION" --profile "$PROFILE"
+
+echo "  Updating environment variables..."
+cat > /tmp/site-regen-env.json <<EOF
+{
+  "Variables": {
+    "API_URL": "${API_URL}",
+    "S3_BUCKET": "${S3_BUCKET}",
+    "GA4_ID": "${GA4_ID}",
+    "FB_PIXEL_ID": "${FB_PIXEL_ID}",
+    "ENVIRONMENT": "${ENV}",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "${MEDIA_BUCKET}",
+    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
+  }
+}
+EOF
+aws lambda update-function-configuration \
+  --function-name yallabalagan-site-regenerator \
+  --environment file:///tmp/site-regen-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/site-regen-env.json
+
+update_lambda "yallabalagan-email-sender" \
+  ".aws-sam/build/EmailSenderFunction" \
+  "lambdas/email-sender.lambda_handler"
+
+echo "  Updating environment variables..."
+cat > /tmp/email-sender-env.json <<EOF
+{
+  "Variables": {
+    "SENDER_EMAIL": "${SENDER_EMAIL}",
+    "FRONTEND_URL": "${FRONTEND_URL}",
+    "ENVIRONMENT": "${ENV}",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "${MEDIA_BUCKET}",
+    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
+  }
+}
+EOF
+aws lambda update-function-configuration \
+  --function-name yallabalagan-email-sender \
+  --environment file:///tmp/email-sender-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/email-sender-env.json
+
+update_lambda "yallabalagan-sms-sender" \
+  ".aws-sam/build/SmsSenderFunction" \
+  "lambdas/sms-sender.lambda_handler"
+
+echo "  Updating environment variables..."
+cat > /tmp/sms-sender-env.json <<EOF
+{
+  "Variables": {
+    "ACTIVETRAIL_API_KEY": "${ACTIVETRAIL_API_KEY}",
+    "ACTIVETRAIL_SENDER_ID": "${ACTIVETRAIL_SENDER_ID}",
+    "FRONTEND_URL": "${FRONTEND_URL}",
+    "ENVIRONMENT": "${ENV}",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "ORDERS_TABLE": "yallabalagan-orders"
+  }
+}
+EOF
+aws lambda update-function-configuration \
+  --function-name yallabalagan-sms-sender \
+  --environment file:///tmp/sms-sender-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/sms-sender-env.json
+
+update_lambda "yallabalagan-event-status-updater" \
+  ".aws-sam/build/EventStatusUpdaterFunction" \
+  "lambdas/event-status-updater.lambda_handler"
+
+echo "  Updating environment variables..."
+cat > /tmp/event-updater-env.json <<EOF
+{
+  "Variables": {
+    "ENVIRONMENT": "${ENV}",
+    "PAYMENT_MODE": "${PAYMENT_MODE}",
+    "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "LOCATIONS_TABLE": "yallabalagan-locations",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "COUPONS_TABLE": "yallabalagan-coupons",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "${MEDIA_BUCKET}",
+    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
+  }
+}
+EOF
+aws lambda wait function-updated \
+  --function-name yallabalagan-event-status-updater \
+  --region "$REGION" --profile "$PROFILE"
+aws lambda update-function-configuration \
+  --function-name yallabalagan-event-status-updater \
+  --environment file:///tmp/event-updater-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/event-updater-env.json
+
+# Sync S3
+echo ""
+echo "Syncing admin files to S3..."
+aws s3 sync "$SCRIPT_DIR/admin/" "s3://$ADMIN_BUCKET/" \
+  --profile "$PROFILE" \
+  --exclude "*.md" --exclude ".DS_Store" \
+  --delete
+
+echo "Syncing frontend static files to S3..."
+aws s3 sync "$SCRIPT_DIR/frontend/static/" "s3://$FRONTEND_BUCKET/static/" \
+  --profile "$PROFILE" \
+  --exclude "*.md" --exclude ".DS_Store"
+
+# Regenerate site
+echo ""
+echo "Regenerating site..."
+aws lambda invoke \
+  --function-name yallabalagan-site-regenerator \
+  --invocation-type RequestResponse \
+  --region "$REGION" --profile "$PROFILE" \
+  --cli-read-timeout 120 \
+  /tmp/site-regenerator-output.json > /dev/null 2>&1
+
+if [ -f /tmp/site-regenerator-output.json ]; then
+  REGEN_STATUS=$(cat /tmp/site-regenerator-output.json | grep -o '"statusCode": [0-9]*' | grep -o '[0-9]*')
+  if [ "$REGEN_STATUS" = "200" ]; then
+    echo "  Site regenerated"
+  else
+    echo "  Site regeneration returned status: $REGEN_STATUS"
+    cat /tmp/site-regenerator-output.json
+  fi
+  rm -f /tmp/site-regenerator-output.json
+fi
+
+# CloudFront invalidation (prod only)
+if [[ "$ENV" == "prod" ]]; then
+  echo ""
+  echo "Invalidating CloudFront cache..."
+  aws cloudfront create-invalidation \
+    --distribution-id E1QVQ0JRE575WR \
+    --paths "/*" \
+    --profile "$PROFILE" --no-cli-pager > /dev/null
+  echo "  Invalidation created"
+fi
+
+echo ""
+echo "=== Deployment complete: $ENV ==="
+echo ""
+if [[ "$ENV" == "prod" ]]; then
+  echo "  Admin:    https://admin.yallabalagan.org"
+  echo "  Frontend: https://events.yallabalagan.org"
+  echo "  API:      https://ovajavet67.execute-api.eu-north-1.amazonaws.com"
+else
+  echo "  Admin:    http://$ADMIN_BUCKET.s3-website.eu-north-1.amazonaws.com"
+  echo "  Frontend: http://$FRONTEND_BUCKET.s3-website.eu-north-1.amazonaws.com"
+  echo "  API:      ${API_URL}"
+fi
+echo ""
+echo "Logs: aws logs tail /aws/lambda/yallabalagan-ticket-api --follow --profile $PROFILE"
