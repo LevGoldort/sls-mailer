@@ -12,18 +12,17 @@ Updated May 2026.
 
 ---
 
-## Phase 2: User Management + RBAC
+## Phase 2: User Management + RBAC ✅ (RBAC deferred)
 
 Replace API key auth with proper user system.
 
-- JWT-based auth (PyJWT + Argon2)
-- Roles: Admin (full access) and Organizer (own events only)
-- Admin-only user creation and password reset
-- Refresh tokens in DynamoDB with TTL
-- Frontend: login page, auth.js, users management page
-- Migration: existing events assigned to first admin
-
-PRD and task breakdown: `.taskmaster/docs/user-management-prd.md`, tasks in `.taskmaster/tasks/tasks.json`
+- ✅ JWT-based auth (PyJWT + Argon2)
+- ✅ Roles: Admin and Organizer — role stored in token and DB
+- ✅ Admin-only user creation and password reset
+- ✅ Refresh tokens in DynamoDB with TTL
+- ✅ Frontend: login page, auth.js, users management page
+- ✅ Migration: existing events assigned to first admin
+- ⏸ **Organizer RBAC enforcement** — deferred. Role is issued but not enforced on backend (no row-level filtering by owner_id). Only have admins right now, nothing to restrict. Revisit when first organizer is onboarded.
 
 ---
 

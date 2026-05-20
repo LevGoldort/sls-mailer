@@ -23,7 +23,8 @@ Each service has its own `template.yaml`, `samconfig.toml`, and is deployed inde
 
 | Function | Handler | Trigger | Purpose |
 |----------|---------|---------|---------|
-| `yallabalagan-ticket-api` | `api-handler.py` | API Gateway | All public + admin API endpoints |
+| `yallabalagan-ticket-api` | `api-handler.py` | API Gateway `ANY /api/{proxy+}` | All public + admin API endpoints |
+| `yallabalagan-user-api` | `user-api-handler.py` | API Gateway `/api/auth/*`, `/api/users/*` | JWT auth (login/refresh/logout) + user management |
 | `yallabalagan-site-regenerator` | `site-regenerator.py` | EventBridge / manual | Generates static HTML from DynamoDB |
 | `yallabalagan-email-sender` | `email-sender.py` | SQS / direct invoke | Sends ticket confirmation emails via SES |
 | `yallabalagan-sms-sender` | `sms-sender.py` | SQS / direct invoke | Sends SMS via Active Trail |
@@ -34,11 +35,13 @@ Each service has its own `template.yaml`, `samconfig.toml`, and is deployed inde
 
 | Table | Key Schema | GSIs | Purpose |
 |-------|-----------|------|---------|
-| `yallabalagan-events` | PK, SK | GSI1, DateIndex, SlugIndex | Events with ticket types, seat allocation |
+| `yallabalagan-events` | PK, SK | GSI1, DateIndex, SlugIndex, OwnerIndex | Events with ticket types, seat allocation |
 | `yallabalagan-locations` | PK, SK | — | Venue data with coordinates, media |
 | `yallabalagan-orders` | PK, SK | EventIndex (event_id+created_at), EmailIndex (email+created_at) | Customer orders and QR codes |
 | `yallabalagan-coupons` | PK, SK | — | Discount/promo codes |
 | `yallabalagan-seat-reservations` | event_id (HASH), seat_id (RANGE) | ExpirationIndex | Temporary seat holds during checkout (TTL-based) |
+| `yallabalagan-users` | PK (`USER#<id>`), SK (`PROFILE`) | EmailIndex (email), TenantIndex (tenant_id+status) | Admin and organizer users; RATELIMIT# prefix for rate limiting |
+| `yallabalagan-refresh-tokens` | PK (`TOKEN#<token>`), SK (`META`) | UserIndex (user_id+created_at) | JWT refresh tokens with TTL-based expiry |
 
 > Table names have no environment suffix — dev and prod are isolated via separate AWS accounts, not naming conventions.
 
@@ -50,14 +53,43 @@ Each service has its own `template.yaml`, `samconfig.toml`, and is deployed inde
 
 ### Auth
 
-Two credential types, checked independently on every request:
+Three credential types in order of precedence:
 
 | Credential | Header | Scope |
 |-----------|--------|-------|
-| Admin API key | `X-API-Key` | All admin endpoints |
+| JWT Bearer | `Authorization: Bearer <token>` | All admin + user endpoints (primary) |
+| Admin API key | `X-API-Key` | All admin endpoints (legacy, deprecated) |
 | Scanner token | `X-Scanner-Token` + `X-Scanner-Event` | `/api/orders/verify/*` and `/api/scanner/search` only |
 
+**JWT flow** (`user-api-handler.py`):
+1. `POST /api/auth/login` → returns `access_token` (15 min) + `refresh_token` (30 days, stored in DynamoDB)
+2. `POST /api/auth/refresh` → validates refresh token, issues new access token
+3. `POST /api/auth/logout` → deletes refresh token from DynamoDB
+4. Admin panel auto-refreshes access token every 60 s when nearing expiry
+
+**Roles:** `admin` (full access) · `organizer` (own events only, future RBAC)
+
+**Migration bridge:** `utils/auth.py` `verify_admin_key()` also accepts valid JWT admin tokens, so legacy handlers that check `X-API-Key` work transparently with Bearer tokens until migrated.
+
+**Rate limiting:** login endpoint enforces 10 attempts / 5 min per IP via DynamoDB atomic counter (`RATELIMIT#<ip>` key in `yallabalagan-users`, TTL-based reset).
+
+**Security headers** on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=63072000`.
+
 Scanner tokens are event-scoped and expire 8 hours after event start time.
+
+### API Gateway Routing
+
+One HTTP API (`yallabalagan-ticket-service-{env}`), two Lambda integrations:
+
+```
+ANY /api/auth/{proxy+}   → yallabalagan-user-api
+ANY /api/auth            → yallabalagan-user-api
+ANY /api/users/{proxy+}  → yallabalagan-user-api
+ANY /api/users           → yallabalagan-user-api
+ANY /api/{proxy+}        → yallabalagan-ticket-api  (catch-all)
+```
+
+Routes for `user-api` are wired by `deploy.sh` via AWS CLI (not SAM), idempotently on every deploy.
 
 ### Key API Endpoints
 
@@ -76,27 +108,42 @@ POST /api/orders/webhook            — All-Pay payment webhook
 POST /api/orders/verify/{code}      — scan QR code, mark as checked in
 GET  /api/scanner/search            — search orders by name/email/phone
 
-# Admin (X-API-Key)
+# Auth (user-api-handler.py)
+POST /api/auth/login
+POST /api/auth/refresh
+POST /api/auth/logout
+POST /api/auth/change-password
+
+# User management — admin only (user-api-handler.py)
+GET  /api/users
+POST /api/users
+GET  /api/users/{id}
+PUT  /api/users/{id}
+DELETE /api/users/{id}              — deactivates (sets status=inactive)
+POST /api/users/{id}/reset-password
+
+# Admin (JWT Bearer or X-API-Key)
 POST/PUT/DELETE /api/events/{id}
 POST/PUT/DELETE /api/locations/{id}
 GET  /api/orders                    — list all orders
 GET  /api/admin/facebook-ads/*      — Facebook Ads integration (feature branch)
-POST /api/users                     — user management (planned, not implemented)
 ```
 
 ### Admin Panel Pages
 
-Located in `ticket-service/admin/`, served from S3:
+Located in `ticket-service/admin/`, served from S3. Auth state is managed by `auth.js` (access/refresh tokens in `localStorage`). Shared utilities in `shared.js`.
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Dashboard |
+| `login.html` | JWT login form |
+| `index.html` | Dashboard with stats + site regeneration |
 | `events.html` | Events list |
 | `event-edit.html` | Create/edit event, seating map, scanner password, FB ads |
 | `orders.html` | Orders list and management |
 | `locations.html` | Locations list |
 | `location-edit.html` | Create/edit location |
 | `coupons.html` | Coupon management |
+| `users.html` | User management (admin only, hidden from organizers) |
 | `scanner.html` | **Ralphy** — door scanner for volunteers (mobile) |
 | `analytics.html` | Sales analytics |
 | `sms-blast.html` | Bulk SMS to event attendees |
@@ -126,16 +173,25 @@ Located in `ticket-service/admin/`, served from S3:
 | Resource naming | same names, isolated by account | same names, isolated by account |
 | Region | `eu-north-1` | `eu-north-1` |
 
-Deploy single service:
+Deploy single service (full — rebuilds all Lambdas):
 ```bash
 cd ticket-service
 sam build && sam deploy --config-env dev --profile yallabalagan-dev
+./deploy.sh dev
+```
+
+Deploy admin panel only (fast — S3 sync, no Lambda rebuild):
+```bash
+cd ticket-service
+./deploy.sh dev admin
 ```
 
 Deploy all services:
 ```bash
 ./deploy-all.sh dev  # or prod
 ```
+
+`deploy.sh` also wires the `user-api` API Gateway routes on every run (idempotent). The API ID is derived from `API_URL` in `.env.dev` / `.env.prod`.
 
 ---
 
@@ -153,6 +209,8 @@ Deploy all services:
 
 ## Planned / In Progress
 
-- **User Management + RBAC** — JWT auth replacing API keys, Admin/Organizer roles, user CRUD. Tasks tracked in `.taskmaster/tasks/tasks.json`.
-- **Dev environment fix** — dev AWS account is currently broken; needs clean redeploy (see `ROADMAP.md` Phase 1).
-- **SaaS / multi-tenancy** — `tenant_id` prefix in DynamoDB, payment provider abstraction, per-tenant sub-users (see `ROADMAP.md` Phase 2).
+- **Organizer RBAC** — `organizer` role is issued and stored, but row-level filtering (own events only) is not enforced yet in `api-handler.py` route handlers.
+- **Full JWT migration** — 21 route handlers in `api-handler.py` still use the legacy `get_admin_authenticator()` pattern. A bridge in `utils/auth.py` makes them accept JWT tokens transparently in the meantime.
+- **Frontend redesign** — fix mobile UX; evaluate React vs vanilla (Phase 3).
+- **Service consolidation** — merge events-site + donate-site into ticket-service; retire Notion/Telegram-bot admin (Phase 4).
+- **SaaS / multi-tenancy** — `tenant_id` prefix in DynamoDB, payment provider abstraction, per-tenant sub-users (Phase 5+).

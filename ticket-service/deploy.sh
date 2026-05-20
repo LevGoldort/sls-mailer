@@ -146,6 +146,7 @@ cat > /tmp/ticket-api-env.json <<EOF
     "ALLPAY_API_KEY": "${ALLPAY_API_KEY}",
     "ALLPAY_USE_API": "${ALLPAY_USE_API}",
     "PAYMENT_EXPIRE_MINUTES": "${PAYMENT_EXPIRE_MINUTES}",
+    "JWT_SECRET": "${JWT_SECRET}",
     "ADMIN_API_KEYS": "${ADMIN_API_KEYS}",
     "API_URL": "${API_URL}",
     "FRONTEND_URL": "${FRONTEND_URL}",
@@ -201,12 +202,11 @@ echo "  Environment variables updated"
 
 # Wire user-api routes into the existing HTTP API (idempotent)
 echo "  Wiring API Gateway routes for user-api..."
-API_ID=$(aws apigatewayv2 get-apis \
-  --query "Items[?Name=='yallabalagan-ticket-api'].ApiId | [0]" \
-  --output text --profile "$PROFILE" --region "$REGION" --no-cli-pager)
+# Extract API ID from API_URL (e.g. https://d4xhvmdzbg.execute-api.eu-north-1... → d4xhvmdzbg)
+API_ID=$(echo "$API_URL" | sed 's|https://\([^.]*\)\..*|\1|')
 
 if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-  echo "  WARNING: Could not find yallabalagan-ticket-api HTTP API — skipping route wiring"
+  echo "  WARNING: Could not determine API ID from API_URL — skipping route wiring"
 else
   USER_API_ARN="arn:aws:lambda:${REGION}:${ACTUAL_ACCOUNT}:function:yallabalagan-user-api"
   INTEGRATION_URI="arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/${USER_API_ARN}/invocations"
@@ -231,7 +231,7 @@ else
   fi
 
   # Create routes (idempotent)
-  for ROUTE_KEY in "ANY /api/auth/{proxy+}" "ANY /api/users/{proxy+}"; do
+  for ROUTE_KEY in "ANY /api/auth/{proxy+}" "ANY /api/users" "ANY /api/users/{proxy+}"; do
     EXISTING_ROUTE=$(aws apigatewayv2 get-routes \
       --api-id "$API_ID" \
       --query "Items[?RouteKey=='${ROUTE_KEY}'].RouteId | [0]" \
