@@ -14,7 +14,7 @@ function escapeHtml(str) {
 // Auto-detect environment based on hostname
 const isDev = window.location.hostname.includes('-dev') || window.location.hostname === 'localhost';
 const API_BASE_URL = isDev
-    ? 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev'
+    ? 'https://d4xhvmdzbg.execute-api.eu-north-1.amazonaws.com/dev'
     : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 
 // Make API_BASE_URL available to auth.js (loaded after shared.js on some pages,
