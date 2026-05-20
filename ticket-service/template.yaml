@@ -606,10 +606,7 @@ Resources:
   UserApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !If
-        - IsProd
-        - yallabalagan-user-api
-        - !Sub yallabalagan-user-api-${Environment}
+      FunctionName: yallabalagan-user-api
       CodeUri: .
       Handler: lambdas/user-api-handler.lambda_handler
       Description: Auth and user management endpoints
