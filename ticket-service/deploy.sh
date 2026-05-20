@@ -332,12 +332,14 @@ aws lambda update-function-configuration \
   --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
 rm -f /tmp/email-sender-env.json
 
-update_lambda "yallabalagan-sms-sender" \
-  ".aws-sam/build/SmsSenderFunction" \
-  "lambdas/sms-sender.lambda_handler"
+if aws lambda get-function --function-name yallabalagan-sms-sender \
+    --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null 2>&1; then
+  update_lambda "yallabalagan-sms-sender" \
+    ".aws-sam/build/SmsSenderFunction" \
+    "lambdas/sms-sender.lambda_handler"
 
-echo "  Updating environment variables..."
-cat > /tmp/sms-sender-env.json <<EOF
+  echo "  Updating environment variables..."
+  cat > /tmp/sms-sender-env.json <<EOF
 {
   "Variables": {
     "ACTIVETRAIL_API_KEY": "${ACTIVETRAIL_API_KEY}",
@@ -349,11 +351,15 @@ cat > /tmp/sms-sender-env.json <<EOF
   }
 }
 EOF
-aws lambda update-function-configuration \
-  --function-name yallabalagan-sms-sender \
-  --environment file:///tmp/sms-sender-env.json \
-  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
-rm -f /tmp/sms-sender-env.json
+  aws lambda update-function-configuration \
+    --function-name yallabalagan-sms-sender \
+    --environment file:///tmp/sms-sender-env.json \
+    --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+  rm -f /tmp/sms-sender-env.json
+else
+  echo ""
+  echo "  Skipping yallabalagan-sms-sender — function not found in this account"
+fi
 
 update_lambda "yallabalagan-event-status-updater" \
   ".aws-sam/build/EventStatusUpdaterFunction" \
