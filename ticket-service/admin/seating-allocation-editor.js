@@ -120,7 +120,7 @@ class SeatingAllocationEditor {
         // Auto-detect environment
         const isDev = window.location.hostname.includes('-dev');
         const API_URL = isDev
-            ? 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev'
+            ? 'https://d4xhvmdzbg.execute-api.eu-north-1.amazonaws.com/dev'
             : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 
         if (!apiKey) {
