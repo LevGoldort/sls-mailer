@@ -157,6 +157,35 @@ aws lambda update-function-configuration \
 rm -f /tmp/ticket-api-env.json
 echo "  Environment variables updated"
 
+# Update User API (auth + user management)
+echo ""
+update_lambda "yallabalagan-user-api" \
+  ".aws-sam/build/UserApiFunction" \
+  "lambdas/user-api-handler.lambda_handler"
+
+echo "  Updating environment variables..."
+cat > /tmp/user-api-env.json <<EOF
+{
+  "Variables": {
+    "ADMIN_API_KEYS": "${ADMIN_API_KEYS}",
+    "JWT_SECRET": "${JWT_SECRET}",
+    "USERS_TABLE": "yallabalagan-users",
+    "REFRESH_TOKENS_TABLE": "yallabalagan-refresh-tokens",
+    "TENANT_ID": "yallabalagan",
+    "ENVIRONMENT": "${ENV}"
+  }
+}
+EOF
+aws lambda update-function-configuration \
+  --function-name yallabalagan-user-api \
+  --environment file:///tmp/user-api-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+aws lambda wait function-updated \
+  --function-name yallabalagan-user-api \
+  --region "$REGION" --profile "$PROFILE"
+rm -f /tmp/user-api-env.json
+echo "  Environment variables updated"
+
 # Update SiteTemplatesLayer
 echo ""
 echo "Updating SiteTemplatesLayer..."
