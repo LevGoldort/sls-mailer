@@ -77,6 +77,15 @@ class DynamoDBClient:
             return False
         return True
 
+    def list_events_by_owner(self, owner_id: str) -> List[Dict]:
+        """Получает события принадлежащие конкретному владельцу (OwnerIndex GSI)"""
+        response = self.events_table.query(
+            IndexName='OwnerIndex',
+            KeyConditionExpression='owner_id = :owner_id',
+            ExpressionAttributeValues={':owner_id': owner_id}
+        )
+        return response.get('Items', [])
+
     def delete_event(self, event_id: str):
         """Удаляет событие"""
         return self.events_table.delete_item(

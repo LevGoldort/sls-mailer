@@ -18,6 +18,8 @@ from models import Event, Location, Order, Customer, OrderTicket, TicketType, Co
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
 from utils.auth import get_admin_authenticator
+from utils.auth_middleware import authenticate, AuthError
+from utils.permissions import can_access_event, is_admin
 from datetime import datetime, timezone
 
 
@@ -141,7 +143,7 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
 
     # GET /api/events - список событий
     if method == 'GET' and path == '/api/events':
-        return list_events()
+        return list_events(event)
 
     # GET /api/events/slug/{slug} - детали события по slug
     if method == 'GET' and path.startswith('/api/events/slug/'):
@@ -190,9 +192,17 @@ def handle_events(event: Dict, method: str, path: str) -> Dict:
     return error_response(404, "Events endpoint not found")
 
 
-def list_events() -> Dict:
-    """GET /api/events"""
-    items = db.list_events()
+def list_events(request_event: Dict = None) -> Dict:
+    """GET /api/events — admins see all; organizers see only their own events."""
+    try:
+        ctx = authenticate(request_event) if request_event else None
+    except AuthError:
+        ctx = None
+
+    if ctx and ctx.get("role") == "organizer" and ctx.get("user_id"):
+        items = db.list_events_by_owner(ctx["user_id"])
+    else:
+        items = db.list_events()
 
     events = []
     for item in items:
@@ -482,17 +492,13 @@ def save_seat_allocation(event_id: str, request_event: Dict) -> Dict:
 
 
 def create_event(request_event: Dict) -> Dict:
-    """ADMIN ONLY - POST /api/events"""
+    """POST /api/events — admin or organizer (organizer becomes owner)"""
 
-    # SECURITY: Require admin authentication
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(request_event)
-
-    if not auth.verify_admin_key(api_key):
-        log_security_event('unauthorized_event_create', {
-            'ip': get_client_identifier(request_event)
-        })
-        return error_response(401, "Unauthorized: Admin access required")
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        log_security_event('unauthorized_event_create', {'ip': get_client_identifier(request_event)})
+        return error_response(e.status_code, str(e))
 
     try:
         body = json.loads(request_event.get('body', '{}'))
@@ -546,6 +552,11 @@ def create_event(request_event: Dict) -> Dict:
 
         # Создаем событие
         event_id = Event.generate_id()
+        # owner_id: from JWT ctx (user_id), body override only for admins
+        owner_id = ctx.get("user_id")
+        if is_admin(ctx, ctx.get("tenant_id", "")) and body.get("owner_id"):
+            owner_id = body["owner_id"]
+        tenant_id = ctx.get("tenant_id") or "yallabalagan"
         evt = Event(
             event_id=event_id,
             title=body['title'],
@@ -556,7 +567,9 @@ def create_event(request_event: Dict) -> Dict:
             currency=body.get('currency', 'ILS'),
             images=body.get('images', []),
             slug=slug_value,
-            seat_allocation=seat_allocation
+            seat_allocation=seat_allocation,
+            owner_id=owner_id,
+            tenant_id=tenant_id,
         )
 
         # Сохраняем в DynamoDB
@@ -642,24 +655,23 @@ def get_purchased_seats_set(event_id: str) -> set:
 
 
 def update_event(event_id: str, request_event: Dict) -> Dict:
-    """ADMIN ONLY - PUT /api/events/{id}"""
+    """PUT /api/events/{id} — admin or event owner"""
 
-    # SECURITY: Require admin authentication
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(request_event)
-
-    if not auth.verify_admin_key(api_key):
-        log_security_event('unauthorized_event_update', {
-            'event_id': event_id,
-            'ip': get_client_identifier(request_event)
-        })
-        return error_response(401, "Unauthorized: Admin access required")
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        log_security_event('unauthorized_event_update', {'event_id': event_id, 'ip': get_client_identifier(request_event)})
+        return error_response(e.status_code, str(e))
 
     try:
         # Проверяем что событие существует
         item = db.get_event(event_id)
         if not item:
             return error_response(404, "Event not found")
+
+        if not can_access_event(ctx, item, ctx.get("tenant_id", "")):
+            log_security_event('unauthorized_event_update', {'event_id': event_id, 'ip': get_client_identifier(request_event)})
+            return error_response(403, "Access denied: not the event owner")
 
         body = json.loads(request_event.get('body', '{}'))
 
@@ -790,22 +802,21 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
 
 
 def delete_event(event_id: str, request_event: Dict) -> Dict:
-    """ADMIN ONLY - DELETE /api/events/{id}"""
+    """DELETE /api/events/{id} — admin or event owner"""
 
-    # SECURITY: Require admin authentication
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(request_event)
-
-    if not auth.verify_admin_key(api_key):
-        log_security_event('unauthorized_event_delete', {
-            'event_id': event_id,
-            'ip': get_client_identifier(request_event)
-        })
-        return error_response(401, "Unauthorized: Admin access required")
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        log_security_event('unauthorized_event_delete', {'event_id': event_id, 'ip': get_client_identifier(request_event)})
+        return error_response(e.status_code, str(e))
 
     item = db.get_event(event_id)
     if not item:
         return error_response(404, "Event not found")
+
+    if not can_access_event(ctx, item, ctx.get("tenant_id", "")):
+        log_security_event('unauthorized_event_delete', {'event_id': event_id, 'ip': get_client_identifier(request_event)})
+        return error_response(403, "Access denied: not the event owner")
 
     db.delete_event(event_id)
 
