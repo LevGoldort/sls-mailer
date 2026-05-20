@@ -600,8 +600,8 @@ Resources:
               Action:
                 - lambda:InvokeFunction
               Resource:
-                - !GetAtt SiteRegeneratorFunction.Arn
-                - !GetAtt EmailSenderFunction.Arn
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-site-regenerator*"
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-email-sender*"
 
   UserApiFunction:
     Type: AWS::Serverless::Function
