@@ -1,3 +1,4 @@
+# DEPRECATED — will be removed in Task 17 after full JWT migration
 """Simple API key authentication for admin endpoints"""
 import os
 import hmac
