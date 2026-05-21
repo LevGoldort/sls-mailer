@@ -608,6 +608,7 @@ def create_event(request_event: Dict) -> Dict:
             event_type=event_type,
             external_url=body.get('external_url'),
             performer_ids=body.get('performer_ids', []),
+            tags=body.get('tags', []),
         )
 
         # Сохраняем в DynamoDB
@@ -751,6 +752,8 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
             evt.external_url = body['external_url']
         if 'performer_ids' in body:
             evt.performer_ids = body['performer_ids']
+        if 'tags' in body:
+            evt.tags = body['tags']
         # Validate external_url presence after potential changes
         if evt.event_type == 'external' and not evt.external_url:
             return error_response(400, "external_url is required for external events")
@@ -3032,6 +3035,8 @@ def create_product(request_event: Dict) -> Dict:
         gallery_urls=body.get('gallery_urls', []),
         total_slots=body.get('total_slots'),
         status=body.get('status', 'active'),
+        product_type=body.get('product_type', 'personal'),
+        group_size=body.get('group_size'),
     )
     db.put_product(product.to_dynamodb_item())
     return success_response({'product': product.to_dynamodb_item()}, 201)
@@ -3084,6 +3089,10 @@ def update_product(product_id: str, request_event: Dict) -> Dict:
         product.total_slots = body['total_slots']
     if 'status' in body:
         product.status = body['status']
+    if 'product_type' in body:
+        product.product_type = body['product_type']
+    if 'group_size' in body:
+        product.group_size = body['group_size']
 
     product.updated_at = datetime.utcnow().isoformat()
     db.put_product(product.to_dynamodb_item())
