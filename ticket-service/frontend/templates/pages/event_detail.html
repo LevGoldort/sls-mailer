@@ -1,0 +1,784 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.title }} - YallaBalagan{% endblock %}
+{% block description %}{{ event.description }}{% endblock %}
+
+{% block og_type %}event{% endblock %}
+{% block og_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
+{% block og_image %}{% if event.images and event.images|length > 0 %}{{ event.images[0] }}{% else %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endif %}{% endblock %}
+
+{% block twitter_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
+{% block twitter_image %}{% if event.images and event.images|length > 0 %}{{ event.images[0] }}{% else %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endif %}{% endblock %}
+
+{% block canonical_url %}https://yallabalagan.org/events/{{ event.event_id }}.html{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/seat-picker.css">
+<!-- Schema.org Event Markup -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "{{ event.title }}",
+  "description": "{{ event.description | striptags }}",
+  "startDate": "{{ event.date }}",
+  "endDate": "{{ event.date }}",
+  "eventStatus": "https://schema.org/EventScheduled",
+  {% if event.images and event.images|length > 0 %}
+  "image": "{{ event.images[0] }}",
+  {% endif %}
+  "location": {
+    "@type": "Place",
+    "name": "{{ event.location_name }}"{% if location and location.address %},
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "{{ location.address.street }}",
+      "addressLocality": "{{ location.address.city }}",
+      "addressCountry": "IL"
+    }{% endif %}
+  },
+  "offers": {
+    "@type": "AggregateOffer",
+    "priceCurrency": "ILS",
+    "lowPrice": "{{ event.min_price }}",
+    "availability": "https://schema.org/InStock",
+    "url": "https://yallabalagan.org/events/{{ event.event_id }}.html"
+  },
+  "organizer": {
+    "@type": "Organization",
+    "name": "YallaBalagan",
+    "url": "https://yallabalagan.org"
+  }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="event-detail">
+    <!-- Hero Image -->
+    {% if event.images and event.images|length > 0 %}
+    <img src="{{ event.images[0] }}" alt="{{ event.title }}" class="event-hero-image">
+    {% else %}
+    <div class="event-hero-image" style="display: flex; align-items: center; justify-content: center; font-size: 5rem; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white;">
+        🎭
+    </div>
+    {% endif %}
+
+    <!-- Event Content -->
+    <div class="event-detail-content">
+        <!-- Header -->
+        <div class="event-detail-header">
+            <h1 class="event-detail-title">{{ event.title }}</h1>
+
+            <!-- Meta Information -->
+            <div class="event-meta">
+                <div class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    <span>{{ event.date_formatted }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">🕐</span>
+                    <span>{{ event.time_formatted }}</span>
+                </div>
+                {% if event.location_name %}
+                <div class="meta-item">
+                    <span class="meta-icon">📍</span>
+                    <span>{{ event.location_name }}</span>
+                </div>
+                {% endif %}
+                {% if event.status == 'sold_out' %}
+                <div class="meta-item" style="color: var(--danger); font-weight: 600;">
+                    <span class="meta-icon">🎫</span>
+                    <span>Билеты проданы</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="event-description-full">
+            {{ event.description | safe }}
+        </div>
+
+        <!-- External Event: link to external ticketing -->
+        {% if event.event_type == 'external' and event.external_url %}
+        <div class="tickets-section" style="text-align: center; padding: 2rem 0;">
+            <p style="color: var(--gray-600); margin-bottom: 1.5rem; font-size: 1rem;">
+                Билеты на это событие продаются на внешнем ресурсе.
+            </p>
+            <a href="{{ event.external_url }}" target="_blank" rel="noopener"
+               class="btn btn-primary btn-large"
+               style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 1rem 2.5rem; font-size: 1.125rem;">
+                🔗 Купить билеты
+            </a>
+        </div>
+        {% else %}
+
+        <!-- Tickets Section -->
+        {% if event.status != 'sold_out' and event.status != 'cancelled' %}
+        <div class="tickets-section">
+            {% if not event.seat_allocation %}
+            <h2 class="tickets-title">Выберите билеты</h2>
+            {% endif %}
+
+            <div class="ticket-types" id="ticket-types" {% if event.seat_allocation %}style="display: none;"{% endif %}>
+                {% for ticket in event.ticket_types %}
+                <div class="ticket-type {% if ticket.available == 0 %}sold-out{% endif %}"
+                     data-ticket-id="{{ ticket.id }}"
+                     data-original-price="{{ ticket.price }}"
+                     data-available="{{ ticket.available }}">
+                    <div class="ticket-info">
+                        <h3>{{ ticket.name }}</h3>
+                        {% if ticket.description %}
+                        <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.25rem;">
+                            {{ ticket.description }}
+                        </p>
+                        {% endif %}
+                        <div class="ticket-available">
+                            {% if ticket.available > 0 %}
+                                {% if ticket.available < ticket.total / 2 %}
+                                    <span style="color: var(--warning, #f59e0b); font-weight: 600;">
+                                        ⚡ Осталось меньше половины билетов! Доступно {{ ticket.available }} билетов
+                                    </span>
+                                {% endif %}
+                            {% else %}
+                                Билеты проданы
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="ticket-price-section">
+                        <div class="ticket-price-wrapper">
+                            <div class="ticket-price" data-price="{{ ticket.price }}">
+                                {{ ticket.price }}<span class="ticket-currency">₪</span>
+                            </div>
+                            <div class="ticket-price-discounted" style="display: none;">
+                                <span style="text-decoration: line-through; color: var(--gray-500); font-size: 0.875rem;">{{ ticket.price }}₪</span>
+                                <span class="discounted-price" style="color: var(--primary); font-weight: 700; font-size: 1.25rem;"></span><span class="ticket-currency">₪</span>
+                            </div>
+                        </div>
+
+                        {% if ticket.available > 0 and not event.seat_allocation %}
+                            <!-- For unseated events: direct buy button -->
+                            <a href="/checkout.html?event_id={{ event.event_id }}&ticket_type={{ ticket.id }}"
+                               class="btn btn-primary ticket-buy-btn"
+                               style="margin-top: 0.5rem; padding: 0.5rem 1.5rem; font-size: 0.9375rem;">
+                                Купить
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Seat Picker Section (only for seated venues) -->
+            {% if event.seat_allocation %}
+            <div id="seat-selection">
+                <h2 class="tickets-title">Выберите места</h2>
+                <div id="seat-picker-container"></div>
+            </div>
+
+            <!-- Proceed to Checkout Button (only for seated venues) -->
+            <div id="checkout-button-container" style="text-align: center; margin-top: 2rem;">
+                <button id="proceed-to-checkout"
+                        class="btn btn-primary btn-large"
+                        disabled
+                        style="padding: 1rem 2rem; font-size: 1.125rem;">
+                    Перейти к оформлению заказа
+                </button>
+                <p id="checkout-status" style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;">
+                    Выберите места для продолжения
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Coupon Button -->
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <button
+                    id="show-coupon-btn"
+                    onclick="toggleCouponSection()"
+                    style="padding: 0.75rem 1.5rem; background: rgba(99, 102, 241, 0.1); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 0.375rem; cursor: pointer; font-weight: 500; font-size: 0.9375rem; transition: all 0.2s;">
+                    У меня есть промо-код
+                </button>
+            </div>
+
+            <!-- Coupon Section (hidden by default) -->
+            <div id="coupon-section" style="display: none; background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-top: 1rem;">
+                <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <label for="coupon-input" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9375rem;">
+                            Введите код купона
+                        </label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input
+                                type="text"
+                                id="coupon-input"
+                                placeholder="Введите код купона"
+                                style="flex: 1; padding: 0.625rem; border: 1px solid var(--gray-300); border-radius: 0.375rem; font-size: 0.9375rem;"
+                            >
+                            <button
+                                id="apply-coupon-btn"
+                                onclick="applyCoupon()"
+                                style="padding: 0.625rem 1.25rem; background: var(--primary); color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 600; font-size: 0.9375rem; white-space: nowrap;">
+                                Применить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="coupon-message" style="margin-top: 0.75rem; font-size: 0.875rem; display: none;"></div>
+            </div>
+        </div>
+        {% elif event.status == 'sold_out' %}
+        <div class="alert alert-info">
+            <p><strong>Все билеты проданы</strong></p>
+            <p>К сожалению, на это событие больше нет доступных билетов.</p>
+        </div>
+        {% elif event.status == 'cancelled' %}
+        <div class="alert" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">
+            <p><strong>Событие отменено</strong></p>
+            <p>Это событие было отменено организаторами.</p>
+        </div>
+        {% endif %}
+        {% endif %}{# end external/internal split #}
+
+        <!-- Location Information -->
+        {% if location %}
+        <div class="location-card">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">Место проведения</h2>
+
+            <div class="location-header">
+                {% if location.media and location.media.photos and location.media.photos|length > 0 %}
+                <img src="{{ location.media.photos[0] }}" alt="{{ location.name }}" class="location-image">
+                {% else %}
+                <div class="location-image" style="display: flex; align-items: center; justify-content: center; font-size: 2rem;">
+                    🏛️
+                </div>
+                {% endif %}
+
+                <div class="location-info">
+                    <h3>
+                        {% if location.slug %}
+                        <a href="/locations/{{ location.slug }}.html" style="color: var(--primary); text-decoration: none;">
+                            {{ location.name }}
+                        </a>
+                        {% else %}
+                        {{ location.name }}
+                        {% endif %}
+                    </h3>
+                    {% if location.short_description %}
+                    <p class="location-description">{{ location.short_description }}</p>
+                    {% endif %}
+                    {% if location.capacity %}
+                    <p style="color: var(--gray-600); font-size: 0.875rem;">
+                        Вместимость: {{ location.capacity }} человек
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Address -->
+            {% if location.address %}
+            <div class="location-address">
+                <strong>📍 Адрес:</strong>
+                {{ location.address.street }}
+                {% if location.address.city %}, {{ location.address.city }}{% endif %}
+                {% if location.address.coordinates %}
+                <br>
+                <a href="https://www.google.com/maps?q={{ location.address.coordinates.lat }},{{ location.address.coordinates.lng }}"
+                   target="_blank"
+                   style="color: var(--primary); text-decoration: none; font-size: 0.875rem; margin-top: 0.25rem; display: inline-block;">
+                    🗺️ Открыть в Google Maps
+                </a>
+
+                <!-- Embedded Map -->
+                <div style="margin-top: 1rem; border-radius: 0.5rem; overflow: hidden;">
+                    <iframe
+                        width="100%"
+                        height="300"
+                        style="border: 0; display: block;"
+                        loading="lazy"
+                        src="https://www.google.com/maps?q={{ location.address.coordinates.lat }},{{ location.address.coordinates.lng }}&output=embed">
+                    </iframe>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Parking Information -->
+            {% if location.parkings and location.parkings|length > 0 %}
+            <div class="parking-info">
+                <h4>🅿️ Парковка</h4>
+                {% for parking in location.parkings %}
+                <div {% if not loop.first %}style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);"{% endif %}>
+                    {% if parking.description %}
+                    <p class="parking-description">{{ parking.description }}</p>
+                    {% endif %}
+                    {% if parking.coordinates %}
+                    <a href="https://www.google.com/maps?q={{ parking.coordinates.lat }},{{ parking.coordinates.lng }}"
+                       target="_blank"
+                       style="color: var(--primary); text-decoration: none; font-size: 0.875rem;">
+                        🗺️ Показать на карте
+                    </a>
+                    {% elif parking.google_maps_url %}
+                    <a href="{{ parking.google_maps_url }}"
+                       target="_blank"
+                       style="color: var(--primary); text-decoration: none; font-size: 0.875rem;">
+                        🗺️ Показать на карте
+                    </a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Refund Policy -->
+        {% if event.refund_policy and event.refund_policy.enabled %}
+        <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-top: 2rem; font-size: 0.875rem; color: var(--gray-600);">
+            <strong>ℹ️ Политика возврата:</strong>
+            Возврат билетов возможен за {{ event.refund_policy.hours_before }} часов до начала события.
+        </div>
+        {% endif %}
+
+        <!-- Performers Section -->
+        {% if event_performers and event_performers|length > 0 %}
+        <div style="margin-top: 2.5rem;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem;">Участники</h2>
+            {% for performer in event_performers %}
+            <div style="display: flex; gap: 1.5rem; align-items: flex-start; padding: 1.5rem; background: var(--gray-50); border-radius: 0.75rem; margin-bottom: 1rem;">
+                {% if performer.photo_url %}
+                <img src="{{ performer.photo_url }}" alt="{{ performer.name }}"
+                     style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                {% else %}
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--gray-200); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 2rem;">🎤</div>
+                {% endif %}
+                <div style="flex: 1; min-width: 0;">
+                    <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 0.25rem;">
+                        {% if performer.slug %}
+                        <a href="/performer/{{ performer.slug }}/" style="color: var(--primary); text-decoration: none;">{{ performer.name }}</a>
+                        {% else %}
+                        {{ performer.name }}
+                        {% endif %}
+                    </h3>
+                    {% if performer.role %}
+                    <p style="color: var(--primary); font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;">{{ performer.role }}</p>
+                    {% endif %}
+                    {% if performer.bio %}
+                    <p style="color: var(--gray-600); font-size: 0.875rem; line-height: 1.5;">{{ performer.bio }}</p>
+                    {% endif %}
+                    {% if performer.products and performer.products|length > 0 %}
+                    <div style="margin-top: 1rem;">
+                        <p style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.5rem;">🛍️ Мерч:</p>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            {% for product in performer.products %}
+                            <a href="/checkout.html?product_id={{ product.product_id }}"
+                               style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: white; border: 1px solid var(--primary); border-radius: 1rem; font-size: 0.8125rem; color: var(--primary); text-decoration: none; font-weight: 500;">
+                                {{ product.name }} — {{ product.price_ils }}₪
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Back Button -->
+        <div style="margin-top: 2rem;">
+            <a href="/" class="btn" style="background: var(--gray-200); color: var(--gray-800);">
+                ← Назад к событиям
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/seat-picker.js"></script>
+<script>
+// API Configuration
+const API_URL = '{{ api_url }}' || 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+const EVENT_ID = '{{ event.event_id }}';
+const EVENT_DATA = {{ event | tojson | safe }};
+
+// Fire ViewContent event on page load
+if (typeof fbq !== 'undefined') {
+    fbq('track', 'ViewContent', {
+        content_ids: ['{{ event.event_id }}'],
+        content_name: '{{ event.title }}',
+        content_type: 'product',
+        value: {{ event.min_price }},
+        currency: 'ILS'
+    });
+}
+
+// Fire GA4 view_item event
+if (typeof gtag !== 'undefined') {
+    gtag('event', 'view_item', {
+        currency: 'ILS',
+        value: {{ event.min_price }},
+        items: [{
+            item_id: '{{ event.event_id }}',
+            item_name: '{{ event.title }}',
+            price: {{ event.min_price }}
+        }]
+    });
+}
+
+// Coupon state
+let appliedCoupon = null;
+
+// Toggle coupon section visibility
+function toggleCouponSection() {
+    const section = document.getElementById('coupon-section');
+    const button = document.getElementById('show-coupon-btn');
+
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        button.style.display = 'none';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for coupon in URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const couponCode = urlParams.get('c');
+
+    if (couponCode) {
+        // Auto-show coupon section if coupon in URL
+        toggleCouponSection();
+        document.getElementById('coupon-input').value = couponCode;
+        applyCoupon();
+    }
+
+    // Allow pressing Enter in coupon input
+    document.getElementById('coupon-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyCoupon();
+        }
+    });
+});
+
+// Apply coupon
+async function applyCoupon() {
+    const couponInput = document.getElementById('coupon-input');
+    const couponCode = couponInput.value.trim();
+    const applyBtn = document.getElementById('apply-coupon-btn');
+    const messageDiv = document.getElementById('coupon-message');
+
+    if (!couponCode) {
+        showCouponMessage('Введите код купона', 'error');
+        return;
+    }
+
+    // Disable button
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Проверка...';
+
+    try {
+        // Get first ticket price for validation
+        const firstTicket = document.querySelector('[data-original-price]');
+        const testAmount = parseFloat(firstTicket.dataset.originalPrice);
+
+        const response = await fetch(`${API_URL}/api/coupons/validate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                coupon_code: couponCode,
+                event_id: EVENT_ID,
+                amount: testAmount
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.valid) {
+            appliedCoupon = data;
+            updatePricesWithCoupon(data);
+            showCouponMessage(`✓ Купон применен! ${data.discount_description}`, 'success');
+
+            // Fire Lead event for FB Pixel
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'Lead', {
+                    content_name: '{{ event.title }}',
+                    content_category: 'Coupon Applied',
+                    value: testAmount,
+                    currency: 'ILS'
+                });
+            }
+
+            // Fire GA4 generate_lead event
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'generate_lead', {
+                    currency: 'ILS',
+                    value: testAmount
+                });
+            }
+
+            // Disable input and button
+            couponInput.disabled = true;
+            applyBtn.textContent = 'Применен';
+
+            // Add remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '×';
+            removeBtn.onclick = removeCoupon;
+            removeBtn.style.cssText = 'padding: 0.625rem 1rem; background: var(--gray-300); color: var(--gray-800); border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 600; font-size: 1.125rem; margin-left: 0.5rem;';
+            applyBtn.parentElement.appendChild(removeBtn);
+        } else {
+            showCouponMessage('Купон недействителен или не применим к этому событию', 'error');
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'Применить';
+        }
+    } catch (error) {
+        console.error('Error validating coupon:', error);
+        showCouponMessage('Ошибка при проверке купона. Попробуйте позже.', 'error');
+        applyBtn.disabled = false;
+        applyBtn.textContent = 'Применить';
+    }
+}
+
+// Remove coupon
+function removeCoupon() {
+    appliedCoupon = null;
+
+    // Reset prices
+    const tickets = document.querySelectorAll('[data-original-price]');
+    tickets.forEach(ticket => {
+        const originalPrice = parseFloat(ticket.dataset.originalPrice);
+        const priceEl = ticket.querySelector('.ticket-price');
+        const discountedEl = ticket.querySelector('.ticket-price-discounted');
+
+        priceEl.style.display = 'block';
+        discountedEl.style.display = 'none';
+
+        // Update buy button link
+        const buyBtn = ticket.querySelector('.ticket-buy-btn');
+        if (buyBtn) {
+            const url = new URL(buyBtn.href);
+            url.searchParams.delete('coupon');
+            buyBtn.href = url.toString();
+        }
+    });
+
+    // Reset input
+    const couponInput = document.getElementById('coupon-input');
+    const applyBtn = document.getElementById('apply-coupon-btn');
+    couponInput.value = '';
+    couponInput.disabled = false;
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Применить';
+
+    // Remove remove button
+    const removeBtn = applyBtn.parentElement.querySelector('button:last-child');
+    if (removeBtn && removeBtn !== applyBtn) {
+        removeBtn.remove();
+    }
+
+    // Hide message
+    document.getElementById('coupon-message').style.display = 'none';
+}
+
+// Update prices with coupon
+function updatePricesWithCoupon(couponData) {
+    const tickets = document.querySelectorAll('[data-original-price]');
+
+    tickets.forEach(ticket => {
+        const originalPrice = parseFloat(ticket.dataset.originalPrice);
+        const priceEl = ticket.querySelector('.ticket-price');
+        const discountedEl = ticket.querySelector('.ticket-price-discounted');
+        const discountedPriceSpan = discountedEl.querySelector('.discounted-price');
+
+        // Calculate discounted price
+        let discountedPrice;
+        if (couponData.coupon.discount_type === 'percentage') {
+            discountedPrice = originalPrice * (1 - couponData.coupon.discount_value / 100);
+        } else {
+            discountedPrice = Math.max(0, originalPrice - couponData.coupon.discount_value);
+        }
+        discountedPrice = Math.round(discountedPrice * 100) / 100;
+
+        // Update display
+        priceEl.style.display = 'none';
+        discountedEl.style.display = 'block';
+        discountedPriceSpan.textContent = discountedPrice;
+
+        // Update buy button link to include coupon
+        const buyBtn = ticket.querySelector('.ticket-buy-btn');
+        if (buyBtn) {
+            const url = new URL(buyBtn.href);
+            url.searchParams.set('coupon', couponData.coupon.coupon_code);
+            buyBtn.href = url.toString();
+        }
+    });
+}
+
+// Show coupon message
+function showCouponMessage(message, type) {
+    const messageDiv = document.getElementById('coupon-message');
+    messageDiv.textContent = message;
+    messageDiv.style.display = 'block';
+
+    if (type === 'success') {
+        messageDiv.style.color = '#059669';
+        messageDiv.style.background = '#d1fae5';
+        messageDiv.style.padding = '0.75rem';
+        messageDiv.style.borderRadius = '0.375rem';
+    } else {
+        messageDiv.style.color = '#dc2626';
+        messageDiv.style.background = '#fee2e2';
+        messageDiv.style.padding = '0.75rem';
+        messageDiv.style.borderRadius = '0.375rem';
+    }
+}
+
+// ============================================
+// Seated Venue Logic
+// ============================================
+{% if event.seat_allocation %}
+// State for seated venue
+let seatPicker = null;
+let selectedSeats = [];
+
+// Initialize seat picker immediately on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initSeatPicker();
+});
+
+// Initialize seat picker
+async function initSeatPicker() {
+    try {
+        // Prepare ticket types data
+        const ticketTypes = EVENT_DATA.ticket_types.map(tt => ({
+            id: tt.id,
+            name: tt.name,
+            price: tt.price
+        }));
+
+        // Fetch seating map configuration to get numbering settings
+        let seatingMapConfig = null;
+        try {
+            const response = await fetch(`${API_URL}/api/events/${EVENT_ID}/seating-map`);
+            if (response.ok) {
+                const data = await response.json();
+                seatingMapConfig = data.seating_map;
+            }
+        } catch (error) {
+            console.warn('Could not load seating map config, using defaults:', error);
+        }
+
+        seatPicker = new SeatPicker(
+            'seat-picker-container',
+            EVENT_ID,
+            ticketTypes,
+            {
+                apiUrl: API_URL,
+                seatAllocation: EVENT_DATA.seat_allocation,
+                seatingMapConfig: seatingMapConfig,  // Pass numbering config
+                onSelectionChange: handleSeatSelectionChange,
+                onReservationExpired: handleReservationExpired
+            }
+        );
+    } catch (error) {
+        console.error('Error creating seat picker:', error);
+        alert('Ошибка при создании выбора мест. Пожалуйста, обновите страницу.');
+    }
+}
+
+// Handle seat selection change
+function handleSeatSelectionChange(seats) {
+    selectedSeats = seats;
+    const checkoutBtn = document.getElementById('proceed-to-checkout');
+    const statusText = document.getElementById('checkout-status');
+
+    if (seats.length > 0) {
+        checkoutBtn.disabled = false;
+        statusText.textContent = `Выбрано мест: ${seats.length}`;
+    } else {
+        checkoutBtn.disabled = true;
+        statusText.textContent = 'Выберите места для продолжения';
+    }
+}
+
+// Handle reservation expired
+function handleReservationExpired() {
+    alert('Время резервации истекло. Пожалуйста, выберите места заново.');
+    window.location.reload();
+}
+
+// Proceed to checkout button handler
+document.addEventListener('DOMContentLoaded', function() {
+    const checkoutBtn = document.getElementById('proceed-to-checkout');
+    if (checkoutBtn) {
+        checkoutBtn.addEventListener('click', proceedToCheckout);
+    }
+});
+
+// Proceed to checkout
+async function proceedToCheckout() {
+    if (!seatPicker || selectedSeats.length === 0) {
+        alert('Пожалуйста, выберите места');
+        return;
+    }
+
+    try {
+        // Reserve seats before proceeding to checkout
+        await seatPicker.reserveSeats();
+
+        // Get seat allocation from event data
+        const seatAllocation = EVENT_DATA.seat_allocation;
+
+        // Group seats by ticket type
+        const seatsByType = {};
+        selectedSeats.forEach(seatId => {
+            const ticketTypeId = seatAllocation[seatId];
+            if (!seatsByType[ticketTypeId]) {
+                seatsByType[ticketTypeId] = [];
+            }
+            seatsByType[ticketTypeId].push(seatId);
+        });
+
+        // Create tickets array with seats
+        const tickets = Object.keys(seatsByType).map(typeId => ({
+            type_id: typeId,
+            quantity: seatsByType[typeId].length,
+            purchased_seats: seatsByType[typeId]
+        }));
+
+        // Get session ID from seat picker
+        const sessionId = seatPicker.sessionId;
+
+        // Store in sessionStorage
+        const orderData = {
+            event_id: EVENT_ID,
+            tickets: tickets,
+            purchased_seats: selectedSeats,
+            session_id: sessionId,
+            is_seated: true,
+            seating_map_config: seatPicker.options.seatingMapConfig  // Include numbering config
+        };
+
+        // Add coupon if applied
+        if (appliedCoupon) {
+            orderData.coupon_code = appliedCoupon.coupon.coupon_code;
+        }
+
+        console.log('Proceeding to checkout with order data:', orderData);
+        sessionStorage.setItem('orderData', JSON.stringify(orderData));
+
+        // Navigate to checkout
+        window.location.href = '/checkout.html?seated=true';
+    } catch (error) {
+        console.error('Failed to proceed to checkout:', error);
+        // Error notification is already shown by seatPicker.reserveSeats()
+    }
+}
+{% endif %}
+</script>
+{% endblock %}

@@ -12,29 +12,16 @@ from pathlib import Path
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 
+from utils.date_helpers import (
+    date_num, month_abbr, month_full, day_of_week,
+    format_date_full, format_time, year, ru_plural,
+)
+from utils.ui_strings import UI_STRINGS
+
 s3_client = boto3.client('s3')
 API_URL = os.environ.get('API_URL', 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com')
 S3_BUCKET = os.environ.get('S3_BUCKET', 'yallabalagan-tickets-frontend')
 REGION = os.environ.get('AWS_REGION', 'eu-north-1')
-
-def format_date(date_str):
-    """Format date for display"""
-    # Parse as naive datetime (already in Israel time)
-    clean_str = date_str.replace('Z', '')
-    dt = datetime.fromisoformat(clean_str)
-    months = {
-        1: 'января', 2: 'февраля', 3: 'марта', 4: 'апреля',
-        5: 'мая', 6: 'июня', 7: 'июля', 8: 'августа',
-        9: 'сентября', 10: 'октября', 11: 'ноября', 12: 'декабря'
-    }
-    return f"{dt.day} {months[dt.month]} {dt.year}"
-
-def format_time(date_str):
-    """Format time for display"""
-    # Parse as naive datetime (already in Israel time)
-    clean_str = date_str.replace('Z', '')
-    dt = datetime.fromisoformat(clean_str)
-    return dt.strftime('%H:%M')
 
 def generate_sitemap(events, locations, performers=None):
     """Generate sitemap.xml"""
@@ -147,7 +134,7 @@ def fetch_data():
     # Process events
     for event in events:
         if 'date_formatted' not in event:
-            event['date_formatted'] = format_date(event['date'])
+            event['date_formatted'] = format_date_full(event['date'])
         if 'time_formatted' not in event:
             event['time_formatted'] = format_time(event['date'])
         # min_price only for internal events with ticket_types
@@ -167,15 +154,28 @@ def generate_html_files(events, locations, output_dir, templates_dir,
     performers = performers or []
     performer_products_map = performer_products_map or {}
 
+    strings = UI_STRINGS['ru']
+
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
+
+    # Date filters
+    env.filters['date_num'] = date_num
+    env.filters['month_abbr'] = month_abbr
+    env.filters['month_full'] = month_full
+    env.filters['day_of_week'] = day_of_week
+    env.filters['format_date'] = format_date_full
+    env.filters['format_time'] = format_time
+    env.filters['year'] = year
+
+    # Globals available in every template
     env.globals.update({
-        'format_date': format_date,
-        'format_time': format_time,
+        'strings': strings,
+        'ru_plural': ru_plural,
         'min': min,
         'max': max,
         'fb_pixel_id': os.environ.get('FB_PIXEL_ID'),
         'ga4_id': os.environ.get('GA4_ID'),
-        'api_url': API_URL
+        'api_url': API_URL,
     })
 
     # Create lookup maps
@@ -183,14 +183,14 @@ def generate_html_files(events, locations, output_dir, templates_dir,
 
     # Generate index.html
     print("Generating index.html...")
-    template = env.get_template('index.html')
+    template = env.get_template('pages/index.html')
     html = template.render(events=events)
     (output_dir / 'index.html').write_text(html, encoding='utf-8')
 
     # Generate event detail pages
     print("Generating event detail pages...")
     (output_dir / 'events').mkdir(exist_ok=True)
-    template = env.get_template('event_detail.html')
+    template = env.get_template('pages/event_detail.html')
 
     for event in events:
         location = location_map.get(event['location_id'])
@@ -215,7 +215,7 @@ def generate_html_files(events, locations, output_dir, templates_dir,
     # Generate location detail pages
     print("Generating location detail pages...")
     (output_dir / 'locations').mkdir(exist_ok=True)
-    template = env.get_template('location_detail.html')
+    template = env.get_template('pages/location_detail.html')
 
     for location in locations:
         upcoming_events = [e for e in events if e['location_id'] == location['location_id']]
@@ -227,7 +227,7 @@ def generate_html_files(events, locations, output_dir, templates_dir,
     if performers:
         print(f"Generating {len(performers)} performer pages...")
         (output_dir / 'performer').mkdir(exist_ok=True)
-        performer_template = env.get_template('performer_detail.html')
+        performer_template = env.get_template('pages/performer_detail.html')
 
         for performer in performers:
             slug = performer.get('slug')
@@ -241,19 +241,19 @@ def generate_html_files(events, locations, output_dir, templates_dir,
 
     # Generate processing.html (payment processing page)
     print("Generating processing.html...")
-    template = env.get_template('processing.html')
+    template = env.get_template('pages/processing.html')
     html = template.render()
     (output_dir / 'processing.html').write_text(html, encoding='utf-8')
 
     # Generate checkout.html (checkout page)
     print("Generating checkout.html...")
-    template = env.get_template('checkout.html')
+    template = env.get_template('pages/checkout.html')
     html = template.render()
     (output_dir / 'checkout.html').write_text(html, encoding='utf-8')
 
     # Generate accessibility.html
     print("Generating accessibility.html...")
-    template = env.get_template('accessibility.html')
+    template = env.get_template('pages/accessibility.html')
     html = template.render()
     (output_dir / 'accessibility.html').write_text(html, encoding='utf-8')
 
@@ -266,7 +266,7 @@ def generate_html_files(events, locations, output_dir, templates_dir,
 
     if payment_mode == 'mock':
         print("Generating mock_payment.html...")
-        template = env.get_template('mock_payment.html')
+        template = env.get_template('pages/mock_payment.html')
         html = template.render()
         (output_dir / 'mock_payment.html').write_text(html, encoding='utf-8')
         pages_generated += 1

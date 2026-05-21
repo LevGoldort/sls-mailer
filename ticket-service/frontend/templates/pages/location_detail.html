@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location.name }} - YallaBalagan{% endblock %}
+{% block description %}{{ location.description if location.description else 'Информация о локации ' + location.name }}{% endblock %}
+
+{% block content %}
+<div style="margin-top: 2rem;">
+    <!-- Hero Section -->
+    <div style="background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+        {% if location.media and location.media.photos and location.media.photos|length > 0 %}
+        <img src="{{ location.media.photos[0] }}"
+             alt="{{ location.name }}"
+             style="width: 100%; height: 400px; object-fit: cover; background: var(--gray-200);">
+        {% else %}
+        <div style="width: 100%; height: 400px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); display: flex; align-items: center; justify-content: center; font-size: 6rem; color: white;">
+            🏛️
+        </div>
+        {% endif %}
+
+        <!-- Content -->
+        <div style="padding: 2rem;">
+            <!-- Header -->
+            <div style="margin-bottom: 2rem;">
+                <h1 class="page-title" style="margin-bottom: 0.5rem;">{{ location.name }}</h1>
+
+                {% if location.description %}
+                <p style="font-size: 1.125rem; color: var(--gray-600); line-height: 1.75;">
+                    {{ location.description }}
+                </p>
+                {% endif %}
+
+                <!-- Meta Info -->
+                <div style="display: flex; gap: 2rem; margin-top: 1rem; flex-wrap: wrap; color: var(--gray-600);">
+                    {% if location.capacity %}
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1.25rem;">👥</span>
+                        <span>Вместимость: {{ location.capacity }} человек</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Address Section -->
+            {% if location.address %}
+            <div style="background: var(--gray-50); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    📍 Адрес
+                </h2>
+                <p style="font-size: 1.0625rem; color: var(--gray-700); margin-bottom: 1rem;">
+                    {{ location.address.street }}
+                    {% if location.address.city %}<br>{{ location.address.city }}{% endif %}
+                </p>
+
+                {% if location.address.coordinates %}
+                <div style="margin-top: 1rem;">
+                    <a href="https://www.google.com/maps?q={{ location.address.coordinates.lat }},{{ location.address.coordinates.lng }}"
+                       target="_blank"
+                       class="btn btn-primary"
+                       style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                        🗺️ Открыть в Google Maps
+                    </a>
+                </div>
+
+                <!-- Embedded Map -->
+                <div style="margin-top: 1rem; border-radius: 0.5rem; overflow: hidden;">
+                    <iframe
+                        width="100%"
+                        height="300"
+                        style="border: 0; display: block;"
+                        loading="lazy"
+                        src="https://www.google.com/maps?q={{ location.address.coordinates.lat }},{{ location.address.coordinates.lng }}&output=embed">
+                    </iframe>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Parking Information -->
+            {% if location.parkings and location.parkings|length > 0 %}
+            <div style="background: white; border: 1px solid var(--gray-200); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    🅿️ Парковка
+                </h2>
+
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    {% for parking in location.parkings %}
+                    <div {% if not loop.first %}style="padding-top: 1.5rem; border-top: 1px solid var(--gray-200);"{% endif %}>
+                        {% if parking.description %}
+                        <p style="color: var(--gray-600); margin-bottom: 0.75rem;">
+                            {{ parking.description }}
+                        </p>
+                        {% endif %}
+
+                        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9375rem;">
+                            {% if parking.coordinates %}
+                            <a href="https://www.google.com/maps?q={{ parking.coordinates.lat }},{{ parking.coordinates.lng }}"
+                               target="_blank"
+                               style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                                🗺️ Показать на карте →
+                            </a>
+                            {% elif parking.google_maps_url %}
+                            <a href="{{ parking.google_maps_url }}"
+                               target="_blank"
+                               style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                                🗺️ Показать на карте →
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Photo Gallery -->
+            {% if location.media and location.media.photos and location.media.photos|length > 1 %}
+            <div style="margin-bottom: 2rem;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Фотографии</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                    {% for photo in location.media.photos[1:] %}
+                    <img src="{{ photo }}"
+                         alt="{{ location.name }}"
+                         style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.5rem; cursor: pointer;"
+                         onclick="window.open('{{ photo }}', '_blank')">
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Video Gallery -->
+            {% if location.media and location.media.videos and location.media.videos|length > 0 %}
+            <div style="margin-bottom: 2rem;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Видео</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+                    {% for video in location.media.videos %}
+                    <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 0.5rem;">
+                        <iframe
+                            src="{{ video }}"
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Upcoming Events at this Location -->
+            {% if upcoming_events and upcoming_events|length > 0 %}
+            <div>
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Предстоящие события</h2>
+                <div class="events-grid">
+                    {% for event in upcoming_events %}
+                    {% set event_slug = event.slug if event.slug else event.event_id %}
+                    <a href="/events/{{ event_slug }}.html" class="event-card">
+                        {% if event.images and event.images|length > 0 %}
+                        <img src="{{ event.images[0] }}" alt="{{ event.title }}" class="event-image">
+                        {% else %}
+                        <div class="event-image" style="display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+                            🎭
+                        </div>
+                        {% endif %}
+
+                        <div class="event-content">
+                            <span class="event-date">{{ event.date_formatted }}</span>
+                            <h3 class="event-title">{{ event.title }}</h3>
+                            <p class="event-description">{{ event.description }}</p>
+
+                            <div class="event-footer">
+                                {% if event.min_price %}
+                                <div class="event-price">от {{ event.min_price }}₪</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <p>В данный момент нет запланированных событий в этой локации.</p>
+            </div>
+            {% endif %}
+
+            <!-- Back Button -->
+            <div style="margin-top: 2rem;">
+                <a href="/" class="btn" style="background: var(--gray-200); color: var(--gray-800);">
+                    ← Назад к событиям
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

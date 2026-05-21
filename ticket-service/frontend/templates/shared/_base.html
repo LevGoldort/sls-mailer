@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="origin">
+    <title>{% block title %}YallaBalagan - События{% endblock %}</title>
+    <meta name="description" content="{% block description %}Афиша культурных событий{% endblock %}">
+
+    <!-- SEO Meta Tags -->
+    <meta name="keywords" content="{% block keywords %}стендап, стендап в Израиле, комедия, юмор, развлечения, стендап-шоу, комедийные шоу, культурные события, Тель-Авив, Хайфа, Иерусалим, YallaBalagan{% endblock %}">
+    <meta name="author" content="YallaBalagan">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{% block canonical_url %}https://yallabalagan.org/{% endblock %}">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}https://yallabalagan.org/{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ self.description() }}{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:site_name" content="YallaBalagan">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{% block twitter_url %}https://yallabalagan.org/{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ self.title() }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ self.description() }}{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/accessibility-toolbar.css">
+
+    <!-- Cookie Consent Script - Loads analytics only after user consent -->
+    <script src="/static/js/cookie-consent.js"></script>
+
+    <!-- Schema.org Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "YallaBalagan",
+      "url": "https://yallabalagan.org",
+      "logo": "https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg",
+      "description": "Афиша культурных событий, стендап-шоу и развлечений в Израиле",
+      "email": "yalla@yallabalagan.org",
+      "telephone": "+972506491680",
+      "sameAs": [
+        "https://facebook.com/YallaBalaganIsrael",
+        "https://instagram.com/yallabala",
+        "https://t.me/yallabala",
+        "https://youtube.com/@yallabalagan"
+      ]
+    }
+    </script>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Skip to main content link for keyboard navigation -->
+    <a href="#main-content" class="skip-link">דלג לתוכן הראשי | Skip to main content</a>
+
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo" data-critical>🎭 YallaBalagan</a>
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content" class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 YallaBalagan. Все права защищены.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                <a href="mailto:yalla@yallabalagan.org" style="color: inherit;">yalla@yallabalagan.org</a>
+            </p>
+            <p style="margin-top: 0.75rem; font-size: 0.875rem;">
+                <a href="https://yallabalagan.org/privacy/" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+                <span style="margin: 0 0.5rem;">•</span>
+                <a href="https://yallabalagan.org/terms/" style="color: inherit; text-decoration: underline;">Terms and Conditions</a>
+                <span style="margin: 0 0.5rem;">•</span>
+                <a href="https://yallabalagan.org/accessibility.html" style="color: inherit; text-decoration: underline;">Accessibility Statement</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Cookie Consent Banner -->
+    <div id="cookie-consent-banner" class="cookie-consent"
+         data-fb-pixel="{{ fb_pixel_id or '' }}"
+         data-ga4="{{ ga4_id or '' }}">
+        <div class="cookie-consent-content">
+            <div class="cookie-consent-text">
+                <h3>Мы используем cookies</h3>
+                <p>
+                    Этот сайт использует cookies и аналитические сервисы (Google Analytics, Facebook Pixel)
+                    для улучшения вашего опыта и анализа посещаемости.
+                    <a href="https://yallabalagan.org/privacy/" target="_blank">Подробнее</a>
+                </p>
+            </div>
+            <div class="cookie-consent-buttons">
+                <button id="cookie-accept" class="cookie-consent-btn cookie-consent-btn-accept">
+                    Принять
+                </button>
+                <button id="cookie-decline" class="cookie-consent-btn cookie-consent-btn-decline">
+                    Отклонить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/accessibility-toolbar.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
