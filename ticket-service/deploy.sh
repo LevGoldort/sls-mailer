@@ -160,6 +160,9 @@ cat > /tmp/ticket-api-env.json <<EOF
     "ORDERS_TABLE": "yallabalagan-orders",
     "COUPONS_TABLE": "yallabalagan-coupons",
     "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "PERFORMERS_TABLE": "yallabalagan-performers",
+    "PRODUCTS_TABLE": "yallabalagan-products",
+    "MERCHANDISE_ORDERS_TABLE": "yallabalagan-merchandise-orders",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
     "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
   }

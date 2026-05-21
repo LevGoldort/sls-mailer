@@ -336,11 +336,7 @@
                 errorBox.style.display = 'block';
                 return;
             }
-            if (!photoUrl && !productId) {
-                errorBox.textContent = 'Загрузите фото товара.';
-                errorBox.style.display = 'block';
-                return;
-            }
+
 
             const payload = {
                 performer_id: performerId,

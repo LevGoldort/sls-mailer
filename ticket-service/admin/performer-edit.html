@@ -358,11 +358,7 @@
                 errorBox.style.display = 'block';
                 return;
             }
-            if (!photoUrl && !performerId) {
-                errorBox.textContent = 'Загрузите основное фото.';
-                errorBox.style.display = 'block';
-                return;
-            }
+
 
             const payload = {
                 name, slug, bio, role,

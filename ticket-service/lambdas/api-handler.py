@@ -242,7 +242,10 @@ def list_events(request_event: Dict = None) -> Dict:
                 'images': evt.images,
                 'slug': evt.slug,
                 'currency': evt.currency,
-                'seat_allocation': evt.seat_allocation  # Include for frontend seat picker
+                'event_type': evt.event_type,
+                'external_url': evt.external_url,
+                'performer_ids': evt.performer_ids,
+                'seat_allocation': evt.seat_allocation,
             })
         except Exception as e:
             print(f"Error parsing event: {e}")
@@ -2632,29 +2635,18 @@ def handle_image_upload(event: Dict) -> Dict:
 def handle_regenerate_site(event: Dict) -> Dict:
     """ADMIN ONLY - Регенерация публичного сайта через Lambda site-regenerator"""
 
-    # SECURITY: Require admin authentication (Lambda abuse prevention)
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(event)
-
-    if not auth.verify_admin_key(api_key):
-        log_security_event('unauthorized_site_regenerate', {
-            'ip': get_client_identifier(event)
-        })
-        return error_response(401, "Unauthorized: Admin access required")
+    try:
+        ctx = authenticate(event)
+        if ctx.get('role') != 'admin':
+            return error_response(403, "Forbidden: Admin access required")
+    except AuthError as e:
+        return error_response(401, str(e))
 
     try:
         print("Invoking site-regenerator Lambda...")
 
         lambda_client = boto3.client('lambda')
-
-        # Get environment to construct correct function name
-        environment = os.environ.get('ENVIRONMENT', 'prod')
-        if environment == 'prod':
-            # Prod function has no suffix
-            function_name = 'yallabalagan-site-regenerator'
-        else:
-            # Dev and other envs have suffix
-            function_name = f'yallabalagan-site-regenerator-{environment}'
+        function_name = 'yallabalagan-site-regenerator'
 
         # Invoke site regenerator Lambda synchronously
         response = lambda_client.invoke(
@@ -2821,7 +2813,7 @@ def create_performer(request_event: Dict) -> Dict:
     except json.JSONDecodeError:
         return error_response(400, "Invalid JSON body")
 
-    required = ['name', 'slug', 'bio', 'role', 'photo_url']
+    required = ['name', 'slug', 'bio', 'role']
     for f in required:
         if not body.get(f):
             return error_response(400, f"Missing required field: {f}")
@@ -2840,7 +2832,7 @@ def create_performer(request_event: Dict) -> Dict:
         slug=slug,
         bio=body['bio'],
         role=body['role'],
-        photo_url=body['photo_url'],
+        photo_url=body.get('photo_url'),
         photos=body.get('photos', []),
         youtube_embed=body.get('youtube_embed'),
         social=SocialLinks.from_dict(social_data),
@@ -3009,7 +3001,7 @@ def create_product(request_event: Dict) -> Dict:
     except json.JSONDecodeError:
         return error_response(400, "Invalid JSON body")
 
-    required = ['performer_id', 'name', 'slug', 'short_description', 'price_ils', 'photo_url']
+    required = ['performer_id', 'name', 'slug', 'short_description', 'price_ils']
     for f in required:
         if not body.get(f) and body.get(f) != 0:
             return error_response(400, f"Missing required field: {f}")
@@ -3033,7 +3025,7 @@ def create_product(request_event: Dict) -> Dict:
         full_description=body.get('full_description', ''),
         what_you_get=body.get('what_you_get', ''),
         price_ils=float(body['price_ils']),
-        photo_url=body['photo_url'],
+        photo_url=body.get('photo_url'),
         gallery_urls=body.get('gallery_urls', []),
         total_slots=body.get('total_slots'),
         status=body.get('status', 'active'),
