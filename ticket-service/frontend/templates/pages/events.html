@@ -1,0 +1,110 @@
+{% extends 'shared/_base.html' %}
+{% from 'macros/_macros.html' import event_card, filter_bar, month_divider %}
+
+{% block title %}{{ strings.events.hero_line1 }} {{ strings.events.hero_line2 }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ strings.events.hero_sub }}{% endblock %}
+
+{% block content %}
+
+{# ── Page hero ── #}
+<section class="yb-page-hero">
+  <div class="yb-page-hero__breadcrumb">
+    <a href="/">{{ strings.events.breadcrumb_home }}</a>
+    <span> ► </span>
+    <b style="opacity:1">{{ strings.events.breadcrumb_self }}</b>
+    <span> · </span>
+    <span>{{ strings.site.cities }}</span>
+  </div>
+
+  <h1 class="yb-page-hero__h1">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.events.hero_line1 }}</span>
+      {{ strings.events.hero_line1 }}
+    </span>
+    {' '}
+    <span class="yb-riso" style="color:var(--yb-magenta)">
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.events.hero_line2 }}</span>
+      {{ strings.events.hero_line2 }}
+    </span>
+  </h1>
+
+  <div class="yb-page-hero__footer">
+    <p class="yb-page-hero__desc">{{ strings.events.hero_sub }}</p>
+    <div class="yb-page-hero__roster">
+      {{ events | length }}
+      <br><span>{{ ru_plural(events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }} в афише</span>
+    </div>
+  </div>
+</section>
+
+{# ── Filter + events ── #}
+<section class="yb-pad-x" style="padding-bottom:60px">
+
+  {{ filter_bar(['ВСЕ'] + all_tags) }}
+
+  {% if events_by_month %}
+  <div id="events-list"
+       data-empty-tag="{{ strings.filter.no_events }}"
+       data-empty-sub="{{ strings.filter.no_events_sub }}">
+    {% set ns = namespace(card_index=0) %}
+    {% for group in events_by_month %}
+    <div style="margin-top: {{ '0' if loop.first else '28px' }}">
+      {{ month_divider(group.label, group.events | length) }}
+      <div class="yb-events-list">
+        {% for event in group.events %}
+        {% set _loc = location_map.get(event.get('location_id', '')) %}
+        {{ event_card(event, location=_loc, index=ns.card_index) }}
+        {% set ns.card_index = ns.card_index + 1 %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="padding:120px 0 80px; text-align:center; border:3px dashed var(--yb-ink); margin-top:16px">
+    <div style="font-family:var(--yb-font-display); font-size:48px; letter-spacing:-.02em; text-transform:uppercase; margin-bottom:12px">
+      Пока ничего
+    </div>
+    <div style="font-family:var(--yb-font-mono); font-size:14px; letter-spacing:.08em; opacity:.7; text-transform:uppercase">
+      Следите за обновлениями.
+    </div>
+  </div>
+  {% endif %}
+
+</section>
+
+{# ── Socials strip ── #}
+<section class="yb-socials yb-pad">
+  <div class="yb-socials__head">
+    <h3>{{ strings.socials.heading }}</h3>
+    <span class="yb-socials__sub">{{ strings.socials.sub }}</span>
+  </div>
+  <div class="yb-socials__grid">
+    <a href="https://instagram.com/yallabala" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">IG</div>
+      <div class="yb-socials__tile-name">Instagram</div>
+      <div class="yb-socials__tile-handle">@yallabala</div>
+    </a>
+    <a href="https://t.me/yallabala" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">TG</div>
+      <div class="yb-socials__tile-name">Telegram</div>
+      <div class="yb-socials__tile-handle">@yallabala</div>
+    </a>
+    <a href="https://youtube.com/@yallabalagan" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">YT</div>
+      <div class="yb-socials__tile-name">YouTube</div>
+      <div class="yb-socials__tile-handle">@yallabalagan</div>
+    </a>
+    <a href="https://facebook.com/YallaBalaganIsrael" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">FB</div>
+      <div class="yb-socials__tile-name">Facebook</div>
+      <div class="yb-socials__tile-handle">YallaBalaganIsrael</div>
+    </a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/filter.js"></script>
+{% endblock %}

@@ -84,6 +84,39 @@ def is_event_past(event_date_str):
     now = datetime.now(israel_tz)
     return event_end_time <= now
 
+_MONTHS_NOM = {
+    1:'Январь', 2:'Февраль', 3:'Март', 4:'Апрель', 5:'Май', 6:'Июнь',
+    7:'Июль', 8:'Август', 9:'Сентябрь', 10:'Октябрь', 11:'Ноябрь', 12:'Декабрь',
+}
+
+def group_events_by_month(events):
+    """Return [{label, events}] grouped by calendar month, preserving order."""
+    groups = []
+    current_key = None
+    for event in events:
+        clean = event['date'].replace('Z', '').split('+')[0]
+        dt = datetime.fromisoformat(clean)
+        key = event['date'][:7]
+        if key != current_key:
+            current_key = key
+            label = f"{_MONTHS_NOM[dt.month]} {dt.year}"
+            groups.append({'label': label, 'events': []})
+        groups[-1]['events'].append(event)
+    return groups
+
+
+def collect_tags(events):
+    """Return list of unique tags across all events, preserving first-seen order."""
+    seen = set()
+    tags = []
+    for event in events:
+        for tag in event.get('tags', []):
+            if tag not in seen:
+                seen.add(tag)
+                tags.append(tag)
+    return tags
+
+
 def _enrich_event(event, performer_map):
     """Add computed display fields to an event dict (in-place)."""
     if 'date_formatted' not in event:
@@ -223,6 +256,17 @@ def generate_html_files(site_data, output_dir, templates_dir):
     html = template.render(events=events, active_nav='home')
     (output_dir / 'index.html').write_text(html, encoding='utf-8')
 
+    # Generate events listing page
+    print("Generating events.html...")
+    template = env.get_template('pages/events.html')
+    html = template.render(
+        events=events,
+        events_by_month=group_events_by_month(events),
+        all_tags=collect_tags(events),
+        active_nav='events',
+    )
+    (output_dir / 'events.html').write_text(html, encoding='utf-8')
+
     # Generate event detail pages
     print("Generating event detail pages...")
     (output_dir / 'events').mkdir(exist_ok=True)
@@ -259,6 +303,21 @@ def generate_html_files(site_data, output_dir, templates_dir):
         html = template.render(location=location, upcoming_events=loc_events, active_nav='')
         slug = location.get('slug', location['location_id'])
         (output_dir / 'locations' / f"{slug}.html").write_text(html, encoding='utf-8')
+
+    # Generate performers listing page
+    if performers:
+        print("Generating performers.html...")
+        all_performer_tags = collect_tags(
+            [{'tags': p.get('tags', [])} for p in performers]
+        )
+        template = env.get_template('pages/performers.html')
+        html = template.render(
+            performers=performers,
+            all_tags=all_performer_tags,
+            active_nav='performers',
+        )
+        (output_dir / 'performers.html').write_text(html, encoding='utf-8')
+        pages_generated += 1
 
     # Generate performer detail pages
     if performers:
@@ -304,7 +363,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
     payment_mode = os.environ.get('PAYMENT_MODE', 'mock').lower()
     slugged_events = sum(1 for event in events if event.get('slug'))
     performer_pages = sum(1 for p in performers if p.get('slug'))
-    pages_generated = (1 + len(events) + slugged_events + len(locations)
+    pages_generated = (1 + 1 + len(events) + slugged_events + len(locations)
                        + performer_pages + 3)  # +3 for processing, checkout, accessibility
 
     if payment_mode == 'mock':
