@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактировать товар - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            background: white; padding: 24px 30px; border-radius: 12px;
+            margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 16px; font-size: 22px; }
+        .nav { display: flex; gap: 12px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 8px 16px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .card {
+            background: white; border-radius: 12px; padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 15px; font-weight: 700; color: #444;
+            border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;
+            margin-bottom: 20px; margin-top: 24px;
+        }
+        .section-title:first-child { margin-top: 0; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
+        label .req { color: #e53e3e; }
+        input[type="text"], input[type="number"], input[type="url"],
+        textarea, select {
+            width: 100%; padding: 10px 12px; border: 1.5px solid #ddd;
+            border-radius: 8px; font-size: 14px; outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus, select:focus { border-color: #667eea; }
+        textarea { resize: vertical; min-height: 80px; }
+        .photo-section { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+        .photo-preview {
+            width: 120px; height: 120px; border-radius: 10px;
+            object-fit: cover; background: #e2e8f0; border: 2px solid #e2e8f0; flex-shrink: 0;
+        }
+        .photo-placeholder {
+            width: 120px; height: 120px; border-radius: 10px;
+            background: #e2e8f0; display: flex; align-items: center;
+            justify-content: center; font-size: 36px; flex-shrink: 0;
+        }
+        .photo-upload-area {
+            flex: 1; border: 2px dashed #c3c9f0; border-radius: 8px;
+            padding: 16px; text-align: center; cursor: pointer;
+            font-size: 13px; color: #888; transition: all 0.2s; min-width: 200px;
+        }
+        .photo-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        .gallery-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .gallery-item { position: relative; width: 80px; height: 80px; }
+        .gallery-item img {
+            width: 80px; height: 80px; object-fit: cover;
+            border-radius: 8px; border: 1px solid #e2e8f0;
+        }
+        .gallery-item .remove-btn {
+            position: absolute; top: -6px; right: -6px;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #ef4444; color: white; border: none;
+            font-size: 12px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .add-photo-btn {
+            width: 80px; height: 80px; border: 2px dashed #c3c9f0;
+            border-radius: 8px; background: #f8f9ff;
+            font-size: 24px; color: #667eea; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .add-photo-btn:hover { border-color: #667eea; background: #eff1ff; }
+        input[type="file"] { display: none; }
+        .btn {
+            padding: 12px 28px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-save { background: #667eea; color: white; }
+        .btn-save:hover { background: #5568d3; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-cancel { background: #f1f5f9; color: #666; margin-left: 10px; }
+        .btn-cancel:hover { background: #e2e8f0; }
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert {
+            padding: 12px 14px; border-radius: 8px; font-size: 14px;
+            margin-bottom: 18px; display: none;
+        }
+        .alert-error { background: #fff0f0; border: 1px solid #fca5a5; color: #dc2626; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #323232;
+            color: white; padding: 16px 24px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="page-title">Новый товар</h1>
+            <div class="nav">
+                <a href="products.html" class="nav-btn">← Назад</a>
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div id="alert-error" class="alert alert-error"></div>
+
+            <div class="section-title">Основное фото</div>
+            <div class="photo-section">
+                <div id="main-photo-placeholder" class="photo-placeholder">🛍️</div>
+                <img id="main-photo-preview" class="photo-preview" style="display:none" src="" alt="">
+                <div class="photo-upload-area" onclick="document.getElementById('main-photo-file').click()">
+                    Нажмите для загрузки фото товара<br>
+                    <small style="color:#aaa">JPG, PNG до 5MB</small>
+                </div>
+                <input type="file" id="main-photo-file" accept="image/*">
+                <input type="hidden" id="photo-url">
+            </div>
+
+            <div class="section-title">Основная информация</div>
+            <div class="form-group">
+                <label>Перформер <span class="req">*</span></label>
+                <select id="performer-id">
+                    <option value="">Выберите перформера...</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Название <span class="req">*</span></label>
+                    <input type="text" id="name" placeholder="Название товара">
+                </div>
+                <div class="form-group">
+                    <label>Slug <span class="req">*</span></label>
+                    <input type="text" id="slug" placeholder="product-slug">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Краткое описание <span class="req">*</span></label>
+                <input type="text" id="short-description" placeholder="Одна строка">
+            </div>
+            <div class="form-group">
+                <label>Полное описание</label>
+                <textarea id="full-description" placeholder="Подробное описание товара..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Что получает покупатель</label>
+                <textarea id="what-you-get" placeholder="Что именно входит в покупку..."></textarea>
+            </div>
+
+            <div class="section-title">Цена и слоты</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Цена (₪) <span class="req">*</span></label>
+                    <input type="number" id="price" min="0" step="0.01" placeholder="100">
+                </div>
+                <div class="form-group">
+                    <label>Всего слотов (пусто = неограничено)</label>
+                    <input type="number" id="total-slots" min="1" placeholder="оставьте пустым для ∞">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Статус</label>
+                    <select id="status">
+                        <option value="active">Доступен</option>
+                        <option value="inactive">Неактивен</option>
+                        <option value="sold_out">Распродан</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section-title">Галерея</div>
+            <div class="gallery-grid" id="gallery-grid">
+                <button type="button" class="add-photo-btn" onclick="document.getElementById('gallery-file').click()">+</button>
+            </div>
+            <input type="file" id="gallery-file" accept="image/*" multiple>
+
+            <div style="margin-top: 28px;">
+                <button class="btn btn-save" id="save-btn" onclick="save()">Сохранить</button>
+                <button class="btn btn-cancel" onclick="location.href='products.html'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const productId = urlParams.get('id');
+        let galleryUrls = [];
+
+        document.getElementById('name').addEventListener('input', function() {
+            if (productId) return;
+            const slug = this.value.toLowerCase()
+                .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+                .replace(/-+/g, '-').replace(/^-|-$/g, '');
+            document.getElementById('slug').value = slug;
+        });
+
+        async function loadPerformerOptions() {
+            try {
+                const data = await API.getPerformers();
+                const sel = document.getElementById('performer-id');
+                (data.performers || []).forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.performer_id;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                });
+            } catch (e) { console.warn('Could not load performers', e); }
+        }
+
+        document.getElementById('main-photo-file').addEventListener('change', async function() {
+            const file = this.files[0];
+            if (!file) return;
+            const url = await uploadFile(file);
+            if (!url) return;
+            document.getElementById('photo-url').value = url;
+            document.getElementById('main-photo-preview').src = url;
+            document.getElementById('main-photo-preview').style.display = 'block';
+            document.getElementById('main-photo-placeholder').style.display = 'none';
+        });
+
+        document.getElementById('gallery-file').addEventListener('change', async function() {
+            for (const file of Array.from(this.files)) {
+                const url = await uploadFile(file);
+                if (url) addGalleryPhoto(url);
+            }
+            this.value = '';
+        });
+
+        async function uploadFile(file) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/upload-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': file.type, 'Authorization': `Bearer ${Auth.getAccessToken()}` },
+                    body: file,
+                });
+                if (!res.ok) throw new Error('Upload failed');
+                const data = await res.json();
+                return data.url || data.image_url;
+            } catch (e) {
+                showToast('Ошибка загрузки фото', 'error');
+                return null;
+            }
+        }
+
+        function addGalleryPhoto(url) {
+            if (galleryUrls.includes(url)) return;
+            galleryUrls.push(url);
+            renderGallery();
+        }
+
+        function removeGalleryPhoto(url) {
+            galleryUrls = galleryUrls.filter(u => u !== url);
+            renderGallery();
+        }
+
+        function renderGallery() {
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = galleryUrls.map(url => `
+                <div class="gallery-item">
+                    <img src="${escapeHtml(url)}" alt="">
+                    <button class="remove-btn" onclick="removeGalleryPhoto('${escapeHtml(url)}')">&times;</button>
+                </div>
+            `).join('') + `<button type="button" class="add-photo-btn" onclick="document.getElementById('gallery-file').click()">+</button>`;
+        }
+
+        async function loadProduct() {
+            if (!productId) return;
+            document.getElementById('page-title').textContent = 'Редактировать товар';
+            try {
+                const data = await API.getProduct(productId);
+                const p = data.product;
+                document.getElementById('performer-id').value = p.performer_id || '';
+                document.getElementById('name').value = p.name || '';
+                document.getElementById('slug').value = p.slug || '';
+                document.getElementById('short-description').value = p.short_description || '';
+                document.getElementById('full-description').value = p.full_description || '';
+                document.getElementById('what-you-get').value = p.what_you_get || '';
+                document.getElementById('price').value = p.price_ils || '';
+                document.getElementById('total-slots').value = p.total_slots != null ? p.total_slots : '';
+                document.getElementById('status').value = p.status || 'active';
+                document.getElementById('photo-url').value = p.photo_url || '';
+                if (p.photo_url) {
+                    document.getElementById('main-photo-preview').src = p.photo_url;
+                    document.getElementById('main-photo-preview').style.display = 'block';
+                    document.getElementById('main-photo-placeholder').style.display = 'none';
+                }
+                galleryUrls = p.gallery_urls || [];
+                renderGallery();
+            } catch (e) {
+                handleError(e, 'Ошибка загрузки товара');
+            }
+        }
+
+        async function save() {
+            const btn = document.getElementById('save-btn');
+            const errorBox = document.getElementById('alert-error');
+            errorBox.style.display = 'none';
+
+            const performerId = document.getElementById('performer-id').value;
+            const name = document.getElementById('name').value.trim();
+            const slug = document.getElementById('slug').value.trim();
+            const shortDesc = document.getElementById('short-description').value.trim();
+            const price = parseFloat(document.getElementById('price').value);
+            const photoUrl = document.getElementById('photo-url').value;
+            const totalSlotsRaw = document.getElementById('total-slots').value.trim();
+            const totalSlots = totalSlotsRaw ? parseInt(totalSlotsRaw) : null;
+
+            if (!performerId || !name || !slug || !shortDesc || isNaN(price)) {
+                errorBox.textContent = 'Заполните все обязательные поля.';
+                errorBox.style.display = 'block';
+                return;
+            }
+            if (!photoUrl && !productId) {
+                errorBox.textContent = 'Загрузите фото товара.';
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            const payload = {
+                performer_id: performerId,
+                name, slug,
+                short_description: shortDesc,
+                full_description: document.getElementById('full-description').value.trim(),
+                what_you_get: document.getElementById('what-you-get').value.trim(),
+                price_ils: price,
+                photo_url: photoUrl,
+                gallery_urls: galleryUrls,
+                total_slots: totalSlots,
+                status: document.getElementById('status').value,
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Сохранение...';
+
+            try {
+                if (productId) {
+                    await API.updateProduct(productId, payload);
+                } else {
+                    await API.createProduct(payload);
+                }
+                showToast('Сохранено!');
+                setTimeout(() => location.href = 'products.html', 800);
+            } catch (e) {
+                errorBox.textContent = e.message || 'Ошибка сохранения';
+                errorBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Сохранить';
+            }
+        }
+
+        initAdmin().then(async () => {
+            await loadPerformerOptions();
+            loadProduct();
+        });
+    </script>
+</body>
+</html>

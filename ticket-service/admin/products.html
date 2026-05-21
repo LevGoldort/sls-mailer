@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мерч - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: white; padding: 30px; border-radius: 12px;
+            margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 20px; }
+        .nav { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 10px 20px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 14px;
+            transition: all 0.3s; border: none; cursor: pointer;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .btn-primary { background: #4caf50; }
+        .btn-primary:hover { background: #45a049; }
+        .toolbar {
+            display: flex; gap: 12px; align-items: center;
+            margin-top: 14px; flex-wrap: wrap;
+        }
+        .filter-select {
+            padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
+            font-size: 13px; outline: none; min-width: 200px;
+        }
+        .section {
+            background: white; border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 30px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .card-photo {
+            width: 100%; height: 180px; object-fit: cover; background: #e2e8f0;
+        }
+        .card-photo-placeholder {
+            width: 100%; height: 180px; background: #e2e8f0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 48px; color: #aaa;
+        }
+        .card-body { padding: 16px; }
+        .card-name { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 4px; }
+        .card-performer { font-size: 12px; color: #667eea; margin-bottom: 6px; }
+        .card-desc { font-size: 13px; color: #666; margin-bottom: 10px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-meta { display: flex; justify-content: space-between; align-items: center; }
+        .card-price { font-size: 18px; font-weight: 700; color: #333; }
+        .card-slots { font-size: 12px; color: #888; }
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600;
+        }
+        .badge-active { background: #dcfce7; color: #16a34a; }
+        .badge-inactive { background: #fee2e2; color: #dc2626; }
+        .badge-sold_out { background: #fef3c7; color: #d97706; }
+        .card-actions {
+            display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #f0f0f0;
+        }
+        .action-btn {
+            flex: 1; padding: 8px; border: none; border-radius: 6px;
+            font-size: 13px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-edit { background: #dbeafe; color: #1d4ed8; }
+        .btn-edit:hover { background: #bfdbfe; }
+        .btn-delete { background: #fee2e2; color: #dc2626; }
+        .btn-delete:hover { background: #fecaca; }
+        .loading { text-align: center; padding: 60px; color: #666; }
+        .empty { text-align: center; padding: 80px; color: #999; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #323232;
+            color: white; padding: 16px 24px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛍️ Мерч</h1>
+            <div class="nav">
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+                <a href="events.html" class="nav-btn">🎪 События</a>
+                <a href="locations.html" class="nav-btn">📍 Локации</a>
+                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
+                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
+                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+                <a href="users.html" class="nav-btn" data-admin-only>👥 Пользователи</a>
+                <a href="performers.html" class="nav-btn" data-admin-only>🎤 Перформеры</a>
+                <a href="products.html" class="nav-btn" data-admin-only>🛍️ Мерч</a>
+            </div>
+            <div class="toolbar">
+                <div id="user-bar" style="display:flex;align-items:center;gap:10px;font-size:14px;"></div>
+                <select class="filter-select" id="performer-filter">
+                    <option value="">Все перформеры</option>
+                </select>
+                <a href="product-edit.html" class="nav-btn btn-primary">+ Добавить товар</a>
+            </div>
+        </div>
+
+        <div class="section">
+            <div id="products-grid" class="grid">
+                <div class="loading">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script>
+        let performerMap = {};
+
+        async function loadPerformers() {
+            try {
+                const data = await API.getPerformers();
+                const performers = data.performers || [];
+                performers.forEach(p => { performerMap[p.performer_id] = p.name; });
+                const sel = document.getElementById('performer-filter');
+                performers.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.performer_id;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                });
+                sel.addEventListener('change', loadProducts);
+            } catch (e) { console.warn('Could not load performers', e); }
+        }
+
+        async function loadProducts() {
+            const performerId = document.getElementById('performer-filter').value || null;
+            document.getElementById('products-grid').innerHTML = '<div class="loading">Загрузка...</div>';
+            try {
+                const data = await API.getProducts(performerId);
+                render(data.products || []);
+            } catch (e) {
+                handleError(e, 'Ошибка загрузки');
+                document.getElementById('products-grid').innerHTML = '<div class="empty">Ошибка загрузки</div>';
+            }
+        }
+
+        function render(products) {
+            const grid = document.getElementById('products-grid');
+            if (!products.length) {
+                grid.innerHTML = '<div class="empty">Нет товаров</div>';
+                return;
+            }
+            grid.innerHTML = products.map(p => {
+                const photo = p.photo_url
+                    ? `<img class="card-photo" src="${escapeHtml(p.photo_url)}" alt="">`
+                    : `<div class="card-photo-placeholder">🛍️</div>`;
+                const statusClass = { active: 'badge-active', inactive: 'badge-inactive', sold_out: 'badge-sold_out' }[p.status] || 'badge-inactive';
+                const statusLabel = { active: 'доступен', inactive: 'неактивен', sold_out: 'распродан' }[p.status] || p.status;
+                const slotsText = p.total_slots != null
+                    ? `${p.sold_slots || 0} / ${p.total_slots} продано`
+                    : `${p.sold_slots || 0} продано`;
+                const performerName = performerMap[p.performer_id] || '';
+                return `
+                    <div class="card">
+                        ${photo}
+                        <div class="card-body">
+                            <div class="card-name">${escapeHtml(p.name)} <span class="badge ${statusClass}">${statusLabel}</span></div>
+                            ${performerName ? `<div class="card-performer">🎤 ${escapeHtml(performerName)}</div>` : ''}
+                            <div class="card-desc">${escapeHtml(p.short_description || '')}</div>
+                            <div class="card-meta">
+                                <span class="card-price">${p.price_ils}₪</span>
+                                <span class="card-slots">${slotsText}</span>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="action-btn btn-edit" onclick="location.href='product-edit.html?id=${p.product_id}'">✏️ Редактировать</button>
+                            <button class="action-btn btn-delete" onclick="deleteProduct('${p.product_id}','${escapeHtml(p.name).replace(/'/g,"\\&#039;")}')">🗑️ Удалить</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function deleteProduct(id, name) {
+            if (!confirm(`Удалить товар "${name}"?`)) return;
+            try {
+                await API.deleteProduct(id);
+                showToast('Товар удалён');
+                loadProducts();
+            } catch (e) {
+                handleError(e, 'Ошибка удаления');
+            }
+        }
+
+        initAdmin().then(async () => {
+            await loadPerformers();
+            loadProducts();
+        });
+    </script>
+</body>
+</html>

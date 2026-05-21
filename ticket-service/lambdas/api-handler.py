@@ -5,6 +5,7 @@ Main API Handler Lambda для билетного сервиса
 import json
 import os
 import sys
+import hmac
 from typing import Dict, Any
 from decimal import Decimal
 import boto3
@@ -15,6 +16,9 @@ import re
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from models import Event, Location, Order, Customer, OrderTicket, TicketType, Coupon, Address, Coordinates, Parking, Media, Contact, SeatingMapConfig, VenueConfig
+from models.performer import Performer, SocialLinks
+from models.product import Product
+from models.merchandise_order import MerchandiseOrder, BuyerInfo
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
 from utils.auth import get_admin_authenticator
@@ -120,7 +124,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # Routing
     try:
-        if path.startswith('/api/events'):
+        if path == '/api/events/quick' and http_method == 'POST':
+            response = handle_quick_post(event)
+        elif path.startswith('/api/events'):
             response = handle_events(event, http_method, path)
         elif path.startswith('/api/locations'):
             response = handle_locations(event, http_method, path)
@@ -128,6 +134,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = handle_orders(event, http_method, path)
         elif path.startswith('/api/coupons'):
             response = handle_coupons(event, http_method, path)
+        elif path.startswith('/api/performers'):
+            response = handle_performers(event, http_method, path)
+        elif path.startswith('/api/products'):
+            response = handle_products(event, http_method, path)
+        elif path.startswith('/api/merchandise'):
+            response = handle_merchandise(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             response = handle_image_upload(event)
         elif path == '/api/admin/regenerate-site' and http_method == 'POST':
@@ -515,14 +527,23 @@ def create_event(request_event: Dict) -> Dict:
         body = json.loads(request_event.get('body', '{}'))
 
         # Валидация обязательных полей
-        required = ['title', 'description', 'date', 'location_id', 'ticket_types']
+        event_type = body.get('event_type', 'internal')
+        if event_type not in ('internal', 'external'):
+            return error_response(400, "event_type must be 'internal' or 'external'")
+
+        if event_type == 'external' and not body.get('external_url'):
+            return error_response(400, "external_url is required for external events")
+
+        required = ['title', 'description', 'date', 'location_id']
+        if event_type == 'internal':
+            required.append('ticket_types')
         for field in required:
             if field not in body:
                 return error_response(400, f"Missing required field: {field}")
 
         # Создаем типы билетов
         ticket_types = []
-        for tt in body['ticket_types']:
+        for tt in body.get('ticket_types', []):
             ticket_types.append(TicketType(
                 id=tt['id'],
                 name=tt['name'],
@@ -581,6 +602,9 @@ def create_event(request_event: Dict) -> Dict:
             seat_allocation=seat_allocation,
             owner_id=owner_id,
             tenant_id=tenant_id,
+            event_type=event_type,
+            external_url=body.get('external_url'),
+            performer_ids=body.get('performer_ids', []),
         )
 
         # Сохраняем в DynamoDB
@@ -715,6 +739,18 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
             evt.images = body['images']
         if 'status' in body:
             evt.status = body['status']
+        if 'event_type' in body:
+            new_event_type = body['event_type']
+            if new_event_type not in ('internal', 'external'):
+                return error_response(400, "event_type must be 'internal' or 'external'")
+            evt.event_type = new_event_type
+        if 'external_url' in body:
+            evt.external_url = body['external_url']
+        if 'performer_ids' in body:
+            evt.performer_ids = body['performer_ids']
+        # Validate external_url presence after potential changes
+        if evt.event_type == 'external' and not evt.external_url:
+            return error_response(400, "external_url is required for external events")
         if 'ticket_types' in body:
             # NEW: Validate ticket type deletions - prevent deletion of types with sales
             new_type_ids = {tt['id'] for tt in body['ticket_types']}
@@ -2650,6 +2686,655 @@ def handle_regenerate_site(event: Dict) -> Dict:
         traceback.print_exc()
 
         return error_response(500, f"Failed to regenerate site: {str(e)}")
+
+
+# ===== Quick-Post Handler =====
+def handle_quick_post(request_event: Dict) -> Dict:
+    """POST /api/events/quick — no JWT; validates QUICK_POST_SECRET from env"""
+    quick_secret = os.environ.get('QUICK_POST_SECRET', '')
+    if not quick_secret:
+        return error_response(503, "Quick-post not configured")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    provided_secret = body.get('secret', '')
+    if not provided_secret or not hmac.compare_digest(provided_secret, quick_secret):
+        log_security_event('unauthorized_quick_post', {'ip': get_client_identifier(request_event)})
+        return error_response(401, "Invalid secret")
+
+    required = ['title', 'date', 'external_url']
+    for f in required:
+        if not body.get(f):
+            return error_response(400, f"Missing required field: {f}")
+
+    slug_value = None
+    if body.get('slug'):
+        try:
+            slug_value = validate_event_slug(body['slug'])
+        except ValueError as exc:
+            return error_response(400, str(exc))
+
+    evt = Event(
+        event_id=Event.generate_id(),
+        title=body['title'],
+        description=body.get('description', ''),
+        date=body['date'],
+        location_id=body.get('location_id') or 'unknown',
+        ticket_types=[],
+        images=body.get('images', []),
+        slug=slug_value,
+        event_type='external',
+        external_url=body['external_url'],
+        performer_ids=body.get('performer_ids', []),
+        tenant_id='yallabalagan',
+    )
+    db.put_event(evt.to_dynamodb_item())
+
+    # Trigger site regeneration asynchronously
+    try:
+        lambda_client = boto3.client('lambda')
+        lambda_client.invoke(
+            FunctionName=os.environ.get('SITE_REGENERATOR_LAMBDA', 'yallabalagan-site-regenerator'),
+            InvocationType='Event',
+            Payload=json.dumps({'source': 'quick-post', 'event_id': evt.event_id}),
+        )
+    except Exception as e:
+        print(f"Site regeneration trigger failed: {e}")
+
+    return success_response({'event_id': evt.event_id, 'message': 'Event created'}, 201)
+
+
+# ===== Performers Handlers =====
+def handle_performers(event: Dict, method: str, path: str) -> Dict:
+    """Обрабатывает запросы к /api/performers"""
+
+    if method == 'GET' and path == '/api/performers':
+        return list_performers()
+
+    if method == 'GET' and path.startswith('/api/performers/slug/'):
+        slug = path.split('/')[-1]
+        return get_performer_by_slug(slug)
+
+    if method == 'POST' and path == '/api/performers':
+        return create_performer(event)
+
+    if method == 'GET' and path.startswith('/api/performers/'):
+        performer_id = path.split('/')[-1]
+        return get_performer(performer_id)
+
+    if method == 'PUT' and path.startswith('/api/performers/'):
+        performer_id = path.split('/')[-1]
+        return update_performer(performer_id, event)
+
+    if method == 'DELETE' and path.startswith('/api/performers/'):
+        performer_id = path.split('/')[-1]
+        return delete_performer(performer_id, event)
+
+    return error_response(404, "Performers endpoint not found")
+
+
+def list_performers() -> Dict:
+    """GET /api/performers — public"""
+    items = db.list_performers(status='active')
+    performers = []
+    for item in items:
+        try:
+            p = Performer.from_dynamodb_item(item)
+            performers.append(p.to_dynamodb_item())
+        except Exception as e:
+            print(f"Error parsing performer: {e}")
+    return success_response({'performers': performers, 'count': len(performers)})
+
+
+def get_performer(performer_id: str) -> Dict:
+    """GET /api/performers/{id} — public"""
+    item = db.get_performer(performer_id)
+    if not item:
+        return error_response(404, "Performer not found")
+    return success_response({'performer': Performer.from_dynamodb_item(item).to_dynamodb_item()})
+
+
+def get_performer_by_slug(slug: str) -> Dict:
+    """GET /api/performers/slug/{slug} — public"""
+    item = db.get_performer_by_slug(slug)
+    if not item:
+        return error_response(404, "Performer not found")
+    return success_response({'performer': Performer.from_dynamodb_item(item).to_dynamodb_item()})
+
+
+def create_performer(request_event: Dict) -> Dict:
+    """POST /api/performers — admin only"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        log_security_event('unauthorized_performer_create', {'ip': get_client_identifier(request_event)})
+        return error_response(e.status_code, str(e))
+
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, "Access denied: admin only")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    required = ['name', 'slug', 'bio', 'role', 'photo_url']
+    for f in required:
+        if not body.get(f):
+            return error_response(400, f"Missing required field: {f}")
+
+    slug = normalize_slug(body['slug'])
+    if not slug:
+        return error_response(400, "Invalid slug")
+    if db.get_performer_by_slug(slug):
+        return error_response(409, "Slug already in use")
+
+    social_data = body.get('social', {})
+    performer = Performer(
+        performer_id=Performer.generate_id(),
+        tenant_id=ctx.get('tenant_id', 'yallabalagan'),
+        name=body['name'],
+        slug=slug,
+        bio=body['bio'],
+        role=body['role'],
+        photo_url=body['photo_url'],
+        photos=body.get('photos', []),
+        youtube_embed=body.get('youtube_embed'),
+        social=SocialLinks.from_dict(social_data),
+        contact_email=body.get('contact_email'),
+        contact_phone=body.get('contact_phone'),
+        status=body.get('status', 'active'),
+    )
+    db.put_performer(performer.to_dynamodb_item())
+    return success_response({'performer': performer.to_dynamodb_item()}, 201)
+
+
+def update_performer(performer_id: str, request_event: Dict) -> Dict:
+    """PUT /api/performers/{id} — admin only"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, "Access denied: admin only")
+
+    item = db.get_performer(performer_id)
+    if not item:
+        return error_response(404, "Performer not found")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    performer = Performer.from_dynamodb_item(item)
+
+    if 'name' in body:
+        performer.name = body['name']
+    if 'slug' in body:
+        new_slug = normalize_slug(body['slug'])
+        if not new_slug:
+            return error_response(400, "Invalid slug")
+        existing = db.get_performer_by_slug(new_slug)
+        if existing and existing.get('performer_id') != performer_id:
+            return error_response(409, "Slug already in use")
+        performer.slug = new_slug
+    if 'bio' in body:
+        performer.bio = body['bio']
+    if 'role' in body:
+        performer.role = body['role']
+    if 'photo_url' in body:
+        performer.photo_url = body['photo_url']
+    if 'photos' in body:
+        performer.photos = body['photos']
+    if 'youtube_embed' in body:
+        performer.youtube_embed = body['youtube_embed']
+    if 'social' in body:
+        performer.social = SocialLinks.from_dict(body['social'])
+    if 'contact_email' in body:
+        performer.contact_email = body['contact_email']
+    if 'contact_phone' in body:
+        performer.contact_phone = body['contact_phone']
+    if 'status' in body:
+        performer.status = body['status']
+
+    performer.updated_at = datetime.utcnow().isoformat()
+    db.put_performer(performer.to_dynamodb_item())
+    return success_response({'performer': performer.to_dynamodb_item()})
+
+
+def delete_performer(performer_id: str, request_event: Dict) -> Dict:
+    """DELETE /api/performers/{id} — admin only (soft delete: set status=inactive)"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, "Access denied: admin only")
+
+    item = db.get_performer(performer_id)
+    if not item:
+        return error_response(404, "Performer not found")
+
+    performer = Performer.from_dynamodb_item(item)
+    performer.status = 'inactive'
+    performer.updated_at = datetime.utcnow().isoformat()
+    db.put_performer(performer.to_dynamodb_item())
+    return success_response({'message': 'Performer deactivated', 'performer_id': performer_id})
+
+
+# ===== Products Handlers =====
+def handle_products(event: Dict, method: str, path: str) -> Dict:
+    """Обрабатывает запросы к /api/products"""
+
+    if method == 'GET' and path.startswith('/api/products/slug/'):
+        slug = path.split('/')[-1]
+        return get_product_by_slug(slug)
+
+    if method == 'GET' and path == '/api/products':
+        return list_products(event)
+
+    if method == 'POST' and path == '/api/products':
+        return create_product(event)
+
+    if method == 'GET' and path.startswith('/api/products/'):
+        product_id = path.split('/')[-1]
+        return get_product(product_id)
+
+    if method == 'PUT' and path.startswith('/api/products/'):
+        product_id = path.split('/')[-1]
+        return update_product(product_id, event)
+
+    if method == 'DELETE' and path.startswith('/api/products/'):
+        product_id = path.split('/')[-1]
+        return delete_product(product_id, event)
+
+    return error_response(404, "Products endpoint not found")
+
+
+def list_products(request_event: Dict) -> Dict:
+    """GET /api/products — public (active). Supports ?performer_id={id}"""
+    params = request_event.get('queryStringParameters') or {}
+    performer_id = params.get('performer_id')
+
+    if performer_id:
+        items = db.list_products_by_performer(performer_id)
+        items = [i for i in items if i.get('status') == 'active']
+    else:
+        items = db.list_products()
+
+    products = []
+    for item in items:
+        try:
+            products.append(Product.from_dynamodb_item(item).to_dynamodb_item())
+        except Exception as e:
+            print(f"Error parsing product: {e}")
+    return success_response({'products': products, 'count': len(products)})
+
+
+def get_product(product_id: str) -> Dict:
+    """GET /api/products/{id} — public"""
+    item = db.get_product(product_id)
+    if not item:
+        return error_response(404, "Product not found")
+    return success_response({'product': Product.from_dynamodb_item(item).to_dynamodb_item()})
+
+
+def get_product_by_slug(slug: str) -> Dict:
+    """GET /api/products/slug/{slug} — public"""
+    item = db.get_product_by_slug(slug)
+    if not item:
+        return error_response(404, "Product not found")
+    return success_response({'product': Product.from_dynamodb_item(item).to_dynamodb_item()})
+
+
+def create_product(request_event: Dict) -> Dict:
+    """POST /api/products — admin only"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        log_security_event('unauthorized_product_create', {'ip': get_client_identifier(request_event)})
+        return error_response(e.status_code, str(e))
+
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, "Access denied: admin only")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    required = ['performer_id', 'name', 'slug', 'short_description', 'price_ils', 'photo_url']
+    for f in required:
+        if not body.get(f) and body.get(f) != 0:
+            return error_response(400, f"Missing required field: {f}")
+
+    slug = normalize_slug(body['slug'])
+    if not slug:
+        return error_response(400, "Invalid slug")
+    if db.get_product_by_slug(slug):
+        return error_response(409, "Slug already in use")
+
+    if not db.get_performer(body['performer_id']):
+        return error_response(404, "Performer not found")
+
+    product = Product(
+        product_id=Product.generate_id(),
+        tenant_id=ctx.get('tenant_id', 'yallabalagan'),
+        performer_id=body['performer_id'],
+        name=body['name'],
+        slug=slug,
+        short_description=body['short_description'],
+        full_description=body.get('full_description', ''),
+        what_you_get=body.get('what_you_get', ''),
+        price_ils=float(body['price_ils']),
+        photo_url=body['photo_url'],
+        gallery_urls=body.get('gallery_urls', []),
+        total_slots=body.get('total_slots'),
+        status=body.get('status', 'active'),
+    )
+    db.put_product(product.to_dynamodb_item())
+    return success_response({'product': product.to_dynamodb_item()}, 201)
+
+
+def update_product(product_id: str, request_event: Dict) -> Dict:
+    """PUT /api/products/{id} — admin only"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, "Access denied: admin only")
+
+    item = db.get_product(product_id)
+    if not item:
+        return error_response(404, "Product not found")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    product = Product.from_dynamodb_item(item)
+
+    if 'name' in body:
+        product.name = body['name']
+    if 'slug' in body:
+        new_slug = normalize_slug(body['slug'])
+        if not new_slug:
+            return error_response(400, "Invalid slug")
+        existing = db.get_product_by_slug(new_slug)
+        if existing and existing.get('product_id') != product_id:
+            return error_response(409, "Slug already in use")
+        product.slug = new_slug
+    if 'short_description' in body:
+        product.short_description = body['short_description']
+    if 'full_description' in body:
+        product.full_description = body['full_description']
+    if 'what_you_get' in body:
+        product.what_you_get = body['what_you_get']
+    if 'price_ils' in body:
+        product.price_ils = float(body['price_ils'])
+    if 'photo_url' in body:
+        product.photo_url = body['photo_url']
+    if 'gallery_urls' in body:
+        product.gallery_urls = body['gallery_urls']
+    if 'total_slots' in body:
+        product.total_slots = body['total_slots']
+    if 'status' in body:
+        product.status = body['status']
+
+    product.updated_at = datetime.utcnow().isoformat()
+    db.put_product(product.to_dynamodb_item())
+    return success_response({'product': product.to_dynamodb_item()})
+
+
+def delete_product(product_id: str, request_event: Dict) -> Dict:
+    """DELETE /api/products/{id} — admin only"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, "Access denied: admin only")
+
+    item = db.get_product(product_id)
+    if not item:
+        return error_response(404, "Product not found")
+
+    db.delete_product(product_id)
+    return success_response({'message': 'Product deleted', 'product_id': product_id})
+
+
+# ===== Merchandise Handlers =====
+def handle_merchandise(event: Dict, method: str, path: str) -> Dict:
+    """Обрабатывает запросы к /api/merchandise"""
+
+    if method == 'POST' and path == '/api/merchandise/purchase':
+        return purchase_merchandise(event)
+
+    if method == 'POST' and path == '/api/merchandise/webhook':
+        return merchandise_webhook(event)
+
+    return error_response(404, "Merchandise endpoint not found")
+
+
+def purchase_merchandise(request_event: Dict) -> Dict:
+    """POST /api/merchandise/purchase — public, creates pending merch order"""
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    required = ['product_id', 'buyer']
+    for f in required:
+        if not body.get(f):
+            return error_response(400, f"Missing required field: {f}")
+
+    buyer_data = body['buyer']
+    for f in ['name', 'email']:
+        if not buyer_data.get(f):
+            return error_response(400, f"Missing buyer.{f}")
+
+    product_item = db.get_product(body['product_id'])
+    if not product_item:
+        return error_response(404, "Product not found")
+
+    product = Product.from_dynamodb_item(product_item)
+
+    if product.status != 'active':
+        return error_response(409, "Product is not available")
+
+    if product.total_slots is not None and product.sold_slots >= product.total_slots:
+        return error_response(409, "Product is sold out")
+
+    order = MerchandiseOrder(
+        order_id=MerchandiseOrder.generate_id(),
+        product_id=product.product_id,
+        product_slug=product.slug,
+        performer_id=product.performer_id,
+        buyer=BuyerInfo(
+            name=buyer_data['name'],
+            email=buyer_data['email'],
+            phone=buyer_data.get('phone'),
+            telegram=buyer_data.get('telegram'),
+        ),
+        amount_ils=product.price_ils,
+        payment_method='mock' if os.environ.get('PAYMENT_MODE', 'mock') != 'production' else 'allpay',
+    )
+    db.put_merchandise_order(order.to_dynamodb_item())
+
+    payment_provider = get_payment_provider()
+    try:
+        payment_url = payment_provider.create_payment_url(
+            order_id=order.order_id,
+            amount=order.amount_ils,
+            currency='ILS',
+            email=order.buyer.email,
+            customer_name=order.buyer.name,
+            order_created_at=order.created_at,
+        )
+    except Exception as e:
+        print(f"Failed to create payment URL: {e}")
+        return error_response(500, "Failed to initialize payment")
+
+    return success_response({
+        'order_id': order.order_id,
+        'payment_url': payment_url,
+        'amount_ils': order.amount_ils,
+    }, 201)
+
+
+def merchandise_webhook(request_event: Dict) -> Dict:
+    """POST /api/merchandise/webhook — All-Pay webhook for merchandise orders"""
+    try:
+        body = request_event.get('body', '')
+        if request_event.get('isBase64Encoded'):
+            body = base64.b64decode(body).decode('utf-8')
+
+        payment_provider = get_payment_provider()
+
+        headers = request_event.get('headers', {})
+        mock_signature = headers.get('x-webhook-signature', '')
+        try:
+            body_json = json.loads(body)
+            allpay_signature = body_json.get('sign', '')
+        except Exception:
+            allpay_signature = ''
+
+        signature = allpay_signature if allpay_signature else mock_signature
+
+        if not payment_provider.verify_webhook_signature(body.encode(), signature):
+            print("Invalid merchandise webhook signature")
+            return error_response(401, "Invalid signature")
+
+        try:
+            webhook_data = parse_webhook_payload(body)
+        except ValueError as e:
+            return error_response(400, str(e))
+
+        order_id = webhook_data['order_id']
+        payment_status = webhook_data['status']
+        transaction_id = webhook_data.get('transaction_id', '')
+
+        print(f"Merchandise webhook: order_id={order_id}, status={payment_status}")
+
+        order_item = db.get_merchandise_order(order_id)
+        if not order_item:
+            # Return 200 to prevent retries
+            return success_response({'status': 'ignored', 'message': f'Order {order_id} not found'})
+
+        db.update_merchandise_order_status(order_id, payment_status, transaction_id or None)
+
+        if payment_status == 'completed':
+            try:
+                order = MerchandiseOrder.from_dynamodb_item(order_item)
+
+                # Increment sold_slots on product
+                db.increment_sold_slots(order.product_id)
+
+                # Check if product is now sold out and update status
+                product_item = db.get_product(order.product_id)
+                if product_item:
+                    product = Product.from_dynamodb_item(product_item)
+                    if product.total_slots is not None and product.sold_slots >= product.total_slots:
+                        product.status = 'sold_out'
+                        product.updated_at = datetime.utcnow().isoformat()
+                        db.put_product(product.to_dynamodb_item())
+
+                # Send confirmation email to buyer
+                _send_merchandise_email(order, product_item)
+
+                # Notify performer if contact_email is set
+                performer_item = db.get_performer(order.performer_id)
+                if performer_item and performer_item.get('contact_email'):
+                    _send_merchandise_notification_email(order, product_item, performer_item)
+
+            except Exception as e:
+                print(f"Failed to finalize merchandise order {order_id}: {e}")
+                import traceback
+                traceback.print_exc()
+
+        return success_response({'status': 'success', 'message': 'Webhook processed'})
+
+    except Exception as e:
+        print(f"Merchandise webhook error: {e}")
+        import traceback
+        traceback.print_exc()
+        return error_response(500, "Webhook processing failed")
+
+
+def _send_merchandise_email(order: 'MerchandiseOrder', product_item: Dict):
+    """Send purchase confirmation email to buyer via SES"""
+    try:
+        ses = boto3.client('ses', region_name=os.environ.get('AWS_REGION', 'eu-north-1'))
+        sender = os.environ.get('EMAIL_SENDER', 'noreply@yallabalagan.com')
+        product_name = product_item.get('name', 'Product') if product_item else 'Product'
+
+        ses.send_email(
+            Source=sender,
+            Destination={'ToAddresses': [order.buyer.email]},
+            Message={
+                'Subject': {'Data': f'Purchase confirmed: {product_name}', 'Charset': 'UTF-8'},
+                'Body': {
+                    'Html': {
+                        'Data': (
+                            f'<p>Hi {order.buyer.name},</p>'
+                            f'<p>Your purchase of <strong>{product_name}</strong> '
+                            f'for {order.amount_ils:.0f} ILS has been confirmed.</p>'
+                            f'<p>Order ID: {order.order_id}</p>'
+                            f'<p>Thank you!</p>'
+                        ),
+                        'Charset': 'UTF-8',
+                    }
+                },
+            }
+        )
+        print(f"Confirmation email sent to {order.buyer.email} for order {order.order_id}")
+    except Exception as e:
+        print(f"Failed to send buyer email for {order.order_id}: {e}")
+
+
+def _send_merchandise_notification_email(order: 'MerchandiseOrder', product_item: Dict, performer_item: Dict):
+    """Notify performer of a new purchase"""
+    try:
+        ses = boto3.client('ses', region_name=os.environ.get('AWS_REGION', 'eu-north-1'))
+        sender = os.environ.get('EMAIL_SENDER', 'noreply@yallabalagan.com')
+        contact_email = performer_item['contact_email']
+        product_name = product_item.get('name', 'Product') if product_item else 'Product'
+        performer_name = performer_item.get('name', '')
+
+        ses.send_email(
+            Source=sender,
+            Destination={'ToAddresses': [contact_email]},
+            Message={
+                'Subject': {'Data': f'New purchase: {product_name}', 'Charset': 'UTF-8'},
+                'Body': {
+                    'Html': {
+                        'Data': (
+                            f'<p>Hi {performer_name},</p>'
+                            f'<p>New purchase of <strong>{product_name}</strong>:</p>'
+                            f'<ul>'
+                            f'<li>Buyer: {order.buyer.name} ({order.buyer.email})</li>'
+                            f'<li>Amount: {order.amount_ils:.0f} ILS</li>'
+                            f'<li>Order ID: {order.order_id}</li>'
+                            f'</ul>'
+                        ),
+                        'Charset': 'UTF-8',
+                    }
+                },
+            }
+        )
+        print(f"Performer notification sent to {contact_email}")
+    except Exception as e:
+        print(f"Failed to send performer email: {e}")
 
 
 # ===== Helper Functions =====

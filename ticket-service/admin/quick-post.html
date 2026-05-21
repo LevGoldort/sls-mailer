@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Быстрое добавление события</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+            padding: 24px 16px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 { font-size: 26px; font-weight: 700; color: #667eea; }
+        .header p  { color: #888; font-size: 14px; margin-top: 6px; }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 28px 24px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+        }
+
+        .form-group { margin-bottom: 18px; }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        label .req { color: #e53e3e; margin-left: 2px; }
+
+        input[type="text"],
+        input[type="url"],
+        input[type="datetime-local"],
+        input[type="password"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+            background: white;
+            color: #333;
+        }
+
+        input:focus, textarea:focus, select:focus { border-color: #667eea; }
+
+        textarea { resize: vertical; min-height: 80px; }
+
+        .image-preview {
+            margin-top: 10px;
+            display: none;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 180px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .performer-list {
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .performer-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 4px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .performer-item:hover { background: #f8f9ff; }
+
+        .performer-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+        .performer-item img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #e2e8f0;
+        }
+
+        .performer-item span { font-size: 13px; }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, opacity 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn:hover:not(:disabled) { background: #5568d3; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .spinner {
+            display: inline-block;
+            width: 15px; height: 15px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .alert {
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 18px;
+            display: none;
+        }
+
+        .alert-error { background: #fff0f0; border: 1px solid #fca5a5; color: #dc2626; }
+        .alert-success { background: #f0fff4; border: 1px solid #86efac; color: #16a34a; }
+
+        .upload-btn-small {
+            display: inline-block;
+            padding: 8px 14px;
+            background: #667eea;
+            color: white;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .upload-btn-small:hover { background: #5568d3; }
+
+        input[type="file"] { display: none; }
+
+        .upload-area {
+            border: 2px dashed #c3c9f0;
+            border-radius: 8px;
+            padding: 18px;
+            text-align: center;
+            color: #888;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+
+        .upload-area.uploading { opacity: 0.6; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>YallaBalagan</h1>
+            <p>Добавить внешнее событие</p>
+        </div>
+
+        <div class="card">
+            <div id="alert-error" class="alert alert-error"></div>
+            <div id="alert-success" class="alert alert-success"></div>
+
+            <form id="quick-post-form">
+                <div class="form-group">
+                    <label>Секретный код <span class="req">*</span></label>
+                    <input type="password" id="secret" placeholder="Введите код доступа" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Название <span class="req">*</span></label>
+                    <input type="text" id="title" placeholder="Название события" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Дата и время <span class="req">*</span></label>
+                    <input type="datetime-local" id="date" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Ссылка на событие <span class="req">*</span></label>
+                    <input type="url" id="external-url" placeholder="https://..." required>
+                </div>
+
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="description" placeholder="Краткое описание (необязательно)"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Обложка</label>
+                    <div class="upload-area" id="upload-area" onclick="document.getElementById('image-file').click()">
+                        Нажмите для загрузки фото
+                    </div>
+                    <input type="file" id="image-file" accept="image/*">
+                    <div class="image-preview" id="image-preview">
+                        <img id="image-preview-img" src="" alt="preview">
+                    </div>
+                    <input type="hidden" id="image-url">
+                </div>
+
+                <div class="form-group">
+                    <label>Место проведения</label>
+                    <select id="location">
+                        <option value="">— не указано —</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Участники / перформеры</label>
+                    <div class="performer-list" id="performer-list">
+                        <div style="color:#aaa; font-size:13px; padding:4px">Загрузка...</div>
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-btn" class="btn">Опубликовать событие</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const isDev = window.location.hostname.includes('-dev') || window.location.hostname === 'localhost';
+        const API_BASE = isDev
+            ? 'https://d4xhvmdzbg.execute-api.eu-north-1.amazonaws.com/dev'
+            : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+
+        const MEDIA_BUCKET = isDev ? 'yallabalagan-ticket-media-dev' : 'yallabalagan-ticket-media';
+
+        // Pre-fill secret from URL ?secret=xxx
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('secret')) {
+            document.getElementById('secret').value = urlParams.get('secret');
+        }
+
+        // ===== Load locations =====
+        async function loadLocations() {
+            try {
+                const res = await fetch(`${API_BASE}/api/locations`);
+                const data = await res.json();
+                const sel = document.getElementById('location');
+                (data.locations || []).forEach(loc => {
+                    const opt = document.createElement('option');
+                    opt.value = loc.location_id || loc.PK?.replace('LOCATION#', '');
+                    opt.textContent = loc.name;
+                    sel.appendChild(opt);
+                });
+            } catch (e) {
+                console.warn('Could not load locations', e);
+            }
+        }
+
+        // ===== Load performers =====
+        async function loadPerformers() {
+            const container = document.getElementById('performer-list');
+            try {
+                const res = await fetch(`${API_BASE}/api/performers`);
+                const data = await res.json();
+                const performers = data.performers || [];
+                if (performers.length === 0) {
+                    container.innerHTML = '<div style="color:#aaa;font-size:13px;padding:4px">Нет перформеров</div>';
+                    return;
+                }
+                container.innerHTML = '';
+                performers.forEach(p => {
+                    const id = p.performer_id;
+                    const div = document.createElement('div');
+                    div.className = 'performer-item';
+                    div.innerHTML = `
+                        <input type="checkbox" id="perf-${id}" value="${id}">
+                        <img src="${p.photo_url || ''}" alt="" onerror="this.style.display='none'">
+                        <span>${escapeHtml(p.name)}</span>
+                    `;
+                    div.addEventListener('click', (e) => {
+                        if (e.target.tagName !== 'INPUT') {
+                            const cb = div.querySelector('input[type=checkbox]');
+                            cb.checked = !cb.checked;
+                        }
+                    });
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                container.innerHTML = '<div style="color:#aaa;font-size:13px;padding:4px">Не удалось загрузить</div>';
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // ===== Image upload =====
+        document.getElementById('image-file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            await uploadImage(file);
+        });
+
+        async function uploadImage(file) {
+            const area = document.getElementById('upload-area');
+            area.classList.add('uploading');
+            area.textContent = 'Загрузка...';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/upload-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': file.type },
+                    body: file,
+                });
+                if (!res.ok) throw new Error('Upload failed');
+                const data = await res.json();
+                const url = data.url || data.image_url;
+                document.getElementById('image-url').value = url;
+
+                const preview = document.getElementById('image-preview');
+                document.getElementById('image-preview-img').src = url;
+                preview.style.display = 'block';
+                area.textContent = 'Фото загружено. Нажмите для замены.';
+            } catch (e) {
+                area.textContent = 'Ошибка загрузки. Попробуйте снова.';
+                console.error(e);
+            } finally {
+                area.classList.remove('uploading');
+            }
+        }
+
+        // ===== Form submit =====
+        document.getElementById('quick-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btn = document.getElementById('submit-btn');
+            const errorBox = document.getElementById('alert-error');
+            const successBox = document.getElementById('alert-success');
+
+            errorBox.style.display = 'none';
+            successBox.style.display = 'none';
+
+            const secret = document.getElementById('secret').value.trim();
+            const title = document.getElementById('title').value.trim();
+            const dateRaw = document.getElementById('date').value;
+            const externalUrl = document.getElementById('external-url').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const imageUrl = document.getElementById('image-url').value;
+            const locationId = document.getElementById('location').value;
+
+            const performerIds = Array.from(
+                document.querySelectorAll('#performer-list input[type=checkbox]:checked')
+            ).map(cb => cb.value);
+
+            if (!secret || !title || !dateRaw || !externalUrl) {
+                errorBox.textContent = 'Заполните все обязательные поля.';
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            // Convert datetime-local to ISO
+            const date = new Date(dateRaw).toISOString();
+
+            const payload = {
+                secret,
+                title,
+                date,
+                external_url: externalUrl,
+                description,
+                images: imageUrl ? [imageUrl] : [],
+                location_id: locationId || null,
+                performer_ids: performerIds,
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Публикация...';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/events/quick`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || `Ошибка ${res.status}`);
+                }
+
+                successBox.textContent = `Событие "${title}" опубликовано!`;
+                successBox.style.display = 'block';
+                document.getElementById('quick-post-form').reset();
+                document.getElementById('image-preview').style.display = 'none';
+                document.getElementById('image-url').value = '';
+                document.getElementById('upload-area').textContent = 'Нажмите для загрузки фото';
+
+            } catch (err) {
+                errorBox.textContent = err.message || 'Произошла ошибка. Попробуйте снова.';
+                errorBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Опубликовать событие';
+            }
+        });
+
+        loadLocations();
+        loadPerformers();
+    </script>
+</body>
+</html>

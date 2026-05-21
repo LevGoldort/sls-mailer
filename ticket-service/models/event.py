@@ -59,6 +59,9 @@ class Event:
     seat_allocation: Optional[Dict[str, str]] = None  # {"0-5": "tt-xxx", ...} - распределение мест по типам билетов
     owner_id: Optional[str] = None   # user_id владельца; None для событий до миграции
     tenant_id: Optional[str] = None  # 'yallabalagan' сейчас, динамически в SaaS-фазе; None до миграции
+    event_type: str = "internal"     # "internal" | "external"
+    external_url: Optional[str] = None  # обязателен когда event_type="external"
+    performer_ids: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -104,6 +107,13 @@ class Event:
         if self.tenant_id:
             item["tenant_id"] = self.tenant_id
 
+        # event_type всегда присутствует; external_url и performer_ids — опционально
+        item["event_type"] = self.event_type
+        if self.external_url:
+            item["external_url"] = self.external_url
+        if self.performer_ids:
+            item["performer_ids"] = self.performer_ids
+
         return item
 
     @classmethod
@@ -139,6 +149,9 @@ class Event:
             seat_allocation=item.get("seat_allocation"),
             owner_id=item.get("owner_id"),
             tenant_id=item.get("tenant_id"),
+            event_type=item.get("event_type", "internal"),
+            external_url=item.get("external_url"),
+            performer_ids=item.get("performer_ids", []),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )

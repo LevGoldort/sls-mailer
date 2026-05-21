@@ -102,6 +102,20 @@ const API = {
     deactivateUser: (id) => apiCall(`/api/users/${id}`, 'DELETE'),
     resetUserPassword: (id, newPassword) => apiCall(`/api/users/${id}/reset-password`, 'POST', { new_password: newPassword }),
     changePassword: (data) => apiCall('/api/auth/change-password', 'POST', data),
+
+    // Performers (admin only)
+    getPerformers: () => apiCall('/api/performers'),
+    getPerformer: (id) => apiCall(`/api/performers/${id}`),
+    createPerformer: (data) => apiCall('/api/performers', 'POST', data),
+    updatePerformer: (id, data) => apiCall(`/api/performers/${id}`, 'PUT', data),
+    deletePerformer: (id) => apiCall(`/api/performers/${id}`, 'DELETE'),
+
+    // Products (admin only)
+    getProducts: (performerId = null) => apiCall(`/api/products${performerId ? `?performer_id=${performerId}` : ''}`),
+    getProduct: (id) => apiCall(`/api/products/${id}`),
+    createProduct: (data) => apiCall('/api/products', 'POST', data),
+    updateProduct: (id, data) => apiCall(`/api/products/${id}`, 'PUT', data),
+    deleteProduct: (id) => apiCall(`/api/products/${id}`, 'DELETE'),
 };
 
 // ===== Formatting Functions =====

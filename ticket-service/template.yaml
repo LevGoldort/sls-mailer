@@ -109,6 +109,9 @@ Globals:
         SEAT_RESERVATIONS_TABLE: !Ref SeatReservationsTable
         USERS_TABLE: !Ref UsersTable
         REFRESH_TOKENS_TABLE: !Ref RefreshTokensTable
+        PERFORMERS_TABLE: !Ref PerformersTable
+        PRODUCTS_TABLE: !Ref ProductsTable
+        MERCHANDISE_ORDERS_TABLE: !Ref MerchandiseOrdersTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -136,6 +139,8 @@ Resources:
         - AttributeName: slug
           AttributeType: S
         - AttributeName: owner_id
+          AttributeType: S
+        - AttributeName: event_type
           AttributeType: S
       KeySchema:
         - AttributeName: PK
@@ -169,6 +174,14 @@ Resources:
           KeySchema:
             - AttributeName: owner_id
               KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: EventTypeIndex
+          KeySchema:
+            - AttributeName: event_type
+              KeyType: HASH
+            - AttributeName: date
+              KeyType: RANGE
           Projection:
             ProjectionType: ALL
       Tags:
@@ -381,6 +394,148 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  PerformersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-performers
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-products
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: PerformerIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  MerchandiseOrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-merchandise-orders
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ProductIndex
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   ##############################################################################
   # S3 Buckets
   ##############################################################################
@@ -538,6 +693,12 @@ Resources:
             TableName: !Ref CouponsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref SeatReservationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PerformersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MerchandiseOrdersTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
         - Version: '2012-10-17'

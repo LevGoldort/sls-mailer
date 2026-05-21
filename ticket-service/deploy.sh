@@ -154,6 +154,7 @@ cat > /tmp/ticket-api-env.json <<EOF
     "PAYMENT_MODE": "${PAYMENT_MODE}",
     "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
     "SMS_SENDER_LAMBDA": "yallabalagan-sms-sender",
+    "QUICK_POST_SECRET": "${QUICK_POST_SECRET}",
     "EVENTS_TABLE": "yallabalagan-events",
     "LOCATIONS_TABLE": "yallabalagan-locations",
     "ORDERS_TABLE": "yallabalagan-orders",

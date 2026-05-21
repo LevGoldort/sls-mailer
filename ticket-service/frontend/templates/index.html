@@ -29,7 +29,9 @@
 
                 <div class="event-footer">
                     <div>
-                        {% if event.min_price %}
+                        {% if event.event_type == 'external' %}
+                        <div class="event-price" style="color: var(--primary); font-size: 0.875rem;">🔗 Внешнее событие</div>
+                        {% elif event.min_price %}
                         <div class="event-price">от {{ event.min_price }}₪</div>
                         {% endif %}
                     </div>
