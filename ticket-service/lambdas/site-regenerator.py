@@ -211,6 +211,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
         'fb_pixel_id': os.environ.get('FB_PIXEL_ID'),
         'ga4_id': os.environ.get('GA4_ID'),
         'api_url': API_URL,
+        'location_map': location_map,
     })
 
     # Create lookup maps
@@ -219,7 +220,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
     # Generate index.html
     print("Generating index.html...")
     template = env.get_template('pages/index.html')
-    html = template.render(events=events)
+    html = template.render(events=events, active_nav='home')
     (output_dir / 'index.html').write_text(html, encoding='utf-8')
 
     # Generate event detail pages
@@ -238,6 +239,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
             event=event,
             location=location,
             event_performers=event_performers_with_products,
+            active_nav='events',
         )
         event_filename = output_dir / 'events' / f"{event['event_id']}.html"
         event_filename.write_text(html, encoding='utf-8')
@@ -254,7 +256,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
 
     for location in locations:
         loc_events = location_events_map.get(location['location_id'], [])
-        html = template.render(location=location, upcoming_events=loc_events)
+        html = template.render(location=location, upcoming_events=loc_events, active_nav='')
         slug = location.get('slug', location['location_id'])
         (output_dir / 'locations' / f"{slug}.html").write_text(html, encoding='utf-8')
 
@@ -274,6 +276,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
                 products=performer_products_map.get(pid, []),
                 upcoming_events=performer_upcoming.get(pid, []),
                 archive_events=performer_archive.get(pid, []),
+                active_nav='performers',
             )
             performer_dir = output_dir / 'performer' / slug
             performer_dir.mkdir(exist_ok=True)

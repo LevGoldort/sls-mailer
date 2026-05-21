@@ -1,0 +1,215 @@
+{#
+  Shared Jinja2 macros for the YallaBalagan public site.
+  Import with: {% from 'macros/_macros.html' import event_card, performer_card, month_divider, filter_bar %}
+#}
+
+
+{# ── Stamp / tag chip ── #}
+{% macro stamp(text, color_class='magenta', size_class='') %}
+<span class="yb-stamp yb-stamp--{{ color_class }}{% if size_class %} yb-stamp--{{ size_class }}{% endif %}">
+  {{ text }}
+</span>
+{% endmacro %}
+
+
+{# ── Filter bar (static HTML; filter.js wires up data-tag clicks) ── #}
+{% macro filter_bar(tags, active_tag='') %}
+{% set _colors = ['ink', 'magenta', 'cyan', 'magenta', 'cyan', 'red'] %}
+{% set _rotations = ['-1deg','1.5deg','-0.5deg','2deg','-1.5deg','0.5deg'] %}
+<div class="yb-filter" role="search" aria-label="Фильтр по тегам">
+  <span class="yb-filter__label">{{ strings.filter.label }}</span>
+  {% for tag in tags %}
+  {% set _ci = loop.index0 % (_colors | length) %}
+  <span class="yb-stamp yb-stamp--lg yb-stamp--{{ _colors[_ci] }}{% if tag == active_tag %} yb-stamp--active{% endif %}"
+        style="transform: rotate({{ _rotations[loop.index0 % (_rotations | length)] }})"
+        data-tag="{{ tag }}"
+        data-clickable
+        role="button"
+        tabindex="0"
+        aria-pressed="{{ 'true' if tag == active_tag else 'false' }}">
+    {{ tag }}
+  </span>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{# ── Event card ──
+   event: dict with keys: event_id, slug, title, description, date, event_type,
+          tags, photo_url, min_price, performers, location_id
+   location: optional location dict {name, address}
+   index: card position (0-based) for tape color cycling
+#}
+{% macro event_card(event, location=None, index=0) %}
+{% set _tape_colors = ['cyan', 'magenta', 'yellow'] %}
+{% set _tape = _tape_colors[index % 3] %}
+{% set _is_external = event.get('event_type', 'internal') == 'external' %}
+{% set _slug = event.get('slug') or event['event_id'] %}
+{% set _venue_name = location.name if location else '' %}
+{% set _venue_addr = location.address if location else '' %}
+
+<article class="yb-event-card" data-tags="{{ event.get('tags', []) | join(',') }}">
+
+  <div class="yb-event-card__tape yb-tape--{{ _tape }}" aria-hidden="true"></div>
+
+  {# Date column #}
+  <div class="yb-event-card__date">
+    <div>
+      <div class="yb-event-card__date-num">{{ event['date'] | date_num }}</div>
+      <div class="yb-event-card__date-month">{{ event['date'] | month_abbr }}</div>
+    </div>
+    <div class="yb-event-card__date-day">{{ event['date'] | day_of_week | upper }} · {{ event['date'] | year }}</div>
+  </div>
+
+  {# Photo column #}
+  <div class="yb-event-card__img">
+    {% if event.get('photo_url') %}
+    <img src="{{ event['photo_url'] }}" alt="{{ event['title'] }}" loading="lazy">
+    {% endif %}
+    <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
+  </div>
+
+  {# Info column #}
+  <div class="yb-event-card__info">
+    <div class="yb-event-card__tags">
+      {% for tag in event.get('tags', []) %}
+      {% if loop.index0 == 0 %}
+      <span class="yb-stamp yb-stamp--magenta" style="transform: rotate(-2deg)">{{ tag }}</span>
+      {% else %}
+      <span class="yb-stamp yb-stamp--cyan" style="transform: rotate(1deg)">{{ tag }}</span>
+      {% endif %}
+      {% endfor %}
+      {% if _is_external %}
+      <span class="yb-stamp yb-stamp--red" style="transform: rotate(3deg)">External</span>
+      {% endif %}
+    </div>
+
+    <h3 class="yb-event-card__title">
+      <a href="/events/{{ _slug }}.html">{{ event['title'] }}</a>
+    </h3>
+
+    {% if event.get('description') %}
+    <p class="yb-event-card__desc">{{ event['description'] | truncate(140, True, '…') }}</p>
+    {% endif %}
+
+    <div class="yb-event-card__venue">
+      {% if _venue_name %}
+      <span>► {{ _venue_name | upper }}</span>
+      {% if _venue_addr %}<span style="opacity:.5">·</span><span>{{ _venue_addr }}</span>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {# Ticket stub column #}
+  <div class="yb-event-card__stub yb-event-card__stub--{{ 'external' if _is_external else 'internal' }}">
+    <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
+
+    {# Perforation #}
+    <div class="yb-event-card__perf" aria-hidden="true">
+      <div class="yb-event-card__perf-dot yb-event-card__perf-dot--top"></div>
+      <div class="yb-event-card__perf-dot yb-event-card__perf-dot--bot"></div>
+    </div>
+
+    <div class="yb-event-card__stub-admit" aria-hidden="true">
+      {{ strings.event_card.external_stub if _is_external else strings.event_card.admit_one }}
+    </div>
+
+    <div class="yb-event-card__stub-meta" style="position:relative">
+      <span>№{{ '%03d' % (index + 1) }}·{{ event['date'] | date_num }}{{ event['date'] | month_abbr }}</span>
+      <span>{{ strings.event_card.stub }}</span>
+    </div>
+
+    {% if _is_external %}
+    <div style="position:relative">
+      <div class="yb-event-card__stub-label">{{ strings.event_card.external_label }}</div>
+      <div class="yb-event-card__stub-price" style="font-size:26px;line-height:1.1">
+        {{ strings.event_card.external_sub }}
+      </div>
+    </div>
+    {% else %}
+    <div style="position:relative">
+      <div class="yb-event-card__stub-label">{{ strings.event_card.tickets_from }}</div>
+      {% if event.get('min_price') %}
+      <div class="yb-event-card__stub-price">{{ event['min_price'] }}<sup>₪</sup></div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <a href="/events/{{ _slug }}.html"
+       class="yb-btn yb-btn--primary yb-btn--full"
+       style="position:relative">
+      {{ strings.event_card.external_goto if _is_external else strings.event_card.buy }}
+    </a>
+  </div>
+
+</article>
+{% endmacro %}
+
+
+{# ── Month divider ──
+   label: e.g. 'Декабрь 2025'
+   count: number of events in this month
+#}
+{% macro month_divider(label, count) %}
+<div class="yb-month-divider">
+  <div class="yb-month-divider__eyebrow">{{ strings.events.month_label }}</div>
+  <div class="yb-month-divider__name">{{ label }}</div>
+  <div class="yb-month-divider__count">
+    {{ count }}
+    <span>{{ ru_plural(count, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}
+    {{ strings.events.in_month }}</span>
+  </div>
+</div>
+{% endmacro %}
+
+
+{# ── Performer card ── #}
+{% macro performer_card(performer) %}
+{% set _tape_colors = ['cyan', 'magenta', 'yellow'] %}
+{% set _tape = _tape_colors[loop.index0 % 3] if loop is defined else 'magenta' %}
+
+<a href="/performer/{{ performer['slug'] }}/"
+   class="yb-performer-card"
+   aria-label="{{ performer['name'] }}">
+
+  <div class="yb-performer-card__tape yb-tape--{{ _tape }}" aria-hidden="true"></div>
+
+  <div class="yb-performer-card__photo">
+    {% if performer.get('photo_url') %}
+    <img src="{{ performer['photo_url'] }}" alt="{{ performer['name'] }}" loading="lazy">
+    {% endif %}
+    <div class="yb-performer-card__id-stamp">ID·{{ performer['performer_id'][:6] | upper }}</div>
+    <div class="yb-performer-card__city-stamp">ISRAEL</div>
+  </div>
+
+  <div class="yb-performer-card__body">
+    <h3 class="yb-performer-card__name">{{ performer['name'] | upper }}</h3>
+    {% if performer.get('tagline') %}
+    <p class="yb-performer-card__desc">{{ performer['tagline'] }}</p>
+    {% elif performer.get('bio') %}
+    <p class="yb-performer-card__desc">{{ performer['bio'] | truncate(100, True, '…') }}</p>
+    {% endif %}
+
+    <div class="yb-performer-card__footer">
+      <span>{{ performer.get('role', '') }}</span>
+      <span class="yb-performer-card__dossier">{{ strings.performers.dossier }}</span>
+    </div>
+  </div>
+
+</a>
+{% endmacro %}
+
+
+{# ── Breadcrumb ── #}
+{% macro breadcrumb(items) %}
+<nav class="yb-breadcrumb" aria-label="Хлебные крошки">
+  {% for item in items %}
+  {% if not loop.last %}
+  <a href="{{ item.url }}">{{ item.label }}</a>
+  <span aria-hidden="true"> / </span>
+  {% else %}
+  <span aria-current="page">{{ item.label }}</span>
+  {% endif %}
+  {% endfor %}
+</nav>
+{% endmacro %}
