@@ -1,6 +1,6 @@
 # YallaBalagan — Architecture
 
-Serverless event ticketing platform on AWS. Four independent services sharing one AWS account per environment (prod/dev).
+Serverless event ticketing platform on AWS. Two active services sharing one AWS account per environment (prod/dev).
 
 ---
 
@@ -8,12 +8,12 @@ Serverless event ticketing platform on AWS. Four independent services sharing on
 
 | Service | Directory | Purpose |
 |---------|-----------|---------|
-| **Ticket Service** | `ticket-service/` | Core product — events, tickets, payments, scanner |
-| **Events Site** | `events-site/` | Public-facing static site with event listings (Notion-driven) |
-| **Donate Site** | `donate-site/` | Crowdfunding/donations with All-Pay integration |
+| **Ticket Service** | `ticket-service/` | Core product — events, tickets, payments, scanner, public site |
 | **Newsletter** | `newsletter/` | Email campaign management (Mailchimp alternative) |
 
 Each service has its own `template.yaml`, `samconfig.toml`, and is deployed independently.
+
+> **Archived:** `events-site/` (Notion-driven event listings) and `donate-site/` (crowdfunding) have been consolidated into Ticket Service. Their data was migrated via `scripts/migrate_from_events_site.py` and `scripts/migrate_from_donate_site.py`. The legacy SAM stacks can be deleted once the migration is verified on production.
 
 ---
 
@@ -42,6 +42,9 @@ Each service has its own `template.yaml`, `samconfig.toml`, and is deployed inde
 | `yallabalagan-seat-reservations` | event_id (HASH), seat_id (RANGE) | ExpirationIndex | Temporary seat holds during checkout (TTL-based) |
 | `yallabalagan-users` | PK (`USER#<id>`), SK (`PROFILE`) | EmailIndex (email), TenantIndex (tenant_id+status) | Admin and organizer users; RATELIMIT# prefix for rate limiting |
 | `yallabalagan-refresh-tokens` | PK (`TOKEN#<token>`), SK (`META`) | UserIndex (user_id+created_at) | JWT refresh tokens with TTL-based expiry |
+| `yallabalagan-performers` | PK (`PERFORMER#<id>`), SK (`METADATA`) | TenantIndex, SlugIndex | Performer profiles (artists, hosts) |
+| `yallabalagan-products` | PK (`PRODUCT#<id>`), SK (`METADATA`) | PerformerIndex, StatusIndex, SlugIndex | Merchandise and group products |
+| `yallabalagan-merchandise-orders` | PK, SK | — | Product purchase orders |
 
 > Table names have no environment suffix — dev and prod are isolated via separate AWS accounts, not naming conventions.
 

@@ -122,17 +122,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo -e "${GREEN}Starting deployment of all services...${NC}"
 echo ""
 
-# 1. Ticket Service
+# 1. Ticket Service (consolidates events-site and donate-site functionality)
 deploy_service "Ticket Service" "$SCRIPT_DIR/ticket-service"
 
-# 2. Events Site
-deploy_service "Events Site" "$SCRIPT_DIR/events-site"
-
-# 3. Donate Site
-deploy_service "Donate Site" "$SCRIPT_DIR/donate-site"
-
-# 4. Newsletter
+# 2. Newsletter
 deploy_service "Newsletter" "$SCRIPT_DIR/newsletter"
+
+# NOTE: events-site and donate-site have been consolidated into ticket-service.
+# To delete legacy stacks after verifying the migration:
+#   sam delete --stack-name yallabalagan-events-site-prod --profile yallabalagan-prod
+#   sam delete --stack-name yallabalagan-donate-site-prod --profile yallabalagan-prod
+#   sam delete --stack-name yallabalagan-events-site-dev  --profile yallabalagan-dev
+#   sam delete --stack-name yallabalagan-donate-site-dev  --profile yallabalagan-dev
 
 # Summary
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -160,21 +161,6 @@ echo -e "${YELLOW}Ticket Service:${NC}"
 echo "  API URL: $(get_stack_output $TICKET_STACK ApiUrl)"
 echo "  Frontend: $(get_stack_output $TICKET_STACK FrontendUrl)"
 echo "  Admin: $(get_stack_output $TICKET_STACK AdminUrl)"
-echo ""
-
-# Events Site
-EVENTS_STACK="yallabalagan-events-site-$ENV"
-echo -e "${YELLOW}Events Site:${NC}"
-echo "  Website: $(get_stack_output $EVENTS_STACK WebsiteUrl)"
-echo "  Telegram Webhook: $(get_stack_output $EVENTS_STACK TelegramWebhookUrl)"
-echo ""
-
-# Donate Site
-DONATE_STACK="yallabalagan-donate-site-$ENV"
-echo -e "${YELLOW}Donate Site:${NC}"
-echo "  Website: $(get_stack_output $DONATE_STACK WebsiteUrl)"
-echo "  Payment Webhook: $(get_stack_output $DONATE_STACK PaymentWebhookUrl)"
-echo "  Telegram Webhook: $(get_stack_output $DONATE_STACK TelegramWebhookUrl)"
 echo ""
 
 # Newsletter
