@@ -1,0 +1,90 @@
+{% extends 'shared/_base.html' %}
+{% from 'macros/_macros.html' import performer_card %}
+
+{% block title %}{{ strings.performers.hero_line1 | capitalize }} {{ strings.performers.hero_line2 }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ strings.performers.hero_sub }}{% endblock %}
+
+{% block content %}
+
+{# ── Page hero ── #}
+<section class="yb-page-hero">
+  <div class="yb-page-hero__breadcrumb">
+    <a href="/">{{ strings.performers.breadcrumb_home }}</a>
+    <span> ► </span>
+    <b style="opacity:1">{{ strings.performers.breadcrumb_self }}</b>
+    <span> · </span>
+    <span>{{ strings.site.cities }}</span>
+  </div>
+
+  <h1 class="yb-page-hero__h1">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.performers.hero_line1 | upper }}</span>
+      {{ strings.performers.hero_line1 | upper }}
+    </span>
+    {' '}
+    <span class="yb-riso" style="color:var(--yb-magenta)">
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.performers.hero_line2 | upper }}</span>
+      {{ strings.performers.hero_line2 | upper }}
+    </span>
+  </h1>
+
+  <div class="yb-page-hero__footer">
+    <p class="yb-page-hero__desc">{{ strings.performers.hero_sub }}</p>
+    <div class="yb-page-hero__roster">
+      {{ strings.performers.roster_label }}
+      <br><span>{{ performers | length }}
+      {{ ru_plural(performers | length, strings.plurals.people_1, strings.plurals.people_2_4, strings.plurals.people_many) }}</span>
+    </div>
+  </div>
+</section>
+
+{# ── Performer grid ── #}
+<section class="yb-pad">
+  {% if performers %}
+  <div class="yb-performer-grid">
+    {% for performer in performers %}
+    {% if performer.get('slug') and performer.get('status', 'active') == 'active' %}
+    {% set _tape_colors = ['cyan', 'magenta', 'yellow'] %}
+    {% set _tape = _tape_colors[loop.index0 % 3] %}
+
+    <a href="/performer/{{ performer.slug }}/"
+       class="yb-performer-card"
+       aria-label="{{ performer.name }}">
+
+      <div class="yb-performer-card__tape yb-tape--{{ _tape }}" aria-hidden="true"></div>
+
+      <div class="yb-performer-card__photo">
+        {% if performer.get('photo_url') %}
+        <img src="{{ performer.photo_url }}" alt="{{ performer.name }}" loading="lazy">
+        {% endif %}
+        <div class="yb-halftone yb-halftone--{{ ['magenta', 'cyan', 'magenta'][loop.index0 % 3] }}" aria-hidden="true"></div>
+        <div class="yb-performer-card__id-stamp">№{{ '%03d' % loop.index }}</div>
+        <div class="yb-performer-card__city-stamp">ISRAEL</div>
+      </div>
+
+      <div class="yb-performer-card__body">
+        <h2 class="yb-performer-card__name">{{ performer.name | upper }}</h2>
+        {% if performer.get('tagline') %}
+        <p class="yb-performer-card__desc">{{ performer.tagline }}</p>
+        {% elif performer.get('bio') %}
+        <p class="yb-performer-card__desc">{{ performer.bio | truncate(100, True, '…') }}</p>
+        {% endif %}
+
+        <div class="yb-performer-card__footer">
+          <span>{{ performer.get('role', '') }}</span>
+          <span class="yb-performer-card__dossier">{{ strings.performers.dossier }}</span>
+        </div>
+      </div>
+
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="padding:80px 0; text-align:center; font-family:var(--yb-font-mono); font-size:14px; letter-spacing:.1em; opacity:.6; text-transform:uppercase">
+    {{ strings.filter.nobody }}
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}

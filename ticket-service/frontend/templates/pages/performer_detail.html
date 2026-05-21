@@ -1,144 +1,210 @@
-{% extends "base.html" %}
+{% extends 'shared/_base.html' %}
+{% from 'macros/_macros.html' import event_card %}
 
-{% block title %}{{ performer.name }} - YallaBalagan{% endblock %}
-{% block description %}{{ performer.bio | truncate(160) if performer.bio else performer.name }}{% endblock %}
-
-{% block og_type %}profile{% endblock %}
-{% block og_url %}https://yallabalagan.org/performer/{{ performer.slug }}/{% endblock %}
-{% block og_image %}{% if performer.photo_url %}{{ performer.photo_url }}{% else %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endif %}{% endblock %}
-
-{% block canonical_url %}https://yallabalagan.org/performer/{{ performer.slug }}/{% endblock %}
+{% block title %}{{ performer.name }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ performer.tagline or (performer.bio | truncate(160, True, '…')) if performer.bio else performer.name }}{% endblock %}
+{% block og_image %}{{ performer.photo_url or super() }}{% endblock %}
 
 {% block content %}
-<div style="max-width: 860px; margin: 2rem auto;">
 
-    <!-- Header -->
-    <div style="display: flex; gap: 2rem; align-items: flex-start; margin-bottom: 2.5rem; flex-wrap: wrap;">
-        {% if performer.photo_url %}
-        <img src="{{ performer.photo_url }}" alt="{{ performer.name }}"
-             style="width: 160px; height: 160px; border-radius: 50%; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 16px rgba(0,0,0,0.12);">
-        {% else %}
-        <div style="width: 160px; height: 160px; border-radius: 50%; background: var(--gray-200); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 4rem;">🎤</div>
-        {% endif %}
+{% set _socials = performer.get('social', {}) %}
 
-        <div style="flex: 1; min-width: 0;">
-            <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">{{ performer.name }}</h1>
-            {% if performer.role %}
-            <p style="color: var(--primary); font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">{{ performer.role }}</p>
-            {% endif %}
-
-            <!-- Social Links -->
-            {% set social = performer.social if performer.social else {} %}
-            {% if social.instagram or social.telegram or social.youtube or social.facebook %}
-            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-                {% if social.instagram %}
-                <a href="{{ social.instagram }}" target="_blank" rel="noopener"
-                   style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; border: 1px solid #e1306c; border-radius: 1rem; color: #e1306c; text-decoration: none; font-size: 0.875rem; font-weight: 500;">
-                    📸 Instagram
-                </a>
-                {% endif %}
-                {% if social.telegram %}
-                <a href="{{ social.telegram }}" target="_blank" rel="noopener"
-                   style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; border: 1px solid #0088cc; border-radius: 1rem; color: #0088cc; text-decoration: none; font-size: 0.875rem; font-weight: 500;">
-                    ✈️ Telegram
-                </a>
-                {% endif %}
-                {% if social.youtube %}
-                <a href="{{ social.youtube }}" target="_blank" rel="noopener"
-                   style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; border: 1px solid #ff0000; border-radius: 1rem; color: #ff0000; text-decoration: none; font-size: 0.875rem; font-weight: 500;">
-                    ▶️ YouTube
-                </a>
-                {% endif %}
-                {% if social.facebook %}
-                <a href="{{ social.facebook }}" target="_blank" rel="noopener"
-                   style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; border: 1px solid #1877f2; border-radius: 1rem; color: #1877f2; text-decoration: none; font-size: 0.875rem; font-weight: 500;">
-                    👤 Facebook
-                </a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Bio -->
-    {% if performer.bio %}
-    <div style="margin-bottom: 2.5rem; font-size: 1rem; line-height: 1.7; color: var(--gray-700);">
-        {{ performer.bio | safe }}
-    </div>
-    {% endif %}
-
-    <!-- YouTube Embed -->
-    {% if performer.youtube_embed %}
-    <div style="margin-bottom: 2.5rem;">
-        <h2 style="font-size: 1.375rem; font-weight: 600; margin-bottom: 1rem;">Видео</h2>
-        <div style="position: relative; padding-bottom: 56.25%; height: 0; border-radius: 0.75rem; overflow: hidden;">
-            <iframe
-                src="https://www.youtube.com/embed/{{ performer.youtube_embed }}"
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-                loading="lazy">
-            </iframe>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Photo Gallery -->
-    {% if performer.photos and performer.photos|length > 0 %}
-    <div style="margin-bottom: 2.5rem;">
-        <h2 style="font-size: 1.375rem; font-weight: 600; margin-bottom: 1rem;">Галерея</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
-            {% for photo_url in performer.photos %}
-            <img src="{{ photo_url }}" alt="{{ performer.name }}"
-                 style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 0.5rem;">
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Products / Merch -->
-    {% if products and products|length > 0 %}
-    <div style="margin-bottom: 2.5rem;">
-        <h2 style="font-size: 1.375rem; font-weight: 600; margin-bottom: 1rem;">🛍️ Мерч</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
-            {% for product in products %}
-            <div style="border: 1px solid var(--gray-200); border-radius: 0.75rem; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;">
-                {% if product.photo_url %}
-                <img src="{{ product.photo_url }}" alt="{{ product.name }}"
-                     style="width: 100%; height: 180px; object-fit: cover;">
-                {% else %}
-                <div style="width: 100%; height: 180px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: 3rem;">🛍️</div>
-                {% endif %}
-                <div style="padding: 1rem;">
-                    <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">{{ product.name }}</h3>
-                    {% if product.short_description %}
-                    <p style="color: var(--gray-600); font-size: 0.875rem; margin-bottom: 0.75rem;">{{ product.short_description }}</p>
-                    {% endif %}
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 1.25rem; font-weight: 700;">{{ product.price_ils }}₪</span>
-                        {% if product.status == 'active' %}
-                        <a href="/checkout.html?product_id={{ product.product_id }}"
-                           class="btn btn-primary"
-                           style="padding: 0.5rem 1rem; font-size: 0.875rem;">
-                            Купить
-                        </a>
-                        {% else %}
-                        <span style="color: var(--gray-500); font-size: 0.875rem; font-weight: 600;">Нет в наличии</span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Back -->
-    <div>
-        <a href="/" class="btn" style="background: var(--gray-200); color: var(--gray-800);">
-            ← Назад к событиям
-        </a>
-    </div>
-
+{# ── Breadcrumb ── #}
+<div class="yb-breadcrumb">
+  <a href="/">{{ strings.performer_detail.breadcrumb_home }}</a>
+  <span> ► </span>
+  <a href="/performers.html">{{ strings.performer_detail.breadcrumb_performers }}</a>
+  <span> ► </span>
+  <b style="opacity:1">{{ performer.name }}</b>
 </div>
+
+{# ── Hero: portrait + info ── #}
+<section class="yb-performer-hero">
+  <div class="yb-performer-hero__box">
+
+    <div class="yb-performer-hero__portrait">
+      {% if performer.get('photo_url') %}
+      <img src="{{ performer.photo_url }}" alt="{{ performer.name }}">
+      {% endif %}
+      <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
+      <div class="yb-halftone" style="background-image:radial-gradient(circle,rgba(0,181,216,.12) 1.2px,transparent 1.2px);background-size:8px 8px;mix-blend-mode:screen;" aria-hidden="true"></div>
+
+      <div style="position:absolute;top:22px;left:22px;padding:6px 12px;background:var(--yb-yellow);border:3px solid var(--yb-ink);font-family:var(--yb-font-mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transform:rotate(-4deg);box-shadow:4px 4px 0 var(--yb-ink)">
+        ★ ARTIST ★
+      </div>
+    </div>
+
+    <div class="yb-performer-hero__info">
+      <div style="position:absolute;top:-14px;left:60px;width:130px;height:24px;background:rgba(0,181,216,.55);transform:rotate(-4deg);border:1px solid var(--yb-ink)" aria-hidden="true"></div>
+      <div style="position:absolute;top:-14px;right:80px;width:110px;height:22px;background:rgba(229,53,171,.5);transform:rotate(3deg);border:1px solid var(--yb-ink)" aria-hidden="true"></div>
+
+      <div class="yb-performer-hero__role">{{ performer.get('role', '') }}</div>
+
+      <h1 class="yb-performer-hero__name">
+        {% set _parts = performer.name.split(' ') %}
+        <span class="yb-riso" style="display:block">
+          <span class="yb-riso__shadow" aria-hidden="true">{{ _parts[0] }}</span>
+          {{ _parts[0] }}
+        </span>
+        {% if _parts | length > 1 %}
+        <span class="yb-riso" style="display:block;color:var(--yb-magenta)">
+          <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ _parts[1:] | join(' ') }}</span>
+          {{ _parts[1:] | join(' ') }}
+        </span>
+        {% endif %}
+      </h1>
+
+      {% if performer.get('tagline') %}
+      <p class="yb-performer-hero__tagline">{{ performer.tagline }}</p>
+      {% endif %}
+
+      {% if _socials %}
+      <div class="yb-performer-hero__socials">
+        {% if _socials.get('instagram') %}
+        <a href="{{ _socials.instagram }}" class="yb-btn yb-btn--paper yb-btn--sm" target="_blank" rel="noopener">IG</a>
+        {% endif %}
+        {% if _socials.get('telegram') %}
+        <a href="{{ _socials.telegram }}" class="yb-btn yb-btn--paper yb-btn--sm" target="_blank" rel="noopener">TG</a>
+        {% endif %}
+        {% if _socials.get('youtube') %}
+        <a href="{{ _socials.youtube }}" class="yb-btn yb-btn--paper yb-btn--sm" target="_blank" rel="noopener">YT</a>
+        {% endif %}
+        {% if _socials.get('facebook') %}
+        <a href="{{ _socials.facebook }}" class="yb-btn yb-btn--paper yb-btn--sm" target="_blank" rel="noopener">FB</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
+
+{# ── Photo gallery ── #}
+{% if performer.get('photos') %}
+<div class="yb-photo-gallery yb-pad-x" style="padding-top:20px;padding-bottom:0">
+  {% for photo_url in performer.photos %}
+  <div class="yb-photo-gallery__item">
+    <img src="{{ photo_url }}" alt="{{ performer.name }} {{ loop.index }}" loading="lazy">
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Bio ── #}
+{% if performer.get('bio') %}
+<section class="yb-pad" style="padding-bottom:24px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:26px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.performer_detail.bio_heading }}</span>
+        {{ strings.performer_detail.bio_heading }}
+      </span>
+    </h2>
+  </div>
+  <div style="max-width:880px;display:flex;flex-direction:column;gap:18px">
+    {% set _bio_paras = performer.bio.split('\n\n') if '\n\n' in performer.bio else [performer.bio] %}
+    {% for para in _bio_paras %}{% if para.strip() %}
+    <p style="margin:0;font-family:{% if loop.first %}var(--yb-font-serif){% else %}var(--yb-font-body){% endif %};font-weight:{% if loop.first %}700{% else %}400{% endif %};font-size:{% if loop.first %}21px{% else %}17px{% endif %};line-height:{% if loop.first %}1.35{% else %}1.6{% endif %}">
+      {{ para.strip() }}
+    </p>
+    {% endif %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── YouTube embed ── #}
+{% if performer.get('youtube_embed') %}
+<section class="yb-pad" style="padding-bottom:24px">
+  <div style="position:relative;border:var(--yb-border);box-shadow:8px 8px 0 var(--yb-magenta);background:var(--yb-ink);aspect-ratio:16/9;overflow:hidden">
+    <iframe src="{{ performer.youtube_embed }}"
+            title="{{ performer.name }} — запись"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            style="width:100%;height:100%;border:none;display:block"></iframe>
+    <div style="position:absolute;top:16px;right:16px;padding:5px 11px;background:var(--yb-red);color:var(--yb-paper);border:2.5px solid var(--yb-ink);font-family:var(--yb-font-mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transform:rotate(2deg);pointer-events:none">★ REC ★</div>
+  </div>
+</section>
+{% endif %}
+
+{# ── Upcoming events ── #}
+{% if upcoming_events %}
+<section class="yb-pad" style="padding-bottom:24px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:24px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      {{ strings.performer_detail.upcoming_heading }}
+    </h2>
+    <span style="font-family:var(--yb-font-mono);font-size:12px;opacity:.65;letter-spacing:.12em;text-transform:uppercase">
+      / {{ upcoming_events | length }}
+      {{ ru_plural(upcoming_events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}
+    </span>
+  </div>
+  <div class="yb-events-list">
+    {% for event in upcoming_events %}
+    {% set _loc = location_map.get(event.get('location_id', '')) %}
+    {{ event_card(event, location=_loc, index=loop.index0) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Products / merch ── #}
+{% if products %}
+<section class="yb-pad" style="padding-bottom:24px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:24px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      {{ strings.performer_detail.merch_heading }}
+    </h2>
+  </div>
+  <div class="yb-products-grid">
+    {% for product in products %}
+    <div class="yb-product-card">
+      {% if product.get('photo_url') %}
+      <div class="yb-product-card__photo">
+        <img src="{{ product.photo_url }}" alt="{{ product.name }}" loading="lazy">
+      </div>
+      {% endif %}
+      <div class="yb-product-card__body">
+        <div class="yb-product-card__name">{{ product.name }}</div>
+        {% if product.get('description') %}
+        <p class="yb-product-card__desc">{{ product.description | truncate(80, True, '…') }}</p>
+        {% endif %}
+      </div>
+      <div class="yb-product-card__footer">
+        <div class="yb-product-card__price">{{ product.price }}₪</div>
+        <a href="/products/{{ product.product_id }}.html" class="yb-btn yb-btn--primary yb-btn--sm">
+          {{ strings.products.buy }}
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Archive ── #}
+{% if archive_events %}
+<section class="yb-pad" style="padding-bottom:48px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:24px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      {{ strings.performer_detail.archive_heading }}
+    </h2>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    {% for event in archive_events %}
+    <a href="/events/{{ event.get('slug') or event.event_id }}.html"
+       style="display:flex;align-items:center;gap:20px;padding:14px 0;border-bottom:1px dashed var(--yb-ink);text-decoration:none;color:var(--yb-ink)">
+      <div style="font-family:var(--yb-font-mono);font-size:13px;letter-spacing:.1em;opacity:.65;white-space:nowrap">
+        {{ event['date'] | date_num }}.{{ event['date'] | month_abbr }}.{{ event['date'] | year }}
+      </div>
+      <div style="font-family:var(--yb-font-display);font-size:18px;letter-spacing:-.01em">{{ event.title }}</div>
+      {% set _loc = location_map.get(event.get('location_id', '')) %}
+      {% if _loc %}
+      <div style="margin-left:auto;font-family:var(--yb-font-mono);font-size:11px;opacity:.6;white-space:nowrap">{{ _loc.name }}</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% endblock %}
