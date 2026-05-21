@@ -304,6 +304,14 @@ def generate_html_files(site_data, output_dir, templates_dir):
         slug = location.get('slug', location['location_id'])
         (output_dir / 'locations' / f"{slug}.html").write_text(html, encoding='utf-8')
 
+    # Generate products listing page
+    if products:
+        print("Generating products.html...")
+        template = env.get_template('pages/products.html')
+        html = template.render(products=products, active_nav='')
+        (output_dir / 'products.html').write_text(html, encoding='utf-8')
+        pages_generated += 1
+
     # Generate performers listing page
     if performers:
         print("Generating performers.html...")

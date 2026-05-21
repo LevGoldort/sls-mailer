@@ -1,0 +1,107 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}{{ strings.products.hero_line1 | capitalize }} {{ strings.products.hero_line2 }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ strings.products.hero_sub }}{% endblock %}
+
+{% block content %}
+
+{# ── Page hero ── #}
+<section class="yb-page-hero">
+  <div class="yb-page-hero__breadcrumb">
+    <a href="/">{{ strings.products.breadcrumb_home }}</a>
+    <span> ► </span>
+    <b style="opacity:1">{{ strings.products.breadcrumb_self }}</b>
+  </div>
+
+  <h1 class="yb-page-hero__h1">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.products.hero_line1 | upper }}</span>
+      {{ strings.products.hero_line1 | upper }}
+    </span>
+    {' '}
+    <span class="yb-riso" style="color:var(--yb-magenta)">
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.products.hero_line2 | upper }}</span>
+      {{ strings.products.hero_line2 | upper }}
+    </span>
+  </h1>
+
+  <div class="yb-page-hero__footer">
+    <p class="yb-page-hero__desc">{{ strings.products.hero_sub }}</p>
+    <div class="yb-page-hero__roster">
+      {{ products | length }}
+      <br><span>{{ ru_plural(products | length, 'продукт', 'продукта', 'продуктов') }}</span>
+    </div>
+  </div>
+</section>
+
+{# ── Product grid ── #}
+<section class="yb-pad" style="padding-bottom:60px">
+  {% if products %}
+  <div class="yb-products-grid">
+    {% for product in products %}
+    {% set _is_group = product.get('product_type', 'personal') == 'group' %}
+    {% set _group_size = product.get('group_size') %}
+    {% set _sold = product.get('sold', 0) %}
+    {% set _available = product.get('available', product.get('quantity', 0)) %}
+    {% set _total = (_group_size if _is_group else (_available + _sold)) or 0 %}
+    {% set _sold_out = _available <= 0 %}
+
+    <div class="yb-product-card">
+      {% if product.get('photo_url') %}
+      <div class="yb-product-card__photo">
+        <img src="{{ product.photo_url }}" alt="{{ product.name }}" loading="lazy">
+        {% if _sold_out %}
+        <div style="position:absolute;inset:0;background:rgba(26,20,16,.55);display:flex;align-items:center;justify-content:center">
+          <div style="background:var(--yb-red);color:var(--yb-paper);border:3px solid var(--yb-ink);padding:10px 18px;font-family:var(--yb-font-display);font-size:20px;letter-spacing:.04em;text-transform:uppercase;transform:rotate(-6deg);box-shadow:4px 4px 0 var(--yb-ink)">★ Sold out ★</div>
+        </div>
+        {% endif %}
+        <div class="yb-product-card__type-stamp" style="background:{{ 'var(--yb-cyan)' if _is_group else 'var(--yb-magenta)' }};color:{{ 'var(--yb-ink)' if _is_group else 'var(--yb-paper)' }}">
+          {{ strings.products.type_group if _is_group else strings.products.type_personal }}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="yb-product-card__body">
+        <div class="yb-product-card__name">{{ product.name }}</div>
+        {% if product.get('description') %}
+        <p class="yb-product-card__desc">{{ product.description | truncate(100, True, '…') }}</p>
+        {% endif %}
+
+        {% if _total > 0 %}
+        <div class="yb-product-card__progress">
+          <div class="yb-product-card__progress-bar">
+            <div class="yb-product-card__progress-fill" style="width:{{ ((_sold / _total) * 100) | round | int }}%"></div>
+          </div>
+          {% if _is_group %}
+          <div class="yb-product-card__progress-label">
+            {{ strings.products.sold_label }}: {{ _sold }} /
+            {{ strings.products.group_size }}: {{ _total }}
+          </div>
+          {% else %}
+          <div class="yb-product-card__progress-label">
+            {{ strings.products.remaining_label }}: {{ _available }}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="yb-product-card__footer">
+        <div class="yb-product-card__price">{{ product.price }}₪</div>
+        {% if not _sold_out %}
+        <a href="/products/{{ product.product_id }}.html" class="yb-btn yb-btn--primary yb-btn--sm">
+          {{ strings.products.buy }}
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="padding:80px 0;text-align:center;font-family:var(--yb-font-mono);font-size:14px;letter-spacing:.1em;opacity:.6;text-transform:uppercase">
+    Пока нет доступных продуктов.
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}
