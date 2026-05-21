@@ -2832,6 +2832,7 @@ def create_performer(request_event: Dict) -> Dict:
         slug=slug,
         bio=body['bio'],
         role=body['role'],
+        tagline=body.get('tagline'),
         photo_url=body.get('photo_url'),
         photos=body.get('photos', []),
         youtube_embed=body.get('youtube_embed'),
@@ -2879,6 +2880,8 @@ def update_performer(performer_id: str, request_event: Dict) -> Dict:
         performer.bio = body['bio']
     if 'role' in body:
         performer.role = body['role']
+    if 'tagline' in body:
+        performer.tagline = body['tagline']
     if 'photo_url' in body:
         performer.photo_url = body['photo_url']
     if 'photos' in body:

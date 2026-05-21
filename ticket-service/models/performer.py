@@ -38,7 +38,8 @@ class Performer:
     slug: str
     bio: str
     role: str
-    photo_url: str
+    tagline: Optional[str] = None
+    photo_url: str = ""
     photos: List[str] = field(default_factory=list)
     youtube_embed: Optional[str] = None
     social: SocialLinks = field(default_factory=SocialLinks)
@@ -63,6 +64,7 @@ class Performer:
             'bio': self.bio,
             'role': self.role,
             'photo_url': self.photo_url,
+            'tagline': self.tagline,
             'photos': self.photos,
             'social': self.social.to_dict(),
             'status': self.status,
@@ -90,6 +92,7 @@ class Performer:
             slug=item['slug'],
             bio=item.get('bio', ''),
             role=item.get('role', ''),
+            tagline=item.get('tagline'),
             photo_url=item.get('photo_url', ''),
             photos=item.get('photos', []),
             youtube_embed=item.get('youtube_embed'),

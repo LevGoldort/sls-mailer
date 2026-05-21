@@ -103,10 +103,24 @@ class TestPerformer:
         assert restored.slug == p.slug
         assert restored.bio == p.bio
         assert restored.role == p.role
+        assert restored.tagline == p.tagline
         assert restored.social.instagram == '@ig'
         assert restored.social.telegram == '@tg'
         assert restored.youtube_embed == 'yt-embed'
         assert restored.contact_email == 'dj@example.com'
+
+    def test_tagline_optional(self):
+        p = self._make()
+        assert p.tagline is None
+        item = p.to_dynamodb_item()
+        assert item['tagline'] is None
+        restored = Performer.from_dynamodb_item(item)
+        assert restored.tagline is None
+
+    def test_tagline_roundtrip(self):
+        p = self._make(tagline='Тель-Авивский комик, автор шоу Изотоп Комедия')
+        restored = Performer.from_dynamodb_item(p.to_dynamodb_item())
+        assert restored.tagline == p.tagline
 
     def test_from_dynamodb_item_defaults_tenant_id(self):
         item = {
