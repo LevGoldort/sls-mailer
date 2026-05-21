@@ -84,29 +84,40 @@ def is_event_past(event_date_str):
     now = datetime.now(israel_tz)
     return event_end_time <= now
 
+def _enrich_event(event, performer_map):
+    """Add computed display fields to an event dict (in-place)."""
+    if 'date_formatted' not in event:
+        event['date_formatted'] = format_date_full(event['date'])
+    if 'time_formatted' not in event:
+        event['time_formatted'] = format_time(event['date'])
+    if 'min_price' not in event and event.get('event_type', 'internal') == 'internal' and event.get('ticket_types'):
+        event['min_price'] = min(t['price'] for t in event['ticket_types'])
+    event_performer_ids = event.get('performer_ids', [])
+    event['performers'] = [performer_map[pid] for pid in event_performer_ids if pid in performer_map]
+
+
 def fetch_data():
-    """Fetch events, locations, performers, and products from API"""
+    """Fetch all site data and return a SiteData dict."""
     import requests
     print(f"Fetching data from {API_URL}")
 
-    # Fetch events
+    # Events (all — upcoming filtered separately; both needed for archive)
     response = requests.get(f"{API_URL}/api/events", timeout=10)
     response.raise_for_status()
-    all_events = response.json().get('events', [])
+    all_events_raw = response.json().get('events', [])
 
-    # Filter out past events (event_date + 30 minutes < now)
-    events = [event for event in all_events if not is_event_past(event['date'])]
+    upcoming_events = [e for e in all_events_raw if not is_event_past(e['date'])]
+    past_events = [e for e in all_events_raw if is_event_past(e['date'])]
+    filtered_count = len(past_events)
+    if filtered_count:
+        print(f"Filtered out {filtered_count} past events (kept for archive)")
 
-    filtered_count = len(all_events) - len(events)
-    if filtered_count > 0:
-        print(f"Filtered out {filtered_count} past events")
-
-    # Fetch locations
+    # Locations
     response = requests.get(f"{API_URL}/api/locations", timeout=10)
     response.raise_for_status()
     locations = response.json().get('locations', [])
 
-    # Fetch performers (non-fatal)
+    # Performers (non-fatal)
     performers = []
     try:
         response = requests.get(f"{API_URL}/api/performers", timeout=10)
@@ -115,7 +126,7 @@ def fetch_data():
     except Exception as e:
         print(f"Warning: could not fetch performers: {e}")
 
-    # Fetch products (non-fatal)
+    # Products (non-fatal)
     products = []
     try:
         response = requests.get(f"{API_URL}/api/products", timeout=10)
@@ -124,35 +135,59 @@ def fetch_data():
     except Exception as e:
         print(f"Warning: could not fetch products: {e}")
 
-    # Build lookup dicts
     performer_map = {p['performer_id']: p for p in performers}
+
+    # Enrich all events with display fields + performer objects
+    for event in upcoming_events + past_events:
+        _enrich_event(event, performer_map)
+
+    # performer_id → upcoming events (asc by date)
+    performer_upcoming = {}
+    for event in sorted(upcoming_events, key=lambda e: e['date']):
+        for pid in event.get('performer_ids', []):
+            performer_upcoming.setdefault(pid, []).append(event)
+
+    # performer_id → past events (desc by date)
+    performer_archive = {}
+    for event in sorted(past_events, key=lambda e: e['date'], reverse=True):
+        for pid in event.get('performer_ids', []):
+            performer_archive.setdefault(pid, []).append(event)
+
+    # performer_id → products
     performer_products_map = {}
     for product in products:
-        pid = product['performer_id']
-        performer_products_map.setdefault(pid, []).append(product)
+        performer_products_map.setdefault(product['performer_id'], []).append(product)
 
-    # Process events
-    for event in events:
-        if 'date_formatted' not in event:
-            event['date_formatted'] = format_date_full(event['date'])
-        if 'time_formatted' not in event:
-            event['time_formatted'] = format_time(event['date'])
-        # min_price only for internal events with ticket_types
-        if 'min_price' not in event and event.get('event_type', 'internal') == 'internal' and event.get('ticket_types'):
-            event['min_price'] = min([t['price'] for t in event['ticket_types']])
-        # Attach performer objects for template rendering
-        event_performer_ids = event.get('performer_ids', [])
-        event['performers'] = [performer_map[pid] for pid in event_performer_ids if pid in performer_map]
+    # location_id → upcoming events (asc by date)
+    location_events_map = {}
+    for event in sorted(upcoming_events, key=lambda e: e['date']):
+        location_events_map.setdefault(event['location_id'], []).append(event)
 
-    print(f"Fetched {len(events)} upcoming events, {len(locations)} locations, "
-          f"{len(performers)} performers, {len(products)} products")
-    return events, locations, performers, performer_products_map
+    print(f"Fetched {len(upcoming_events)} upcoming + {len(past_events)} past events, "
+          f"{len(locations)} locations, {len(performers)} performers, {len(products)} products")
 
-def generate_html_files(events, locations, output_dir, templates_dir,
-                        performers=None, performer_products_map=None):
+    return {
+        'events': upcoming_events,
+        'past_events': past_events,
+        'locations': locations,
+        'performers': performers,
+        'products': products,
+        'performer_products_map': performer_products_map,
+        'performer_upcoming': performer_upcoming,
+        'performer_archive': performer_archive,
+        'location_events_map': location_events_map,
+    }
+
+def generate_html_files(site_data, output_dir, templates_dir):
     """Generate HTML files from templates"""
-    performers = performers or []
-    performer_products_map = performer_products_map or {}
+    events = site_data['events']
+    locations = site_data['locations']
+    performers = site_data['performers']
+    products = site_data['products']
+    performer_products_map = site_data['performer_products_map']
+    performer_upcoming = site_data['performer_upcoming']
+    performer_archive = site_data['performer_archive']
+    location_events_map = site_data['location_events_map']
 
     strings = UI_STRINGS['ru']
 
@@ -218,8 +253,8 @@ def generate_html_files(events, locations, output_dir, templates_dir,
     template = env.get_template('pages/location_detail.html')
 
     for location in locations:
-        upcoming_events = [e for e in events if e['location_id'] == location['location_id']]
-        html = template.render(location=location, upcoming_events=upcoming_events)
+        loc_events = location_events_map.get(location['location_id'], [])
+        html = template.render(location=location, upcoming_events=loc_events)
         slug = location.get('slug', location['location_id'])
         (output_dir / 'locations' / f"{slug}.html").write_text(html, encoding='utf-8')
 
@@ -233,8 +268,13 @@ def generate_html_files(events, locations, output_dir, templates_dir,
             slug = performer.get('slug')
             if not slug:
                 continue
-            products = performer_products_map.get(performer['performer_id'], [])
-            html = performer_template.render(performer=performer, products=products)
+            pid = performer['performer_id']
+            html = performer_template.render(
+                performer=performer,
+                products=performer_products_map.get(pid, []),
+                upcoming_events=performer_upcoming.get(pid, []),
+                archive_events=performer_archive.get(pid, []),
+            )
             performer_dir = output_dir / 'performer' / slug
             performer_dir.mkdir(exist_ok=True)
             (performer_dir / 'index.html').write_text(html, encoding='utf-8')
@@ -324,7 +364,10 @@ def lambda_handler(event, context):
         start_time = datetime.now()
 
         # 1. Fetch data from API
-        events, locations, performers, performer_products_map = fetch_data()
+        site_data = fetch_data()
+        events = site_data['events']
+        locations = site_data['locations']
+        performers = site_data['performers']
 
         # 2. Setup directories
         temp_dir = Path(tempfile.mkdtemp())
@@ -360,9 +403,7 @@ def lambda_handler(event, context):
             print("WARNING: robots.txt not found in static directory")
 
         # 3. Generate HTML
-        generate_html_files(events, locations, output_dir, templates_dir,
-                            performers=performers,
-                            performer_products_map=performer_products_map)
+        generate_html_files(site_data, output_dir, templates_dir)
 
         # 4. Upload to S3
         uploaded_count = upload_to_s3(output_dir)
