@@ -224,6 +224,9 @@ def generate_html_files(site_data, output_dir, templates_dir):
 
     strings = UI_STRINGS['ru']
 
+    # Create lookup maps (must be before env.globals so they can be referenced in templates)
+    location_map = {loc['location_id']: loc for loc in locations}
+
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
 
     # Date filters
@@ -247,14 +250,14 @@ def generate_html_files(site_data, output_dir, templates_dir):
         'location_map': location_map,
     })
 
-    # Create lookup maps
-    location_map = {loc['location_id']: loc for loc in locations}
+    pages_generated = 0
 
     # Generate index.html
     print("Generating index.html...")
     template = env.get_template('pages/index.html')
     html = template.render(events=events, active_nav='home')
     (output_dir / 'index.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
 
     # Generate events listing page
     print("Generating events.html...")
@@ -266,6 +269,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
         active_nav='events',
     )
     (output_dir / 'events.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
 
     # Generate event detail pages
     print("Generating event detail pages...")
@@ -287,11 +291,13 @@ def generate_html_files(site_data, output_dir, templates_dir):
         )
         event_filename = output_dir / 'events' / f"{event['event_id']}.html"
         event_filename.write_text(html, encoding='utf-8')
+        pages_generated += 1
 
         slug = event.get('slug')
         if slug:
             slug_filename = output_dir / 'events' / f"{slug}.html"
             slug_filename.write_text(html, encoding='utf-8')
+            pages_generated += 1
 
     # Generate location detail pages
     print("Generating location detail pages...")
@@ -303,6 +309,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
         html = template.render(location=location, upcoming_events=loc_events, active_nav='')
         slug = location.get('slug', location['location_id'])
         (output_dir / 'locations' / f"{slug}.html").write_text(html, encoding='utf-8')
+        pages_generated += 1
 
     # Generate products listing page
     if products:
@@ -348,31 +355,31 @@ def generate_html_files(site_data, output_dir, templates_dir):
             performer_dir = output_dir / 'performer' / slug
             performer_dir.mkdir(exist_ok=True)
             (performer_dir / 'index.html').write_text(html, encoding='utf-8')
+            pages_generated += 1
 
     # Generate processing.html (payment processing page)
     print("Generating processing.html...")
     template = env.get_template('pages/processing.html')
     html = template.render()
     (output_dir / 'processing.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
 
     # Generate checkout.html (checkout page)
     print("Generating checkout.html...")
     template = env.get_template('pages/checkout.html')
     html = template.render()
     (output_dir / 'checkout.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
 
     # Generate accessibility.html
     print("Generating accessibility.html...")
     template = env.get_template('pages/accessibility.html')
     html = template.render()
     (output_dir / 'accessibility.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
 
     # Generate mock_payment.html (if in mock mode)
     payment_mode = os.environ.get('PAYMENT_MODE', 'mock').lower()
-    slugged_events = sum(1 for event in events if event.get('slug'))
-    performer_pages = sum(1 for p in performers if p.get('slug'))
-    pages_generated = (1 + 1 + len(events) + slugged_events + len(locations)
-                       + performer_pages + 3)  # +3 for processing, checkout, accessibility
 
     if payment_mode == 'mock':
         print("Generating mock_payment.html...")
