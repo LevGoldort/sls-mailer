@@ -1,0 +1,186 @@
+"""UI string dictionary for public site templates. Only 'ru' for now; add 'he'/'en' later."""
+
+UI_STRINGS = {
+    'ru': {
+        'site': {
+            'name': 'Ялла Балаган',
+            'tagline': 'Творческое объединение в Израиле',
+            'cities': 'Tel Aviv — Yaffo — Bat Yam',
+        },
+        'header': {
+            'nav_events': 'Программа',
+            'nav_performers': 'Исполнители',
+            'nav_podcast': 'Подкаст',
+            'nav_about': 'О нас',
+            'cta': '► Купить билет',
+            'ticker_left': 'ZINE / ЯЛЛАxБАЛАГАН',
+            'ticker_center': '★ TEL AVIV — YAFFO — BAT YAM ★',
+            'ticker_right': '· יאללה בלגן · יאללה בלגן ·',
+        },
+        'footer': {
+            'description': (
+                'Творческое объединение в Израиле. Стендап, шоу, '
+                'подкаст «Че там у евреев», опен-микрофоны и музыкальные вечеринки.'
+            ),
+            'col_contacts': 'Контакты',
+            'col_docs': 'Документы',
+            'col_socials': 'Соцсети',
+            'doc_privacy': 'Privacy',
+            'doc_terms': 'Terms',
+            'doc_accessibility': 'Accessibility',
+            'copyright': '© 2025 ЯЛЛА БАЛАГАН · Все права примерно у нас',
+            'made_with': 'Сделано на коленке, с любовью',
+            'contact_addr': 'Bat Yam, Rothschild 17',
+            'contact_email': 'yalla@yallabalagan.org',
+            'contact_phone': '+972 50 649 1680',
+        },
+        'filter': {
+            'label': 'Фильтр ►',
+            'all': 'ВСЕ',
+            'no_events': 'По тегу «{tag}» пока ничего нет.',
+            'no_events_sub': 'Загляни через пару дней.',
+            'no_performers': 'По тегу «{tag}» пока нет исполнителей.',
+            'show_all': '◄ Показать всех',
+            'nobody': 'Никого',
+        },
+        'home': {
+            'hero_line1': 'ЯЛЛА,',
+            'hero_line2': 'БАЛАГАН',
+            'hero_sub': (
+                'Творческое объединение в Израиле. Стендап-концерты, шоу, '
+                'подкаст «Че там у евреев», научно-комедийное «Изотоп Комедия» '
+                'и другие истории на сцене.'
+            ),
+            'subscribe': 'Подписаться',
+            'section_programme': 'Программа',
+            'all_events': 'Все события',
+        },
+        'podcast': {
+            'eyebrow': 'NEW EVERY WEEK · ПОДКАСТ',
+            'name': '«Че там у евреев»',
+            'description': (
+                'Каждую неделю мы разбираемся, что происходит на этой прекрасной '
+                'и странной земле. Без купюр.'
+            ),
+            'latest_label': 'ПОСЛЕДНИЙ ВЫПУСК',
+            'watch_youtube': '▶ Смотреть на YouTube',
+            'listen_spotify': 'Слушать в Spotify',
+        },
+        'socials': {
+            'heading': 'Не пропусти',
+            'sub': '/ ПОДПИШИСЬ',
+        },
+        'event_card': {
+            'admit_one': 'ADMIT ONE · בלגן · ADMIT ONE',
+            'external_stub': 'EXTERNAL · בלגן · LINK',
+            'tickets_from': 'БИЛЕТЫ ОТ',
+            'buy': 'Оторвать ►',
+            'external_goto': 'Перейти →',
+            'external_label': 'ВНЕШНЕЕ СОБЫТИЕ',
+            'external_sub': 'билеты у партнёра',
+            'stub': 'STUB',
+        },
+        'events': {
+            'breadcrumb_home': 'Главная',
+            'breadcrumb_self': 'Все события',
+            'hero_line1': 'ВСЕ',
+            'hero_line2': 'СОБЫТИЯ',
+            'hero_sub': (
+                'Афиша на ближайшие месяцы. Стендап, шоу, опен-микрофоны, '
+                'вечеринки и события друзей. Фильтруй по тегу или листай как зин.'
+            ),
+            'month_label': '★ МЕСЯЦ ★',
+            'in_month': 'в этом месяце',
+        },
+        'event_detail': {
+            'breadcrumb_home': 'Главная',
+            'breadcrumb_events': 'События',
+            'poster_stamp': '★ Афиша · POSTER ★',
+            'meta_date': 'Дата · DATE',
+            'meta_time': 'Время · TIME',
+            'meta_venue': 'Площадка · VENUE',
+            'meta_address': 'Адрес · ADDRESS',
+            'doors': 'Двери',
+            'start': 'Старт',
+            'about': '★ О событии ★',
+            'widget_admit': '★ Admit One ★',
+            'widget_stub': 'STUB',
+            'widget_heading': 'Выбери билет',
+            'promo_placeholder': 'Промокод',
+            'promo_apply': 'применить',
+            'total_label': 'Итого',
+            'sold_out': '★ РАСПРОДАНО ★',
+            'email_note': 'Электронный билет придёт на e-mail.',
+            'refund_note': 'Возврат за 24 ч до начала.',
+            'performers_heading': 'На сцене',
+            'map_label': '★ карта · MAP ★',
+            'you_are_here': 'You are here ★',
+            'venue_label': 'Площадка · VENUE',
+            'open_maps': 'Открыть в Google Maps →',
+            'about_venue': 'О площадке',
+        },
+        'performers': {
+            'breadcrumb_home': 'Главная',
+            'breadcrumb_self': 'Исполнители',
+            'hero_line1': 'наши',
+            'hero_line2': 'люди',
+            'hero_sub': (
+                'Постоянные комики, гости, друзья объединения, ведущие, продюсеры '
+                'и просто интересные люди, через которых проходит «Ялла Балаган». '
+                'Кликни на карточку, чтобы посмотреть досье, ближайшие шоу и мерч.'
+            ),
+            'roster_label': 'КАТАЛОГ · ROSTER',
+            'dossier': 'досье →',
+        },
+        'performer_detail': {
+            'breadcrumb_home': 'Главная',
+            'breadcrumb_performers': 'Исполнители',
+            'bio_heading': '★ Биография ★',
+            'merch_heading': 'Мерч',
+            'merch_buy': 'Купить →',
+            'upcoming_heading': 'Ближайшие показы',
+            'archive_heading': 'Архив',
+            'socials_heading': 'Соцсети',
+        },
+        'locations': {
+            'breadcrumb_home': 'Главная',
+            'parking_heading': 'Парковка',
+            'events_heading': 'События здесь',
+            'map_label': '★ карта · MAP ★',
+            'open_maps': 'Открыть в Google Maps →',
+        },
+        'products': {
+            'breadcrumb_home': 'Главная',
+            'breadcrumb_self': 'Продукты',
+            'hero_line1': 'мерч',
+            'hero_line2': 'и не только',
+            'hero_sub': 'Поддержи наших комиков и забери что-нибудь памятное.',
+            'type_personal': 'Личное участие',
+            'type_group': 'Групповое',
+            'group_size': 'Размер группы',
+            'sold_label': 'продано',
+            'remaining_label': 'осталось',
+            'progress_label_group': 'собрано из {total}',
+            'buy': 'Купить →',
+            'what_you_get': 'Что ты получишь',
+            'similar': 'Похожие продукты',
+        },
+        'checkout': {
+            'heading': 'Оформление заказа',
+            'step1': 'Билеты',
+            'step2': 'Контакты',
+            'step3': 'Оплата',
+        },
+        'plurals': {
+            'events_1': 'событие',
+            'events_2_4': 'события',
+            'events_many': 'событий',
+            'tickets_1': 'билет',
+            'tickets_2_4': 'билета',
+            'tickets_many': 'билетов',
+            'people_1': 'человек',
+            'people_2_4': 'человека',
+            'people_many': 'человек',
+        },
+    }
+}
