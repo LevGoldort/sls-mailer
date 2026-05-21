@@ -22,6 +22,8 @@ class Product:
     total_slots: Optional[int] = None  # None = unlimited
     sold_slots: int = 0
     status: str = "active"  # "active" | "inactive" | "sold_out"
+    product_type: str = "personal"  # "personal" | "group"
+    group_size: Optional[int] = None  # заполняется только для group
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -56,6 +58,9 @@ class Product:
         }
         if self.total_slots is not None:
             item['total_slots'] = self.total_slots
+        item['product_type'] = self.product_type
+        if self.group_size is not None:
+            item['group_size'] = self.group_size
         return item
 
     @classmethod
@@ -75,6 +80,8 @@ class Product:
             total_slots=item.get('total_slots'),
             sold_slots=int(item.get('sold_slots', 0)),
             status=item.get('status', 'active'),
+            product_type=item.get('product_type', 'personal'),
+            group_size=item.get('group_size'),
             created_at=item.get('created_at'),
             updated_at=item.get('updated_at'),
         )

@@ -62,6 +62,7 @@ class Event:
     event_type: str = "internal"     # "internal" | "external"
     external_url: Optional[str] = None  # обязателен когда event_type="external"
     performer_ids: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -114,6 +115,9 @@ class Event:
         if self.performer_ids:
             item["performer_ids"] = self.performer_ids
 
+        if self.tags:
+            item["tags"] = self.tags
+
         return item
 
     @classmethod
@@ -152,6 +156,7 @@ class Event:
             event_type=item.get("event_type", "internal"),
             external_url=item.get("external_url"),
             performer_ids=item.get("performer_ids", []),
+            tags=item.get("tags", []),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )
