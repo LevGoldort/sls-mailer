@@ -165,7 +165,8 @@ class SeatPicker {
                 console.warn('Could not fetch fresh event data, using initial data');
                 return null;
             }
-            return response.json();
+            const data = await response.json();
+            return data.event || data;
         } catch (error) {
             console.warn('Error fetching event data:', error);
             return null;

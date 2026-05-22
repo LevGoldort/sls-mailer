@@ -348,22 +348,6 @@ def generate_html_files(site_data, output_dir, templates_dir):
             slug_filename.write_text(html, encoding='utf-8')
             pages_generated += 1
 
-    # Generate seat picker pages for seated events
-    print("Generating seat picker pages...")
-    (output_dir / 'seats').mkdir(exist_ok=True)
-    seats_template = env.get_template('pages/seats.html')
-
-    for event in events:
-        location = location_map.get(event.get('location_id', ''))
-        if not location:
-            continue
-        if location.get('venue_config', {}).get('venue_type') != 'seated':
-            continue
-        html = seats_template.render(event=event, location=location, active_nav='events')
-        slug = event.get('slug', event['event_id'])
-        (output_dir / 'seats' / f"{slug}.html").write_text(html, encoding='utf-8')
-        pages_generated += 1
-
     # Generate location detail pages
     print("Generating location detail pages...")
     (output_dir / 'locations').mkdir(exist_ok=True)

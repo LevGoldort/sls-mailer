@@ -1,18 +1,18 @@
 {% extends 'shared/_base.html' %}
 {% from 'macros/_macros.html' import breadcrumb %}
 
+{% set _is_external = event.get('event_type', 'internal') == 'external' %}
+{% set _slug = event.get('slug') or event.event_id %}
+{% set _sold_out = event.get('status') == 'sold_out' %}
+{% set _ticket_types = event.get('ticket_types', []) %}
+{% set _is_seated = location and location.get('venue_config', {}).get('venue_type') == 'seated' %}
+
 {% block title %}{{ event.title }} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ event.description | truncate(160, True, '…') if event.description else strings.site.tagline }}{% endblock %}
 {% block og_type %}event{% endblock %}
 {% block og_image %}{{ event.photo_url or super() }}{% endblock %}
 
 {% block content %}
-
-{% set _is_external = event.get('event_type', 'internal') == 'external' %}
-{% set _slug = event.get('slug') or event.event_id %}
-{% set _sold_out = event.get('status') == 'sold_out' %}
-{% set _ticket_types = event.get('ticket_types', []) %}
-{% set _is_seated = location and location.get('venue_config', {}).get('venue_type') == 'seated' %}
 
 {# ── Breadcrumb ── #}
 <div class="yb-page-hero__breadcrumb yb-pad-x" style="padding-top:20px; padding-bottom:8px">
@@ -91,7 +91,7 @@
 </section>
 
 {# ── Body: description + ticket widget ── #}
-<section class="yb-event-body">
+<section class="yb-event-body{% if _is_seated and not _sold_out and not _is_external %} yb-event-body--full{% endif %}">
 
   {# Description #}
   <div class="yb-event-description">
@@ -135,52 +135,8 @@
     <div class="yb-ticket-widget__sold-out">{{ strings.event_detail.sold_out }}</div>
   </aside>
 
-  {# Ticket widget — seated venue: redirect to seat picker page #}
-  {% elif _is_seated %}
-  <aside class="yb-ticket-widget">
-    <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
-    <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tl" aria-hidden="true"></div>
-    <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tr" aria-hidden="true"></div>
-
-    <div class="yb-ticket-widget__header">
-      <span style="font-weight:700">{{ strings.event_detail.widget_admit }}</span>
-      <span style="opacity:.7">{{ strings.event_detail.widget_stub }} · №{{ event['date'] | date_num }}{{ event['date'] | month_abbr }}</span>
-    </div>
-    <div class="yb-ticket-widget__heading">
-      <span class="yb-riso">
-        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.event_detail.widget_heading }}</span>
-        {{ strings.event_detail.widget_heading }}
-      </span>
-    </div>
-    <div class="yb-ticket-widget__date">
-      {{ (event.get('date_formatted') or (event['date'] | format_date)) | upper }} · {{ event['date'] | format_time }}
-    </div>
-
-    <div class="yb-ticket-widget__tiers">
-      {% for tier in _ticket_types %}
-      <div class="yb-ticket-widget__tier">
-        <div>
-          <div class="yb-ticket-widget__tier-name">{{ tier.name }}</div>
-          <div class="yb-ticket-widget__tier-sub">
-            {% if tier.get('description') %}{{ tier.description }} · {% endif %}{{ tier.price }}₪
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="yb-ticket-widget__cta" style="margin-top:24px">
-      <a href="/seats/{{ _slug }}.html"
-         class="yb-btn yb-btn--primary yb-btn--lg yb-btn--full">
-        {{ strings.event_detail.select_seats }}
-      </a>
-    </div>
-
-    <div class="yb-ticket-widget__fine">
-      {{ strings.event_detail.email_note }}<br>
-      {{ strings.event_detail.refund_note }}
-    </div>
-  </aside>
+  {# Seated venue — no widget here, seat picker section appears below #}
+  {% elif _is_seated and not _sold_out %}
 
   {# Ticket widget — normal #}
   {% else %}
@@ -255,6 +211,150 @@
   {% endif %}
 
 </section>
+
+{# ── Seat Picker (seated events only) ── #}
+{% if _is_seated and not _sold_out and not _is_external %}
+
+{# "ВЫБОР МЕСТ" sub-hero #}
+<div class="yb-seats-hero">
+  <div class="yb-seats-hero__inner yb-pad-x">
+    <div class="yb-seats-hero__steps">
+      <span class="yb-seats-hero__step yb-seats-hero__step--active">01 МЕСТА</span>
+      <span class="yb-seats-hero__step">02 ОПЛАТА</span>
+    </div>
+    <h2 class="yb-seats-hero__title">ВЫБОР МЕСТ</h2>
+  </div>
+  <div class="yb-seats-hero__strip yb-pad-x">
+    <span class="yb-seats-hero__stamp">СЦЕНА ЕСТЬ</span>
+    <span class="yb-seats-hero__sep">·</span>
+    <span>{{ event.title }}</span>
+    <span class="yb-seats-hero__sep">·</span>
+    <span>{{ event.get('date_formatted') or (event['date'] | format_date) }}</span>
+    {% if location %}<span class="yb-seats-hero__sep">·</span><span>{{ location.name }}</span>{% endif %}
+    <span class="yb-seats-hero__sep">·</span>
+    <span>{{ strings.event_detail.start }} {{ event['date'] | format_time }}</span>
+  </div>
+</div>
+
+<section class="yb-seats" id="seats">
+
+  {# ПЛАН ЗАЛА header #}
+  <div class="yb-seats__head yb-pad-x">
+    <span class="yb-seats__plan-label">{{ strings.event_detail.seats_plan_hall }}</span>
+    {% if location %}<span class="yb-seats__venue-cap">• {{ location.name | upper }}{% if location.get('venue_config', {}).get('total_seats') %} • CAP. {{ location.venue_config.total_seats }}{% endif %}</span>{% endif %}
+  </div>
+
+  {# Two-column body #}
+  <div class="yb-seats__body">
+
+    {# Left: seat map #}
+    <div class="yb-seats__map-col yb-pad-x">
+      <div id="seat-picker-container"></div>
+    </div>
+
+    {# Right: zones + order #}
+    <div class="yb-seats__widget-col">
+
+      {# Zones panel #}
+      <div class="yb-seats__zones">
+        <div class="yb-seats__zones-head">
+          <span>{{ strings.event_detail.seats_zones }}</span>
+          <span class="yb-seats__zones-sub">/ PRICING</span>
+        </div>
+        {% for tier in _ticket_types %}
+        <div class="yb-seats__zone">
+          <span class="yb-seats__zone-swatch" id="zone-swatch-{{ tier.id }}"></span>
+          <div class="yb-seats__zone-info">
+            <div class="yb-seats__zone-name">{{ tier.name | upper }}</div>
+            {% if tier.get('description') %}<div class="yb-seats__zone-desc">{{ tier.description }}</div>{% endif %}
+          </div>
+          <span class="yb-seats__zone-price">{{ tier.price }}₪</span>
+        </div>
+        {% endfor %}
+        <div class="yb-seats__legend">
+          <div class="yb-seats__legend-label">— СТАТУС МЕСТ</div>
+          <div class="yb-seats__legend-row">
+            <span class="yb-seats__legend-item"><span class="yb-seats__legend-sw" style="background:#ffd400"></span>{{ strings.event_detail.seats_legend_selected }}</span>
+            <span class="yb-seats__legend-item"><span class="yb-seats__legend-sw" style="background:#c8b89a;border:1px dashed rgba(26,20,16,.4)"></span>{{ strings.event_detail.seats_legend_reserved }}</span>
+            <span class="yb-seats__legend-item"><span class="yb-seats__legend-sw" style="background:#1a1410"></span>{{ strings.event_detail.seats_legend_sold }}</span>
+          </div>
+        </div>
+      </div>
+
+      {# Order widget #}
+      <div class="yb-seats__order">
+        <div class="yb-seats__order-hdr">
+          <span>★ ЗАКАЗ · ORDER</span>
+          <span id="order-ref">★</span>
+        </div>
+
+        <div class="yb-seats__order-event">
+          <div class="yb-seats__order-stamp">
+            <span class="yb-seats__order-day">{{ event['date'] | date_num }}</span>
+            <span class="yb-seats__order-mon">{{ event['date'] | month_abbr | upper }}</span>
+          </div>
+          <div class="yb-seats__order-info">
+            <div class="yb-seats__order-title">{{ event.title }}</div>
+            {% if location %}<div class="yb-seats__order-venue">{{ location.name }}</div>{% endif %}
+            <div class="yb-seats__order-time">{{ event['date'] | format_time }}</div>
+          </div>
+        </div>
+
+        <div class="yb-seats__order-zone-row" id="order-zone-row" style="display:none">
+          <span id="order-zone-name"></span>
+          <span id="order-zone-price"></span>
+        </div>
+
+        <div id="order-seats-section" style="display:none">
+          <div class="yb-seats__order-places-lbl">МЕСТА (<span id="order-count">0</span>):</div>
+          <div class="yb-seats__chips" id="order-chips"></div>
+        </div>
+
+        <div class="yb-seats__order-total">
+          <div class="yb-seats__order-total-lbl">ИТОГО · <span id="order-seats-label">0 {{ strings.event_detail.seats_count }}</span></div>
+          <div class="yb-seats__order-total-price"><span id="order-total-num">0</span>₪</div>
+        </div>
+
+        <hr class="yb-seats__rule">
+
+        <div class="yb-seats__promo">
+          <input type="text" id="promo-code" placeholder="{{ strings.event_detail.promo_placeholder | upper }}" autocomplete="off">
+          <button id="promo-apply" class="yb-seats__promo-btn">ОК</button>
+        </div>
+        <div id="promo-message" style="display:none;font-size:12px;margin-top:4px;font-family:var(--yb-font-mono)"></div>
+
+        <button id="seat-proceed-btn"
+                class="yb-btn yb-btn--yellow yb-btn--lg yb-btn--full"
+                style="margin-top:12px;opacity:.5;pointer-events:none">
+          {{ strings.event_detail.seats_proceed }}
+        </button>
+        <div class="yb-seats__reserve-note">Бронь держится 15 минут</div>
+      </div>
+
+    </div>
+  </div>
+
+  {# Info cards #}
+  <div class="yb-seats__cards yb-pad-x">
+    <div class="yb-seats__card yb-seats__card--magenta">
+      <div class="yb-seats__card-num">I.</div>
+      <div class="yb-seats__card-head">{{ strings.event_detail.seats_card1_head }}</div>
+      <p>{{ strings.event_detail.email_note }}</p>
+    </div>
+    <div class="yb-seats__card yb-seats__card--cyan">
+      <div class="yb-seats__card-num">II.</div>
+      <div class="yb-seats__card-head">{{ strings.event_detail.seats_card2_head }}</div>
+      <p>{{ strings.event_detail.seats_card2_body }}</p>
+    </div>
+    <div class="yb-seats__card yb-seats__card--ink">
+      <div class="yb-seats__card-num">III.</div>
+      <div class="yb-seats__card-head">{{ strings.event_detail.seats_card3_head }}</div>
+      <p>{{ strings.event_detail.seats_card3_body }}</p>
+    </div>
+  </div>
+
+</section>
+{% endif %}
 
 {# ── Performers ── #}
 {% if event_performers %}
@@ -343,6 +443,436 @@
 
 {% endblock %}
 
+{% block extra_css %}
+{% if _is_seated and not _sold_out and not _is_external %}
+<link rel="stylesheet" href="/static/css/seat-picker.css">
+<style>
+.yb-event-body--full { grid-template-columns: 1fr; }
+
+/* ── Sub-hero "ВЫБОР МЕСТ" ── */
+.yb-seats-hero {
+  background: var(--yb-ink);
+  color: var(--yb-paper);
+  border-top: 3px solid var(--yb-ink);
+}
+.yb-seats-hero__inner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-top: 28px;
+  padding-bottom: 20px;
+  gap: 20px;
+}
+.yb-seats-hero__title {
+  font-family: var(--yb-font-display);
+  font-size: clamp(48px, 8vw, 96px);
+  line-height: .9;
+  margin: 0;
+  letter-spacing: -.01em;
+}
+.yb-seats-hero__steps {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.yb-seats-hero__step {
+  font-family: var(--yb-font-mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  padding: 6px 14px;
+  border: 1px solid rgba(243,238,225,.3);
+  opacity: .4;
+  white-space: nowrap;
+}
+.yb-seats-hero__step--active {
+  border-color: var(--yb-paper);
+  opacity: 1;
+  background: rgba(243,238,225,.08);
+}
+.yb-seats-hero__step + .yb-seats-hero__step { border-left: none; }
+
+/* Info strip below hero */
+.yb-seats-hero__strip {
+  background: var(--yb-paper);
+  border-top: 2px solid var(--yb-ink);
+  border-bottom: 2px solid var(--yb-ink);
+  padding-top: 10px;
+  padding-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--yb-font-mono);
+  font-size: 13px;
+  color: var(--yb-ink);
+}
+.yb-seats-hero__stamp {
+  background: #00a878;
+  color: #fff;
+  font-family: var(--yb-font-display);
+  font-size: 11px;
+  letter-spacing: .08em;
+  padding: 3px 10px;
+  flex-shrink: 0;
+}
+.yb-seats-hero__sep { opacity: .35; }
+
+/* ── ПЛАН ЗАЛА header ── */
+.yb-seats__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--yb-ink);
+}
+.yb-seats__plan-label {
+  font-family: var(--yb-font-display);
+  font-size: clamp(20px, 3vw, 28px);
+  letter-spacing: -.01em;
+}
+.yb-seats__venue-cap {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  opacity: .5;
+  white-space: nowrap;
+}
+
+/* ── Two-column body ── */
+.yb-seats__body {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  align-items: start;
+}
+.yb-seats__map-col {
+  border-right: 2px solid var(--yb-ink);
+  min-height: 480px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+/* Strip SeatPicker's own sidebar — we own the right panel */
+#seat-picker-container .seat-picker-sidebar { display: none !important; }
+#seat-picker-container .seat-picker-wrapper { border: none !important; box-shadow: none !important; border-radius: 0 !important; background: transparent !important; }
+
+.yb-seats__widget-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Zones panel (dark) ── */
+.yb-seats__zones {
+  background: var(--yb-ink);
+  color: var(--yb-paper);
+  padding: 16px 20px;
+  border-bottom: 2px solid var(--yb-ink);
+}
+.yb-seats__zones-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--yb-font-display);
+  font-size: 13px;
+  letter-spacing: .06em;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,.15);
+}
+.yb-seats__zones-sub { font-family: var(--yb-font-mono); font-size: 10px; opacity: .5; letter-spacing: .1em; }
+
+.yb-seats__zone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.yb-seats__zone:last-of-type { border-bottom: none; }
+.yb-seats__zone-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: #555;
+}
+.yb-seats__zone-info { flex: 1; min-width: 0; }
+.yb-seats__zone-name {
+  font-family: var(--yb-font-display);
+  font-size: 13px;
+  letter-spacing: .04em;
+}
+.yb-seats__zone-desc {
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  opacity: .55;
+  margin-top: 2px;
+}
+.yb-seats__zone-price {
+  font-family: var(--yb-font-display);
+  font-size: 18px;
+  color: var(--yb-yellow);
+  white-space: nowrap;
+}
+
+/* Legend */
+.yb-seats__legend {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+.yb-seats__legend-label {
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  opacity: .4;
+  margin-bottom: 8px;
+}
+.yb-seats__legend-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.yb-seats__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  opacity: .75;
+}
+.yb-seats__legend-sw {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Order widget (cream) ── */
+.yb-seats__order {
+  flex: 1;
+  background: var(--yb-paper);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.yb-seats__order-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  opacity: .5;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(26,20,16,.25);
+}
+.yb-seats__order-event {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(26,20,16,.1);
+}
+.yb-seats__order-stamp {
+  background: var(--yb-ink);
+  color: var(--yb-paper);
+  padding: 5px 9px;
+  text-align: center;
+  font-family: var(--yb-font-display);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.yb-seats__order-day { font-size: 26px; display: block; }
+.yb-seats__order-mon { font-size: 10px; letter-spacing: .1em; }
+.yb-seats__order-info { flex: 1; min-width: 0; }
+.yb-seats__order-title { font-family: var(--yb-font-display); font-size: 14px; line-height: 1.2; }
+.yb-seats__order-venue { font-family: var(--yb-font-mono); font-size: 10px; opacity: .55; margin-top: 2px; }
+.yb-seats__order-time  { font-family: var(--yb-font-mono); font-size: 10px; opacity: .55; }
+
+.yb-seats__order-zone-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--yb-font-mono);
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(26,20,16,.08);
+}
+
+.yb-seats__order-places-lbl {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .06em;
+  opacity: .6;
+  margin-bottom: 6px;
+}
+.yb-seats__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.yb-seats__chip {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  background: var(--yb-ink);
+  color: var(--yb-paper);
+  padding: 3px 8px;
+  letter-spacing: .04em;
+}
+
+.yb-seats__order-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 4px;
+}
+.yb-seats__order-total-lbl { font-family: var(--yb-font-mono); font-size: 11px; letter-spacing: .06em; opacity: .6; }
+.yb-seats__order-total-price { font-family: var(--yb-font-display); font-size: 32px; line-height: 1; }
+
+.yb-seats__rule { border: 0; border-top: 1px dashed rgba(26,20,16,.2); margin: 0; }
+
+.yb-seats__promo { display: flex; border: 2px solid var(--yb-ink); }
+.yb-seats__promo input {
+  flex: 1; border: none; background: transparent;
+  padding: 8px 10px; font-family: var(--yb-font-mono); font-size: 12px;
+  color: var(--yb-ink); outline: none; letter-spacing: .06em;
+}
+.yb-seats__promo-btn {
+  background: var(--yb-ink); color: var(--yb-paper); border: none;
+  padding: 8px 14px; font-family: var(--yb-font-display); font-size: 13px; cursor: pointer;
+}
+.yb-seats__reserve-note {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  opacity: .4;
+  text-align: center;
+  letter-spacing: .06em;
+  margin-top: 2px;
+}
+
+/* ── Info cards ── */
+.yb-seats__cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 2px solid var(--yb-ink);
+}
+.yb-seats__card { padding: 28px 24px; border-right: 2px solid var(--yb-ink); }
+.yb-seats__card:last-child { border-right: none; }
+.yb-seats__card--magenta { background: var(--yb-magenta); color: var(--yb-paper); }
+.yb-seats__card--cyan    { background: var(--yb-cyan);    color: var(--yb-ink);   }
+.yb-seats__card--ink     { background: var(--yb-ink);     color: var(--yb-paper); }
+.yb-seats__card-num  { font-family: var(--yb-font-display); font-size: 13px; opacity: .6; margin-bottom: 6px; }
+.yb-seats__card-head { font-family: var(--yb-font-display); font-size: 18px; line-height: 1.1; margin-bottom: 10px; }
+.yb-seats__card p    { font-family: var(--yb-font-mono); font-size: 13px; line-height: 1.55; opacity: .85; margin: 0; }
+
+@media (max-width: 900px) {
+  .yb-seats__body { grid-template-columns: 1fr; }
+  .yb-seats__map-col { border-right: none; border-bottom: 2px solid var(--yb-ink); }
+  .yb-seats__cards { grid-template-columns: 1fr; }
+  .yb-seats__card { border-right: none; border-bottom: 2px solid var(--yb-ink); }
+  .yb-seats__card:last-child { border-bottom: none; }
+}
+@media (max-width: 600px) {
+  .yb-seats-hero__title { font-size: 40px; }
+  .yb-seats-hero__steps { display: none; }
+  .yb-seats__order-total-price { font-size: 24px; }
+}
+</style>
+{% endif %}
+{% endblock %}
+
 {% block extra_js %}
+{% if _is_seated and not _sold_out and not _is_external %}
+<script src="/static/js/seat-picker.js"></script>
+<script>
+(function() {
+  var EVENT_ID = "{{ event.event_id }}";
+  var API_URL  = "{{ api_url }}";
+  var seatingMapConfig = null;
+
+  fetch(API_URL + '/api/events/' + EVENT_ID + '/seating-map')
+    .then(function(r) { return r.json(); })
+    .then(function(d) { seatingMapConfig = d.seating_map; })
+    .catch(function() {});
+
+  var picker = new SeatPicker('seat-picker-container', EVENT_ID, [], {
+    apiUrl: API_URL,
+    onSelectionChange: function(seats) { updateWidget(seats); }
+  });
+  picker.init().then(function() {
+    // Match swatches by position — IDs from static HTML may differ from API-fetched IDs
+    var swatches = document.querySelectorAll('.yb-seats__zone-swatch');
+    if (picker.ticketTypes && picker.ticketTypeColors) {
+      picker.ticketTypes.forEach(function(tt, i) {
+        if (swatches[i]) swatches[i].style.background = picker.ticketTypeColors[tt.id] || '#555';
+      });
+    }
+  }).catch(function() {});
+
+  function seatLabel(seatId) {
+    var p = seatId.split('-');
+    return 'Р ' + (parseInt(p[0]) + 1) + ' / ' + (parseInt(p[1]) + 1);
+  }
+
+  function updateWidget(seats) {
+    var btn       = document.getElementById('seat-proceed-btn');
+    var labelEl   = document.getElementById('order-seats-label');
+    var totalEl   = document.getElementById('order-total-num');
+    var countEl   = document.getElementById('order-count');
+    var chipsEl   = document.getElementById('order-chips');
+    var secEl     = document.getElementById('order-seats-section');
+    var zoneRow   = document.getElementById('order-zone-row');
+    var zoneNameEl= document.getElementById('order-zone-name');
+    var zonePrEl  = document.getElementById('order-zone-price');
+
+    var enabled = seats.length > 0;
+    if (btn) { btn.style.opacity = enabled ? '1' : '.5'; btn.style.pointerEvents = enabled ? '' : 'none'; }
+    if (labelEl) labelEl.textContent = seats.length + ' мест';
+    if (countEl) countEl.textContent = seats.length;
+
+    var total = 0;
+    var chips = '';
+    var firstTt = null;
+    seats.forEach(function(seatId) {
+      var ttId = picker.seatAllocation && picker.seatAllocation[seatId];
+      var tt = picker.ticketTypes && picker.ticketTypes.find(function(t) { return t.id === ttId; });
+      if (tt) { total += Number(tt.price); if (!firstTt) firstTt = tt; }
+      chips += '<span class="yb-seats__chip">' + seatLabel(seatId) + ' ×</span>';
+    });
+
+    if (totalEl) totalEl.textContent = total;
+    if (chipsEl) chipsEl.innerHTML = chips;
+    if (secEl) secEl.style.display = seats.length ? '' : 'none';
+    if (zoneRow && firstTt) {
+      zoneRow.style.display = '';
+      if (zoneNameEl) zoneNameEl.textContent = firstTt.name;
+      if (zonePrEl) zonePrEl.textContent = firstTt.price + '₪';
+    } else if (zoneRow) {
+      zoneRow.style.display = 'none';
+    }
+  }
+
+  document.getElementById('seat-picker-container').addEventListener('seatPicker:seatsReserved', function(e) {
+    var promoEl = document.getElementById('promo-code');
+    var orderData = { event_id: EVENT_ID, purchased_seats: e.detail.seatIds, seating_map_config: seatingMapConfig };
+    if (promoEl && promoEl.value.trim()) orderData.coupon_code = promoEl.value.trim().toUpperCase();
+    try { sessionStorage.setItem('orderData', JSON.stringify(orderData)); } catch(x) {}
+    window.location.href = '/checkout.html?event_id=' + EVENT_ID + '&seated=true';
+  });
+
+  var proceedBtn = document.getElementById('seat-proceed-btn');
+  if (proceedBtn) proceedBtn.addEventListener('click', function() {
+    if (picker.getSelectedSeats().length > 0) picker.reserveSeats();
+  });
+})();
+</script>
+{% else %}
 <script src="/static/js/ticket-widget.js"></script>
+{% endif %}
 {% endblock %}
