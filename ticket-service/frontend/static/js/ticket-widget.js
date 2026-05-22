@@ -93,6 +93,15 @@
 
     var promoApply = document.getElementById('promo-apply');
     var promoInput = document.getElementById('promo-code');
+    var promoMsg = document.getElementById('promo-message');
+
+    function showPromoMsg(text, isError) {
+      if (!promoMsg) return;
+      promoMsg.textContent = text;
+      promoMsg.style.color = isError ? 'var(--yb-red)' : 'var(--yb-cyan)';
+      promoMsg.style.display = 'block';
+    }
+
     if (promoApply && promoInput) {
       promoApply.addEventListener('click', function () {
         var code = promoInput.value.trim().toUpperCase();
@@ -100,24 +109,33 @@
 
         var eventId = widget.dataset.eventId;
         var apiUrl = widget.dataset.apiUrl || '';
+        var t = calcTotal();
 
         fetch(apiUrl + '/api/coupons/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: code, event_id: eventId }),
+          body: JSON.stringify({
+            coupon_code: code,
+            event_id: eventId,
+            amount: t.price,
+            ticket_quantity: t.count || 1,
+          }),
         })
           .then(function (r) { return r.json(); })
           .then(function (data) {
             if (data.valid) {
               discount = data.discount_amount || 0;
               promoInput.style.borderColor = 'var(--yb-cyan)';
+              showPromoMsg('✓ ' + (data.discount_description || 'Промокод применён'), false);
               update();
             } else {
               promoInput.style.borderColor = 'var(--yb-red)';
+              showPromoMsg(data.message || 'Промокод не найден', true);
             }
           })
           .catch(function () {
             promoInput.style.borderColor = 'var(--yb-red)';
+            showPromoMsg('Ошибка при проверке промокода', true);
           });
       });
     }

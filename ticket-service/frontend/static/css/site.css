@@ -1026,6 +1026,7 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   width: 32px; height: 32px;
   background: transparent;
   border: none;
+  outline: none;
   font-family: var(--yb-font-display);
   font-size: 18px;
   cursor: pointer;

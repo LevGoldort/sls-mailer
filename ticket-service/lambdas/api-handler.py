@@ -2390,7 +2390,7 @@ def create_coupon(request_event: Dict) -> Dict:
                 return error_response(400, f"Missing required field: {field}")
 
         # Генерируем код или используем предоставленный
-        coupon_code = body.get('coupon_code', Coupon.generate_code())
+        coupon_code = body.get('coupon_code', Coupon.generate_code()).strip().upper()
 
         # Проверяем что купон с таким кодом не существует
         existing = db.get_coupon(coupon_code)
@@ -2436,7 +2436,7 @@ def validate_coupon(request_event: Dict) -> Dict:
             if field not in body:
                 return error_response(400, f"Missing required field: {field}")
 
-        coupon_code = body['coupon_code']
+        coupon_code = body['coupon_code'].strip().upper()
         event_id = body['event_id']
         amount = float(body['amount'])
         ticket_quantity = int(body.get('ticket_quantity', 1))  # Optional, defaults to 1
