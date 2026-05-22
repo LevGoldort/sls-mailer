@@ -20,6 +20,8 @@ class DynamoDBClient:
         self.performers_table_name = os.environ.get('PERFORMERS_TABLE', 'yallabalagan-performers')
         self.products_table_name = os.environ.get('PRODUCTS_TABLE', 'yallabalagan-products')
         self.merchandise_orders_table_name = os.environ.get('MERCHANDISE_ORDERS_TABLE', 'yallabalagan-merchandise-orders')
+        self.shows_table_name = os.environ.get('SHOWS_TABLE', 'yallabalagan-shows')
+        self.episodes_table_name = os.environ.get('EPISODES_TABLE', 'yallabalagan-episodes')
 
         self.events_table = self.dynamodb.Table(self.events_table_name)
         self.locations_table = self.dynamodb.Table(self.locations_table_name)
@@ -29,6 +31,8 @@ class DynamoDBClient:
         self.performers_table = self.dynamodb.Table(self.performers_table_name)
         self.products_table = self.dynamodb.Table(self.products_table_name)
         self.merchandise_orders_table = self.dynamodb.Table(self.merchandise_orders_table_name)
+        self.shows_table = self.dynamodb.Table(self.shows_table_name)
+        self.episodes_table = self.dynamodb.Table(self.episodes_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -639,3 +643,72 @@ class DynamoDBClient:
             if self.release_seat(event_id, seat_id, session_id):
                 released_count += 1
         return released_count
+
+    # ===== Shows =====
+
+    def put_show(self, show_item: Dict):
+        return self.shows_table.put_item(Item=show_item)
+
+    def get_show(self, show_id: str) -> Optional[Dict]:
+        response = self.shows_table.get_item(
+            Key={'PK': f'SHOW#{show_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_show_by_slug(self, slug: str) -> Optional[Dict]:
+        response = self.shows_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def list_shows(self) -> List[Dict]:
+        response = self.shows_table.scan()
+        return response.get('Items', [])
+
+    def delete_show(self, show_id: str):
+        return self.shows_table.delete_item(
+            Key={'PK': f'SHOW#{show_id}', 'SK': 'METADATA'}
+        )
+
+    # ===== Episodes =====
+
+    def put_episode(self, episode_item: Dict):
+        return self.episodes_table.put_item(Item=episode_item)
+
+    def get_episode(self, episode_id: str) -> Optional[Dict]:
+        response = self.episodes_table.get_item(
+            Key={'PK': f'EPISODE#{episode_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_episode_by_slug(self, slug: str) -> Optional[Dict]:
+        response = self.episodes_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def list_episodes_by_show(self, show_id: str) -> List[Dict]:
+        response = self.episodes_table.query(
+            IndexName='ShowIndex',
+            KeyConditionExpression='show_id = :sid',
+            ExpressionAttributeValues={':sid': show_id},
+            ScanIndexForward=False
+        )
+        return response.get('Items', [])
+
+    def list_all_episodes(self) -> List[Dict]:
+        response = self.episodes_table.scan()
+        return response.get('Items', [])
+
+    def delete_episode(self, episode_id: str):
+        return self.episodes_table.delete_item(
+            Key={'PK': f'EPISODE#{episode_id}', 'SK': 'METADATA'}
+        )
