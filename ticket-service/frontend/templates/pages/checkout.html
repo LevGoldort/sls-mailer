@@ -103,6 +103,12 @@
                     Перейти к оплате
                 </button>
 
+                <!-- Order error (YB-styled) -->
+                <div id="order-error" style="display:none; margin-top:16px; padding:16px 20px; border:2px solid var(--yb-ink); box-shadow: var(--yb-shadow-magenta); background:var(--yb-paper); color:var(--yb-ink);">
+                  <div style="font-family:var(--yb-font-display); font-size:13px; letter-spacing:.08em; opacity:.5; margin-bottom:6px;">✕ ОШИБКА</div>
+                  <div id="order-error-msg" style="font-family:var(--yb-font-mono); font-size:13px; line-height:1.5;"></div>
+                </div>
+
                 <p style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1rem;">
                     После нажатия вы будете перенаправлены на защищенную страницу оплаты
                 </p>
@@ -418,23 +424,29 @@ function renderCheckout() {
     document.getElementById('checkout-content').style.display = 'block';
 
     // Render event info
+    const photoUrl = eventData.photo_url || eventData.images?.[0] || '';
     const eventInfoHtml = `
-        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Информация о событии</h2>
-        <div style="display: flex; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);">
-            ${eventData.images && eventData.images.length > 0
-                ? `<img src="${eventData.images[0]}" alt="${eventData.title}" style="width: 120px; height: 120px; border-radius: 0.5rem; object-fit: cover; background: var(--gray-200);">`
-                : `<div style="width: 120px; height: 120px; border-radius: 0.5rem; background: var(--gray-200); display: flex; align-items: center; justify-content: center; font-size: 3rem;">🎭</div>`
-            }
-            <div>
-                <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">${eventData.title}</h3>
-                <p style="color: var(--gray-600); font-size: 0.9375rem; margin-bottom: 0.25rem;">
-                    📅 ${eventData.date_formatted} в ${eventData.time_formatted}
-                </p>
-                ${eventData.location_name
-                    ? `<p style="color: var(--gray-600); font-size: 0.9375rem;">📍 ${eventData.location_name}</p>`
-                    : ''
-                }
+        <div style="border: 2px solid var(--yb-ink); box-shadow: var(--yb-shadow-magenta); background: var(--yb-paper); overflow: hidden; margin-bottom: 0;">
+          ${photoUrl ? `
+          <div style="height: 200px; overflow: hidden; position: relative;">
+            <img src="${photoUrl}" alt="${eventData.title}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+            <div style="position:absolute;inset:0;background:var(--yb-magenta);mix-blend-mode:multiply;opacity:.25;pointer-events:none;"></div>
+          </div>` : ''}
+          <div style="padding: 20px 24px;">
+            <div style="font-family: var(--yb-font-mono); font-size: 11px; letter-spacing: .08em; opacity: .45; margin-bottom: 10px;">★ ЗАКАЗ · ORDER</div>
+            <h2 style="font-family: var(--yb-font-display); font-size: clamp(22px, 4vw, 34px); line-height: .95; letter-spacing: -.01em; margin: 0 0 16px; color: var(--yb-ink);">${eventData.title}</h2>
+            <div style="display: flex; gap: 24px; flex-wrap: wrap; border-top: 1px solid rgba(26,20,16,.12); padding-top: 14px;">
+              <div>
+                <div style="font-family: var(--yb-font-mono); font-size: 10px; letter-spacing: .08em; opacity: .4; margin-bottom: 3px;">ДАТА И ВРЕМЯ</div>
+                <div style="font-family: var(--yb-font-mono); font-size: 13px;">${eventData.date_formatted} · ${eventData.time_formatted}</div>
+              </div>
+              ${eventData.location_name ? `
+              <div>
+                <div style="font-family: var(--yb-font-mono); font-size: 10px; letter-spacing: .08em; opacity: .4; margin-bottom: 3px;">ПЛОЩАДКА</div>
+                <div style="font-family: var(--yb-font-mono); font-size: 13px;">${eventData.location_name}</div>
+              </div>` : ''}
             </div>
+          </div>
         </div>
 
         <!-- Ticket Selection (only for unseated venues) -->
@@ -743,6 +755,15 @@ function showError(message) {
     document.getElementById('error-message').textContent = message;
 }
 
+function showOrderError(message) {
+    var el = document.getElementById('order-error');
+    var msg = document.getElementById('order-error-msg');
+    if (!el || !msg) return;
+    msg.textContent = message;
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // Fire InitiateCheckout analytics
 function fireInitiateCheckout() {
     if (typeof fbq !== 'undefined') {
@@ -876,6 +897,12 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
                 // Scroll to top
                 window.scrollTo(0, 0);
 
+                // Non-AllPay URLs (mock payment page, fallback /processing.html): redirect directly
+                if (!result.payment_url.includes('allpay.to') && !result.payment_url.includes('allpay.co')) {
+                    window.location.href = result.payment_url;
+                    return;
+                }
+
                 // Set iframe src to payment URL
                 document.getElementById('allpay-payment-iframe').src = result.payment_url;
 
@@ -883,16 +910,12 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
                 AllpayInstance = new AllpayPayment({
                     iframeId: 'allpay-payment-iframe',
                     onSuccess: function() {
-                        // Payment successful - redirect to confirmation
                         console.log('Payment success callback triggered');
                         window.location.href = '/processing.html?order_id=' + result.order_id;
                     },
                     onError: function(error_n, error_msg) {
-                        // Payment failed - show error
                         console.error('Payment error:', error_n, error_msg);
-                        alert('Ошибка оплаты: ' + error_msg + ' (код: ' + error_n + ')');
-
-                        // Re-enable submit button and show checkout form again
+                        showOrderError('Ошибка оплаты: ' + error_msg + ' (код: ' + error_n + ')');
                         submitButton.disabled = false;
                         submitButton.textContent = 'Перейти к оплате';
                         document.getElementById('checkout-content').style.display = 'block';
@@ -904,13 +927,13 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
                 window.location.href = '/orders/' + result.order_id + '.html';
             }
         } else {
-            alert('Ошибка при создании заказа: ' + (result.error || 'Неизвестная ошибка'));
+            showOrderError(result.error || 'Неизвестная ошибка');
             submitButton.disabled = false;
             submitButton.textContent = 'Перейти к оплате';
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Произошла ошибка при обработке заказа. Пожалуйста, попробуйте снова.');
+        showOrderError('Произошла ошибка при обработке заказа. Пожалуйста, попробуйте снова.');
         submitButton.disabled = false;
         submitButton.textContent = 'Перейти к оплате';
     }

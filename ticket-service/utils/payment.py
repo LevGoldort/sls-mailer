@@ -107,7 +107,9 @@ class MockPaymentProvider(PaymentProvider):
         tickets: list = None,
         order_created_at: str = None,
         discount_type: str = None,
-        discount_value: float = 0
+        discount_value: float = 0,
+        event_title: str = None,
+        seat_display_map: dict = None
     ) -> str:
         """
         Returns URL to mock payment page

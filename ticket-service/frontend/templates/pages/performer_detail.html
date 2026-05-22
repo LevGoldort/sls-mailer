@@ -126,6 +126,43 @@
 </section>
 {% endif %}
 
+{# ── Episodes ── #}
+{% if performer_episodes %}
+<section class="yb-pad" style="padding-bottom:24px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:26px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">Контент</span>
+        Контент
+      </span>
+    </h2>
+    <span style="font-family:var(--yb-font-mono);font-size:12px;opacity:.65;letter-spacing:.12em;text-transform:uppercase">/ {{ performer_episodes | length }}</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:16px">
+    {% for ep in performer_episodes %}
+    {% set _show = ep.get('show', {}) %}
+    <a href="/episodes/{{ ep.slug }}.html"
+       style="display:grid;grid-template-columns:160px 1fr;gap:0;border:2px solid var(--yb-ink);box-shadow:4px 4px 0 var(--yb-ink);background:var(--yb-paper);text-decoration:none;color:var(--yb-ink);overflow:hidden">
+      <div style="position:relative;aspect-ratio:16/9;background:var(--yb-ink);overflow:hidden">
+        <img src="{{ ep.get('thumbnail_url') or pick_placeholder(ep.episode_id) }}"
+             alt="{{ ep.title }}" loading="lazy"
+             style="width:100%;height:100%;object-fit:cover;display:block">
+      </div>
+      <div style="padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:4px">
+        {% if _show.get('name') %}
+        <div style="font-family:var(--yb-font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55">{{ _show.name }} · Эп. {{ ep.number }}</div>
+        {% endif %}
+        <div style="font-family:var(--yb-font-display);font-size:17px;letter-spacing:-.01em;line-height:1.2">{{ ep.title }}</div>
+        {% if ep.get('description') %}
+        <div style="font-family:var(--yb-font-body);font-size:13px;opacity:.6;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ ep.description }}</div>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {# ── Upcoming events ── #}
 {% if upcoming_events %}
 <section class="yb-pad" style="padding-bottom:24px">

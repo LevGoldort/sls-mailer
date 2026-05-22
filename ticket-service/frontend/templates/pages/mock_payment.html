@@ -114,9 +114,9 @@ function sendWebhook(status) {
     .then(data => {
         console.log('Webhook sent successfully:', data);
 
-        // Redirect to processing page
+        // Redirect to processing page — use top to escape iframe if needed
         setTimeout(() => {
-            window.location.href = `/processing.html?order_id=${orderId}`;
+            window.top.location.href = `/processing.html?order_id=${orderId}`;
         }, 1000);
     })
     .catch(error => {

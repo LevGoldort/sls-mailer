@@ -40,20 +40,36 @@
       <p class="yb-performer-hero__bio">{{ episode.description }}</p>
       {% endif %}
 
-      {% if episode.get('url') %}
       <div style="margin-top:24px">
+        {% if not episode.get('url') or 'youtube.com' not in episode.url and 'youtu.be' not in episode.url %}
+        {% if episode.get('url') %}
         <a href="{{ episode.url }}" class="yb-btn yb-btn--primary" target="_blank" rel="noopener">
           {{ strings.shows.watch }} ↗
         </a>
-        <a href="/shows/{{ show.slug }}.html" class="yb-btn yb-btn--paper" style="margin-left:10px">
+        {% endif %}
+        {% endif %}
+        <a href="/shows/{{ show.slug }}.html" class="yb-btn yb-btn--paper">
           {{ strings.shows.back_to_show }}
         </a>
       </div>
-      {% endif %}
     </div>
 
   </div>
 </section>
+
+{% set _embed = episode.get('url', '') | youtube_embed_url %}
+{% if _embed and 'youtube.com/embed' in _embed %}
+<section class="yb-pad" style="padding-top:0;padding-bottom:32px">
+  <div style="position:relative;border:var(--yb-border);box-shadow:8px 8px 0 var(--yb-magenta);background:var(--yb-ink);aspect-ratio:16/9;overflow:hidden">
+    <iframe src="{{ _embed }}"
+            title="{{ episode.title }}"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            style="width:100%;height:100%;border:none;display:block"></iframe>
+    <div style="position:absolute;top:16px;right:16px;padding:5px 11px;background:var(--yb-red);color:var(--yb-paper);border:2.5px solid var(--yb-ink);font-family:var(--yb-font-mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transform:rotate(2deg);pointer-events:none">★ VIDEO ★</div>
+  </div>
+</section>
+{% endif %}
 
 {# ── Performers ── #}
 {% if performers %}

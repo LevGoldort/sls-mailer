@@ -8,9 +8,10 @@ UI_STRINGS = {
             'cities': 'Tel Aviv — Yaffo — Bat Yam',
         },
         'header': {
-            'nav_events': 'Программа',
-            'nav_performers': 'Исполнители',
-            'nav_podcast': 'Подкаст',
+            'nav_events': 'Мероприятия',
+            'nav_performers': 'Таланты',
+            'nav_merch': 'Мерч',
+            'nav_content': 'Контент',
             'nav_about': 'О нас',
             'cta': '► Купить билет',
             'ticker_left': 'ZINE / ЯЛЛАxБАЛАГАН',
@@ -44,7 +45,7 @@ UI_STRINGS = {
             'nobody': 'Никого',
         },
         'home': {
-            'hero_line1': 'ЯЛЛА,',
+            'hero_line1': 'ЯЛЛА',
             'hero_line2': 'БАЛАГАН',
             'hero_sub': (
                 'Творческое объединение в Израиле. Стендап-концерты, шоу, '

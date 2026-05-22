@@ -218,11 +218,12 @@
 {# "ВЫБОР МЕСТ" sub-hero #}
 <div class="yb-seats-hero">
   <div class="yb-seats-hero__inner yb-pad-x">
-    <div class="yb-seats-hero__steps">
-      <span class="yb-seats-hero__step yb-seats-hero__step--active">01 МЕСТА</span>
-      <span class="yb-seats-hero__step">02 ОПЛАТА</span>
-    </div>
-    <h2 class="yb-seats-hero__title">ВЫБОР МЕСТ</h2>
+    <h2 class="yb-seats-hero__title">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">ВЫБОР МЕСТ</span>
+        ВЫБОР МЕСТ
+      </span>
+    </h2>
   </div>
   <div class="yb-seats-hero__strip yb-pad-x">
     <span class="yb-seats-hero__stamp">СЦЕНА ЕСТЬ</span>
@@ -238,17 +239,15 @@
 
 <section class="yb-seats" id="seats">
 
-  {# ПЛАН ЗАЛА header #}
-  <div class="yb-seats__head yb-pad-x">
-    <span class="yb-seats__plan-label">{{ strings.event_detail.seats_plan_hall }}</span>
-    {% if location %}<span class="yb-seats__venue-cap">• {{ location.name | upper }}{% if location.get('venue_config', {}).get('total_seats') %} • CAP. {{ location.venue_config.total_seats }}{% endif %}</span>{% endif %}
-  </div>
-
   {# Two-column body #}
   <div class="yb-seats__body">
 
-    {# Left: seat map #}
+    {# Left: seat map card (includes ПЛАН ЗАЛА header) #}
     <div class="yb-seats__map-col yb-pad-x">
+      <div class="yb-seats__head">
+        <span class="yb-seats__plan-label">{{ strings.event_detail.seats_plan_hall }}</span>
+        {% if location %}<span class="yb-seats__venue-cap">• {{ location.name | upper }}{% if location.get('venue_config', {}).get('total_seats') %} • CAP. {{ location.venue_config.total_seats }}{% endif %}</span>{% endif %}
+      </div>
       <div id="seat-picker-container"></div>
     </div>
 
@@ -281,8 +280,8 @@
         </div>
       </div>
 
-      {# Order widget #}
-      <div class="yb-seats__order">
+      {# Tickets summary (yellow) #}
+      <div class="yb-seats__tickets">
         <div class="yb-seats__order-hdr">
           <span>★ ЗАКАЗ · ORDER</span>
           <span id="order-ref">★</span>
@@ -314,18 +313,19 @@
           <div class="yb-seats__order-total-lbl">ИТОГО · <span id="order-seats-label">0 {{ strings.event_detail.seats_count }}</span></div>
           <div class="yb-seats__order-total-price"><span id="order-total-num">0</span>₪</div>
         </div>
+      </div>
 
-        <hr class="yb-seats__rule">
-
+      {# CTA block (dark) #}
+      <div class="yb-seats__cta">
         <div class="yb-seats__promo">
           <input type="text" id="promo-code" placeholder="{{ strings.event_detail.promo_placeholder | upper }}" autocomplete="off">
           <button id="promo-apply" class="yb-seats__promo-btn">ОК</button>
         </div>
-        <div id="promo-message" style="display:none;font-size:12px;margin-top:4px;font-family:var(--yb-font-mono)"></div>
+        <div id="promo-message" style="display:none;font-size:12px;margin-top:4px;font-family:var(--yb-font-mono);color:var(--yb-ink)"></div>
 
         <button id="seat-proceed-btn"
                 class="yb-btn yb-btn--yellow yb-btn--lg yb-btn--full"
-                style="margin-top:12px;opacity:.5;pointer-events:none">
+                style="margin-top:4px;opacity:.5;pointer-events:none">
           {{ strings.event_detail.seats_proceed }}
         </button>
         <div class="yb-seats__reserve-note">Бронь держится 15 минут</div>
@@ -334,24 +334,6 @@
     </div>
   </div>
 
-  {# Info cards #}
-  <div class="yb-seats__cards yb-pad-x">
-    <div class="yb-seats__card yb-seats__card--magenta">
-      <div class="yb-seats__card-num">I.</div>
-      <div class="yb-seats__card-head">{{ strings.event_detail.seats_card1_head }}</div>
-      <p>{{ strings.event_detail.email_note }}</p>
-    </div>
-    <div class="yb-seats__card yb-seats__card--cyan">
-      <div class="yb-seats__card-num">II.</div>
-      <div class="yb-seats__card-head">{{ strings.event_detail.seats_card2_head }}</div>
-      <p>{{ strings.event_detail.seats_card2_body }}</p>
-    </div>
-    <div class="yb-seats__card yb-seats__card--ink">
-      <div class="yb-seats__card-num">III.</div>
-      <div class="yb-seats__card-head">{{ strings.event_detail.seats_card3_head }}</div>
-      <p>{{ strings.event_detail.seats_card3_body }}</p>
-    </div>
-  </div>
 
 </section>
 {% endif %}
@@ -451,9 +433,8 @@
 
 /* ── Sub-hero "ВЫБОР МЕСТ" ── */
 .yb-seats-hero {
-  background: var(--yb-ink);
-  color: var(--yb-paper);
-  border-top: 3px solid var(--yb-ink);
+  background: var(--yb-paper);
+  color: var(--yb-ink);
 }
 .yb-seats-hero__inner {
   display: flex;
@@ -463,6 +444,7 @@
   padding-bottom: 20px;
   gap: 20px;
 }
+.yb-seats-hero__title .yb-riso__shadow { color: var(--yb-magenta); }
 .yb-seats-hero__title {
   font-family: var(--yb-font-display);
   font-size: clamp(48px, 8vw, 96px);
@@ -470,35 +452,9 @@
   margin: 0;
   letter-spacing: -.01em;
 }
-.yb-seats-hero__steps {
-  display: flex;
-  gap: 0;
-  align-items: center;
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 4px;
-}
-.yb-seats-hero__step {
-  font-family: var(--yb-font-mono);
-  font-size: 12px;
-  letter-spacing: .1em;
-  padding: 6px 14px;
-  border: 1px solid rgba(243,238,225,.3);
-  opacity: .4;
-  white-space: nowrap;
-}
-.yb-seats-hero__step--active {
-  border-color: var(--yb-paper);
-  opacity: 1;
-  background: rgba(243,238,225,.08);
-}
-.yb-seats-hero__step + .yb-seats-hero__step { border-left: none; }
-
 /* Info strip below hero */
 .yb-seats-hero__strip {
   background: var(--yb-paper);
-  border-top: 2px solid var(--yb-ink);
-  border-bottom: 2px solid var(--yb-ink);
   padding-top: 10px;
   padding-bottom: 10px;
   display: flex;
@@ -520,7 +476,7 @@
 }
 .yb-seats-hero__sep { opacity: .35; }
 
-/* ── ПЛАН ЗАЛА header ── */
+/* ── ПЛАН ЗАЛА header (inside map card) ── */
 .yb-seats__head {
   display: flex;
   align-items: baseline;
@@ -548,12 +504,16 @@
   display: grid;
   grid-template-columns: 1fr 320px;
   align-items: start;
+  column-gap: 20px;
+  padding-right: 60px;
+  padding-bottom: 20px;
 }
 .yb-seats__map-col {
-  border-right: 2px solid var(--yb-ink);
+  border: 2px solid var(--yb-ink);
+  box-shadow: var(--yb-shadow-magenta);
   min-height: 480px;
   padding-top: 0;
-  padding-bottom: 0;
+  padding-bottom: 16px;
 }
 /* Strip SeatPicker's own sidebar — we own the right panel */
 #seat-picker-container .seat-picker-sidebar { display: none !important; }
@@ -562,14 +522,16 @@
 .yb-seats__widget-col {
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
-/* ── Zones panel (dark) ── */
+/* ── Zones panel (light) ── */
 .yb-seats__zones {
-  background: var(--yb-ink);
-  color: var(--yb-paper);
+  background: var(--yb-paper);
+  color: var(--yb-ink);
   padding: 16px 20px;
-  border-bottom: 2px solid var(--yb-ink);
+  border: 2px solid var(--yb-ink);
+  box-shadow: var(--yb-shadow-cyan);
 }
 .yb-seats__zones-head {
   display: flex;
@@ -580,7 +542,7 @@
   letter-spacing: .06em;
   padding-bottom: 12px;
   margin-bottom: 10px;
-  border-bottom: 1px solid rgba(255,255,255,.15);
+  border-bottom: 1px solid rgba(26,20,16,.15);
 }
 .yb-seats__zones-sub { font-family: var(--yb-font-mono); font-size: 10px; opacity: .5; letter-spacing: .1em; }
 
@@ -589,7 +551,7 @@
   align-items: center;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid rgba(26,20,16,.06);
 }
 .yb-seats__zone:last-of-type { border-bottom: none; }
 .yb-seats__zone-swatch {
@@ -598,6 +560,7 @@
   border-radius: 4px;
   flex-shrink: 0;
   background: #555;
+  border: 1px solid rgba(26,20,16,.15);
 }
 .yb-seats__zone-info { flex: 1; min-width: 0; }
 .yb-seats__zone-name {
@@ -605,16 +568,11 @@
   font-size: 13px;
   letter-spacing: .04em;
 }
-.yb-seats__zone-desc {
-  font-family: var(--yb-font-mono);
-  font-size: 10px;
-  opacity: .55;
-  margin-top: 2px;
-}
 .yb-seats__zone-price {
   font-family: var(--yb-font-display);
   font-size: 18px;
-  color: var(--yb-yellow);
+  font-weight: 900;
+  color: var(--yb-ink);
   white-space: nowrap;
 }
 
@@ -622,7 +580,7 @@
 .yb-seats__legend {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255,255,255,.12);
+  border-top: 1px solid rgba(26,20,16,.12);
 }
 .yb-seats__legend-label {
   font-family: var(--yb-font-mono);
@@ -652,14 +610,28 @@
   flex-shrink: 0;
 }
 
-/* ── Order widget (cream) ── */
-.yb-seats__order {
-  flex: 1;
-  background: var(--yb-paper);
+/* ── Tickets block (yellow) ── */
+.yb-seats__tickets {
+  background: var(--yb-yellow);
+  color: var(--yb-ink);
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  border: 2px solid var(--yb-ink);
+  box-shadow: var(--yb-shadow);
+}
+
+/* ── CTA block (cream) ── */
+.yb-seats__cta {
+  background: var(--yb-paper);
+  color: var(--yb-ink);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 2px solid var(--yb-ink);
+  box-shadow: var(--yb-shadow-magenta);
 }
 .yb-seats__order-hdr {
   display: flex;
@@ -756,31 +728,12 @@
   margin-top: 2px;
 }
 
-/* ── Info cards ── */
-.yb-seats__cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-top: 2px solid var(--yb-ink);
-}
-.yb-seats__card { padding: 28px 24px; border-right: 2px solid var(--yb-ink); }
-.yb-seats__card:last-child { border-right: none; }
-.yb-seats__card--magenta { background: var(--yb-magenta); color: var(--yb-paper); }
-.yb-seats__card--cyan    { background: var(--yb-cyan);    color: var(--yb-ink);   }
-.yb-seats__card--ink     { background: var(--yb-ink);     color: var(--yb-paper); }
-.yb-seats__card-num  { font-family: var(--yb-font-display); font-size: 13px; opacity: .6; margin-bottom: 6px; }
-.yb-seats__card-head { font-family: var(--yb-font-display); font-size: 18px; line-height: 1.1; margin-bottom: 10px; }
-.yb-seats__card p    { font-family: var(--yb-font-mono); font-size: 13px; line-height: 1.55; opacity: .85; margin: 0; }
-
 @media (max-width: 900px) {
-  .yb-seats__body { grid-template-columns: 1fr; }
-  .yb-seats__map-col { border-right: none; border-bottom: 2px solid var(--yb-ink); }
-  .yb-seats__cards { grid-template-columns: 1fr; }
-  .yb-seats__card { border-right: none; border-bottom: 2px solid var(--yb-ink); }
-  .yb-seats__card:last-child { border-bottom: none; }
+  .yb-seats__body { grid-template-columns: 1fr; column-gap: 0; padding-right: 0; }
+  .yb-seats__widget-col { order: -1; }
 }
 @media (max-width: 600px) {
   .yb-seats-hero__title { font-size: 40px; }
-  .yb-seats-hero__steps { display: none; }
   .yb-seats__order-total-price { font-size: 24px; }
 }
 </style>
@@ -846,7 +799,7 @@
       chips += '<span class="yb-seats__chip">' + seatLabel(seatId) + ' ×</span>';
     });
 
-    if (totalEl) totalEl.textContent = total;
+    if (totalEl) totalEl.textContent = Math.max(0, total - discount);
     if (chipsEl) chipsEl.innerHTML = chips;
     if (secEl) secEl.style.display = seats.length ? '' : 'none';
     if (zoneRow && firstTt) {
@@ -858,10 +811,77 @@
     }
   }
 
+  // Promo code
+  var discount = 0;
+  var promoInput = document.getElementById('promo-code');
+  var promoApply = document.getElementById('promo-apply');
+  var promoMsg   = document.getElementById('promo-message');
+
+  function showPromoMsg(text, isError) {
+    if (!promoMsg) return;
+    promoMsg.textContent = text;
+    promoMsg.style.color = isError ? 'var(--yb-red)' : 'var(--yb-cyan)';
+    promoMsg.style.display = 'block';
+  }
+
+  if (promoApply && promoInput) {
+    promoApply.addEventListener('click', function() {
+      var code = promoInput.value.trim().toUpperCase();
+      if (!code) return;
+      var seats = picker.getSelectedSeats();
+      var rawTotal = seats.reduce(function(sum, seatId) {
+        var ttId = picker.seatAllocation && picker.seatAllocation[seatId];
+        var tt = picker.ticketTypes && picker.ticketTypes.find(function(t) { return t.id === ttId; });
+        return sum + (tt ? Number(tt.price) : 0);
+      }, 0);
+      fetch(API_URL + '/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_code: code, event_id: EVENT_ID, amount: rawTotal, ticket_quantity: seats.length || 1 })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.valid) {
+          discount = data.discount_amount || 0;
+          promoInput.style.borderColor = 'var(--yb-cyan)';
+          showPromoMsg('✓ ' + (data.discount_description || 'Промокод применён'), false);
+          updateWidget(picker.getSelectedSeats());
+        } else {
+          discount = 0;
+          promoInput.style.borderColor = 'var(--yb-red)';
+          showPromoMsg(data.message || 'Промокод не найден', true);
+        }
+      })
+      .catch(function() {
+        promoInput.style.borderColor = 'var(--yb-red)';
+        showPromoMsg('Ошибка при проверке промокода', true);
+      });
+    });
+  }
+
   document.getElementById('seat-picker-container').addEventListener('seatPicker:seatsReserved', function(e) {
-    var promoEl = document.getElementById('promo-code');
-    var orderData = { event_id: EVENT_ID, purchased_seats: e.detail.seatIds, seating_map_config: seatingMapConfig };
-    if (promoEl && promoEl.value.trim()) orderData.coupon_code = promoEl.value.trim().toUpperCase();
+    var seatIds = e.detail.seatIds;
+
+    // Group seats by ticket type so checkout can read tickets[].type_id / quantity / purchased_seats
+    var typeMap = {};
+    seatIds.forEach(function(seatId) {
+      var ttId = picker.seatAllocation && picker.seatAllocation[seatId];
+      if (!ttId) return;
+      if (!typeMap[ttId]) typeMap[ttId] = [];
+      typeMap[ttId].push(seatId);
+    });
+    var tickets = Object.keys(typeMap).map(function(ttId) {
+      return { type_id: ttId, quantity: typeMap[ttId].length, purchased_seats: typeMap[ttId] };
+    });
+
+    var orderData = {
+      event_id: EVENT_ID,
+      purchased_seats: seatIds,
+      tickets: tickets,
+      session_id: picker.sessionId,
+      seating_map_config: seatingMapConfig
+    };
+    if (promoInput && promoInput.value.trim()) orderData.coupon_code = promoInput.value.trim().toUpperCase();
     try { sessionStorage.setItem('orderData', JSON.stringify(orderData)); } catch(x) {}
     window.location.href = '/checkout.html?event_id=' + EVENT_ID + '&seated=true';
   });

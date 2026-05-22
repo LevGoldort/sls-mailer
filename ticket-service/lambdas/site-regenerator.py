@@ -257,6 +257,15 @@ def generate_html_files(site_data, output_dir, templates_dir):
     show_episodes_map = site_data.get('show_episodes_map', {})
     show_episode_counts = site_data.get('show_episode_counts', {})
 
+    # performer_id → episodes where they appear
+    show_map = {s['show_id']: s for s in shows}
+    performer_episodes_map = {}
+    for ep in sorted(episodes, key=lambda e: e.get('published_at', ''), reverse=True):
+        for pid in ep.get('performer_ids', []):
+            ep_with_show = dict(ep)
+            ep_with_show['show'] = show_map.get(ep['show_id'], {})
+            performer_episodes_map.setdefault(pid, []).append(ep_with_show)
+
     strings = UI_STRINGS['ru']
 
     # Create lookup maps (must be before env.globals so they can be referenced in templates)
@@ -277,8 +286,21 @@ def generate_html_files(site_data, output_dir, templates_dir):
 
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
 
+    def youtube_embed_url(url):
+        """Convert a YouTube watch URL to an embed URL."""
+        import re
+        if not url:
+            return ''
+        m = re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})', url)
+        if m:
+            vid = m.group(1)
+            start = re.search(r'[?&]t=(\d+)', url)
+            return f'https://www.youtube.com/embed/{vid}' + (f'?start={start.group(1)}' if start else '')
+        return url
+
     # Date filters
     env.filters['date_num'] = date_num
+    env.filters['youtube_embed_url'] = youtube_embed_url
     env.filters['month_abbr'] = month_abbr
     env.filters['month_full'] = month_full
     env.filters['day_of_week'] = day_of_week
@@ -417,6 +439,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
                 products=performer_products_map.get(pid, []),
                 upcoming_events=performer_upcoming.get(pid, []),
                 archive_events=performer_archive.get(pid, []),
+                performer_episodes=performer_episodes_map.get(pid, []),
                 active_nav='performers',
             )
             performer_dir = output_dir / 'performer' / slug

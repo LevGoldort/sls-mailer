@@ -382,6 +382,32 @@ else
   echo "  Skipping yallabalagan-sms-sender — function not found in this account"
 fi
 
+update_lambda "yallabalagan-pending-orders-cleaner" \
+  ".aws-sam/build/PendingOrdersCleanerFunction" \
+  "lambdas/pending-orders-cleaner.lambda_handler"
+
+echo "  Updating environment variables..."
+cat > /tmp/pending-cleaner-env.json <<EOF
+{
+  "Variables": {
+    "ENVIRONMENT": "${ENV}",
+    "EVENTS_TABLE": "yallabalagan-events",
+    "ORDERS_TABLE": "yallabalagan-orders",
+    "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "MEDIA_BUCKET": "${MEDIA_BUCKET}",
+    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
+  }
+}
+EOF
+aws lambda update-function-configuration \
+  --function-name yallabalagan-pending-orders-cleaner \
+  --environment file:///tmp/pending-cleaner-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+aws lambda wait function-updated \
+  --function-name yallabalagan-pending-orders-cleaner \
+  --region "$REGION" --profile "$PROFILE"
+rm -f /tmp/pending-cleaner-env.json
+
 update_lambda "yallabalagan-event-status-updater" \
   ".aws-sam/build/EventStatusUpdaterFunction" \
   "lambdas/event-status-updater.lambda_handler"

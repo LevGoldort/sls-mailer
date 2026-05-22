@@ -876,6 +876,10 @@
     filter: drop-shadow(0 0 8px rgba(255, 212, 0, 1));
 }
 
+.seat.seat-available {
+    filter: drop-shadow(2px 3px 0px rgba(26,20,16,0.35));
+}
+
 .seat.seat-sold {
     fill: #1a1410;
     stroke: #0a0a0a;

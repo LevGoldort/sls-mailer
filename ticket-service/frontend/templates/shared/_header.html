@@ -13,10 +13,13 @@
       <a href="/performers.html"{% if _active == 'performers' %} class="is-active" aria-current="page"{% endif %}>
         {{ strings.header.nav_performers }}
       </a>
-      <a href="/#podcast"{% if _active == 'podcast' %} class="is-active"{% endif %}>
-        {{ strings.header.nav_podcast }}
+      <a href="/products.html"{% if _active == 'merch' %} class="is-active" aria-current="page"{% endif %}>
+        {{ strings.header.nav_merch }}
       </a>
-      <a href="/about.html"{% if _active == 'about' %} class="is-active" aria-current="page"{% endif %}>
+      <a href="/shows.html"{% if _active == 'content' %} class="is-active" aria-current="page"{% endif %}>
+        {{ strings.header.nav_content }}
+      </a>
+      <a href="#" onclick="return false" style="opacity:.45;cursor:default">
         {{ strings.header.nav_about }}
       </a>
     </nav>

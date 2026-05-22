@@ -310,17 +310,17 @@ class SeatPicker {
         stage.setAttribute('y', 20);
         stage.setAttribute('width', width - 100);
         stage.setAttribute('height', 40);
-        stage.setAttribute('fill', '#333');
-        stage.setAttribute('rx', 5);
+        stage.setAttribute('class', 'stage');
+        stage.setAttribute('rx', 0);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', width / 2);
-        text.setAttribute('y', 48);
+        text.setAttribute('y', 40);
         text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('fill', 'white');
-        text.setAttribute('font-size', '18');
-        text.setAttribute('font-weight', 'bold');
-        text.textContent = 'СЦЕНА';
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('class', 'stage-label');
+        text.setAttribute('font-size', '14');
+        text.textContent = '▶ СЦЕНА · STAGE · במה ◀';
 
         stageGroup.appendChild(stage);
         stageGroup.appendChild(text);
@@ -412,24 +412,26 @@ class SeatPicker {
             rect.setAttribute('stroke-width', '1');
         }
 
-        // Seat label - use calculated display number from venue config
-        // Only show label for selected seats to reduce visual clutter
+        // Seat label - display number from venue config
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', x + seatWidth / 2);
         text.setAttribute('y', y + seatHeight / 2 + 4);
         text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('font-size', '12');
         text.setAttribute('class', 'seat-label');
         text.setAttribute('pointer-events', 'none');
-        text.setAttribute('fill', '#1a1410');  // Dark text on yellow selected seat
 
-        // Only show number if seat is selected
         if (status === 'selected') {
+            text.setAttribute('font-size', '12');
+            text.setAttribute('fill', '#1a1410');
             text.textContent = displayNumber;
-            text.style.display = 'block';
+        } else if (status === 'available') {
+            text.setAttribute('font-size', '10');
+            text.setAttribute('fill', 'rgba(26,20,16,0.45)');
+            text.textContent = displayNumber;
         } else {
-            text.textContent = displayNumber;
-            text.style.display = 'none';  // Hide for non-selected seats
+            text.setAttribute('font-size', '10');
+            text.setAttribute('fill', 'transparent');
+            text.textContent = '';
         }
 
         seatGroup.appendChild(rect);
