@@ -1027,10 +1027,15 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   background: transparent;
   border: none;
   outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
   font-family: var(--yb-font-display);
   font-size: 18px;
   cursor: pointer;
 }
+.yb-ticket-widget__qty button:focus,
+.yb-ticket-widget__qty button:focus-visible,
+.yb-ticket-widget__qty button:active { outline: none; box-shadow: none; }
 .yb-ticket-widget__qty button:first-child { border-right: 2.5px solid var(--yb-ink); }
 .yb-ticket-widget__qty button:last-child  { border-left:  2.5px solid var(--yb-ink); }
 .yb-ticket-widget__qty-num {

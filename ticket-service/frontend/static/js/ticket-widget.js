@@ -91,6 +91,31 @@
       update();
     });
 
+    if (buyBtn) {
+      buyBtn.addEventListener('click', function (e) {
+        var t = calcTotal();
+        if (t.count === 0) { e.preventDefault(); return; }
+
+        var tickets = [];
+        Object.keys(qty).forEach(function (id) {
+          if (qty[id] > 0) tickets.push({ type_id: id, quantity: qty[id] });
+        });
+
+        var orderData = {
+          event_id: widget.dataset.eventId,
+          tickets: tickets,
+        };
+        if (discount > 0 && promoInput && promoInput.value.trim()) {
+          orderData.coupon_code = promoInput.value.trim().toUpperCase();
+        }
+
+        try { sessionStorage.setItem('orderData', JSON.stringify(orderData)); } catch (_) {}
+
+        e.preventDefault();
+        window.location.href = '/checkout.html?event_id=' + widget.dataset.eventId + '&seated=true';
+      });
+    }
+
     var promoApply = document.getElementById('promo-apply');
     var promoInput = document.getElementById('promo-code');
     var promoMsg = document.getElementById('promo-message');
