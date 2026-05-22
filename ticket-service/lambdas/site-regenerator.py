@@ -196,8 +196,35 @@ def fetch_data():
     for event in sorted(upcoming_events, key=lambda e: e['date']):
         location_events_map.setdefault(event['location_id'], []).append(event)
 
+    # Shows (non-fatal)
+    shows = []
+    try:
+        response = requests.get(f"{API_URL}/api/shows", timeout=10)
+        response.raise_for_status()
+        shows = response.json().get('shows', [])
+    except Exception as e:
+        print(f"Warning: could not fetch shows: {e}")
+
+    # Episodes (non-fatal)
+    episodes = []
+    try:
+        response = requests.get(f"{API_URL}/api/episodes", timeout=10)
+        response.raise_for_status()
+        episodes = response.json().get('episodes', [])
+    except Exception as e:
+        print(f"Warning: could not fetch episodes: {e}")
+
+    # show_id → sorted episodes
+    show_episodes_map = {}
+    for ep in sorted(episodes, key=lambda e: e.get('number', 0)):
+        show_episodes_map.setdefault(ep['show_id'], []).append(ep)
+
+    # show_id → episode count
+    show_episode_counts = {sid: len(eps) for sid, eps in show_episodes_map.items()}
+
     print(f"Fetched {len(upcoming_events)} upcoming + {len(past_events)} past events, "
-          f"{len(locations)} locations, {len(performers)} performers, {len(products)} products")
+          f"{len(locations)} locations, {len(performers)} performers, {len(products)} products, "
+          f"{len(shows)} shows, {len(episodes)} episodes")
 
     return {
         'events': upcoming_events,
@@ -209,6 +236,10 @@ def fetch_data():
         'performer_upcoming': performer_upcoming,
         'performer_archive': performer_archive,
         'location_events_map': location_events_map,
+        'shows': shows,
+        'episodes': episodes,
+        'show_episodes_map': show_episodes_map,
+        'show_episode_counts': show_episode_counts,
     }
 
 def generate_html_files(site_data, output_dir, templates_dir):
@@ -221,6 +252,10 @@ def generate_html_files(site_data, output_dir, templates_dir):
     performer_upcoming = site_data['performer_upcoming']
     performer_archive = site_data['performer_archive']
     location_events_map = site_data['location_events_map']
+    shows = site_data.get('shows', [])
+    episodes = site_data.get('episodes', [])
+    show_episodes_map = site_data.get('show_episodes_map', {})
+    show_episode_counts = site_data.get('show_episode_counts', {})
 
     strings = UI_STRINGS['ru']
 
@@ -419,6 +454,56 @@ def generate_html_files(site_data, output_dir, templates_dir):
         html = template.render()
         (output_dir / 'mock_payment.html').write_text(html, encoding='utf-8')
         pages_generated += 1
+
+    # Generate shows listing + detail + episode detail pages
+    if shows or episodes:
+        performer_map = {p['performer_id']: p for p in performers}
+
+        print("Generating shows.html...")
+        template = env.get_template('pages/shows.html')
+        html = template.render(
+            shows=shows,
+            show_episode_counts=show_episode_counts,
+            active_nav='',
+        )
+        (output_dir / 'shows.html').write_text(html, encoding='utf-8')
+        pages_generated += 1
+
+        print(f"Generating {len(shows)} show pages...")
+        (output_dir / 'shows').mkdir(exist_ok=True)
+        show_template = env.get_template('pages/show_detail.html')
+        for show in shows:
+            slug = show.get('slug')
+            if not slug:
+                continue
+            ep_list = show_episodes_map.get(show['show_id'], [])
+            html = show_template.render(
+                show=show,
+                episodes=ep_list,
+                performer_map=performer_map,
+                active_nav='',
+            )
+            (output_dir / 'shows' / f"{slug}.html").write_text(html, encoding='utf-8')
+            pages_generated += 1
+
+        print(f"Generating {len(episodes)} episode pages...")
+        (output_dir / 'episodes').mkdir(exist_ok=True)
+        show_map = {s['show_id']: s for s in shows}
+        episode_template = env.get_template('pages/episode_detail.html')
+        for ep in episodes:
+            slug = ep.get('slug')
+            if not slug:
+                continue
+            show = show_map.get(ep['show_id'], {})
+            ep_performers = [performer_map[pid] for pid in ep.get('performer_ids', []) if pid in performer_map]
+            html = episode_template.render(
+                episode=ep,
+                show=show,
+                performers=ep_performers,
+                active_nav='',
+            )
+            (output_dir / 'episodes' / f"{slug}.html").write_text(html, encoding='utf-8')
+            pages_generated += 1
 
     # Generate sitemap.xml
     print("Generating sitemap.xml...")
