@@ -46,7 +46,7 @@
 {% set _is_external = event.get('event_type', 'internal') == 'external' %}
 {% set _slug = event.get('slug') or event['event_id'] %}
 {% set _venue_name = location.name if location else '' %}
-{% set _venue_addr = location.address if location else '' %}
+{% set _venue_addr = (location.address.street ~ ', ' ~ location.address.city) if location and location.address is mapping else (location.address if location else '') %}
 
 <article class="yb-event-card" data-tags="{{ event.get('tags', []) | join(',') }}">
 
@@ -63,9 +63,7 @@
 
   {# Photo column #}
   <div class="yb-event-card__img">
-    {% if event.get('photo_url') %}
-    <img src="{{ event['photo_url'] }}" alt="{{ event['title'] }}" loading="lazy">
-    {% endif %}
+    <img src="{{ event.get('photo_url') or pick_placeholder(event['event_id']) }}" alt="{{ event['title'] }}" loading="lazy">
     <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
   </div>
 
@@ -175,9 +173,7 @@
   <div class="yb-performer-card__tape yb-tape--{{ _tape }}" aria-hidden="true"></div>
 
   <div class="yb-performer-card__photo">
-    {% if performer.get('photo_url') %}
-    <img src="{{ performer['photo_url'] }}" alt="{{ performer['name'] }}" loading="lazy">
-    {% endif %}
+    <img src="{{ performer.get('photo_url') or pick_placeholder(performer['performer_id']) }}" alt="{{ performer['name'] }}" loading="lazy">
     <div class="yb-performer-card__id-stamp">ID·{{ performer['performer_id'][:6] | upper }}</div>
     <div class="yb-performer-card__city-stamp">ISRAEL</div>
   </div>

@@ -18,7 +18,6 @@
       <span class="yb-riso__shadow" aria-hidden="true">{{ strings.products.hero_line1 | upper }}</span>
       {{ strings.products.hero_line1 | upper }}
     </span>
-    {' '}
     <span class="yb-riso" style="color:var(--yb-magenta)">
       <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.products.hero_line2 | upper }}</span>
       {{ strings.products.hero_line2 | upper }}
@@ -40,16 +39,14 @@
   <div class="yb-products-grid">
     {% for product in products %}
     {% set _is_group = product.get('product_type', 'personal') == 'group' %}
-    {% set _group_size = product.get('group_size') %}
-    {% set _sold = product.get('sold', 0) %}
-    {% set _available = product.get('available', product.get('quantity', 0)) %}
-    {% set _total = (_group_size if _is_group else (_available + _sold)) or 0 %}
+    {% set _sold = product.get('sold_slots', 0) %}
+    {% set _total = product.get('total_slots', 0) %}
+    {% set _available = [_total - _sold, 0] | max %}
     {% set _sold_out = _available <= 0 %}
 
-    <div class="yb-product-card">
-      {% if product.get('photo_url') %}
+    <a href="/products/{{ product.get('slug', product.product_id) }}.html" class="yb-product-card">
       <div class="yb-product-card__photo">
-        <img src="{{ product.photo_url }}" alt="{{ product.name }}" loading="lazy">
+        <img src="{{ product.get('photo_url') or pick_placeholder(product.product_id) }}" alt="{{ product.name }}" loading="lazy">
         {% if _sold_out %}
         <div style="position:absolute;inset:0;background:rgba(26,20,16,.55);display:flex;align-items:center;justify-content:center">
           <div style="background:var(--yb-red);color:var(--yb-paper);border:3px solid var(--yb-ink);padding:10px 18px;font-family:var(--yb-font-display);font-size:20px;letter-spacing:.04em;text-transform:uppercase;transform:rotate(-6deg);box-shadow:4px 4px 0 var(--yb-ink)">★ Sold out ★</div>
@@ -59,12 +56,11 @@
           {{ strings.products.type_group if _is_group else strings.products.type_personal }}
         </div>
       </div>
-      {% endif %}
 
       <div class="yb-product-card__body">
         <div class="yb-product-card__name">{{ product.name }}</div>
-        {% if product.get('description') %}
-        <p class="yb-product-card__desc">{{ product.description | truncate(100, True, '…') }}</p>
+        {% if product.get('short_description') %}
+        <p class="yb-product-card__desc">{{ product.short_description | truncate(100, True, '…') }}</p>
         {% endif %}
 
         {% if _total > 0 %}
@@ -87,14 +83,10 @@
       </div>
 
       <div class="yb-product-card__footer">
-        <div class="yb-product-card__price">{{ product.price }}₪</div>
-        {% if not _sold_out %}
-        <a href="/products/{{ product.product_id }}.html" class="yb-btn yb-btn--primary yb-btn--sm">
-          {{ strings.products.buy }}
-        </a>
-        {% endif %}
+        <div class="yb-product-card__price">{{ product.price_ils }}₪</div>
+        <span class="yb-btn yb-btn--primary yb-btn--sm">{{ strings.products.buy }}</span>
       </div>
-    </div>
+    </a>
     {% endfor %}
   </div>
   {% else %}

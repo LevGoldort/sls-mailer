@@ -26,9 +26,7 @@
   <div class="yb-performer-hero__box">
 
     <div class="yb-performer-hero__portrait">
-      {% if _photos %}
-      <img src="{{ _photos[0] }}" alt="{{ location.name }}">
-      {% endif %}
+      <img src="{{ _photos[0] if _photos else pick_placeholder(location.location_id) }}" alt="{{ location.name }}">
       <div class="yb-halftone yb-halftone--cyan" aria-hidden="true"></div>
 
       <div style="position:absolute;top:22px;left:22px;padding:6px 12px;background:var(--yb-cyan);border:3px solid var(--yb-ink);font-family:var(--yb-font-mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transform:rotate(-4deg);box-shadow:4px 4px 0 var(--yb-ink)">

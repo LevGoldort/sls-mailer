@@ -19,15 +19,13 @@
   <span> ► </span>
   <a href="/events.html">{{ strings.event_detail.breadcrumb_events }}</a>
   <span> ► </span>
-  <b style="opacity:1">{{ event['date'] | date_num }}.{{ event['date'] | month_abbr }}</b>
+  <b style="opacity:1">{{ event['title'] }}</b>
 </div>
 
 {# ── Hero ── #}
 <section class="yb-event-hero">
   <div class="yb-event-hero__banner">
-    {% if event.get('photo_url') %}
-    <img src="{{ event.photo_url }}" alt="{{ event.title }}">
-    {% endif %}
+    <img src="{{ event.get('photo_url') or pick_placeholder(event.event_id) }}" alt="{{ event.title }}">
     <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
 
     <div class="yb-event-hero__date-stamp">
@@ -86,7 +84,7 @@
     </div>
     <div>
       <div class="yb-event-meta__label">{{ strings.event_detail.meta_address }}</div>
-      <div class="yb-event-meta__value">{{ location.address if location else '' }}</div>
+      <div class="yb-event-meta__value">{% if location and location.address is mapping %}{{ location.address.street }}, {{ location.address.city }}{% elif location %}{{ location.address }}{% endif %}</div>
     </div>
   </div>
 </section>
@@ -268,7 +266,7 @@
           {{ location.name }}
         </span>
       </h3>
-      <div class="yb-venue__addr">{{ location.address }}</div>
+      <div class="yb-venue__addr">{% if location.address is mapping %}{{ location.address.street }}, {{ location.address.city }}{% else %}{{ location.address }}{% endif %}</div>
       {% if location.get('parking_info') %}
       <p class="yb-venue__hint">{{ location.parking_info }}</p>
       {% endif %}

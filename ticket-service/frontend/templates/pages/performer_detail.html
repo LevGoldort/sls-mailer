@@ -157,25 +157,29 @@
   </div>
   <div class="yb-products-grid">
     {% for product in products %}
-    <div class="yb-product-card">
-      {% if product.get('photo_url') %}
+    {% set _p_sold = product.get('sold_slots', 0) %}
+    {% set _p_avail = [product.get('total_slots', 0) - _p_sold, 0] | max %}
+    {% set _p_sold_out = _p_avail <= 0 %}
+    <a href="/products/{{ product.get('slug', product.product_id) }}.html" class="yb-product-card">
       <div class="yb-product-card__photo">
-        <img src="{{ product.photo_url }}" alt="{{ product.name }}" loading="lazy">
+        <img src="{{ product.get('photo_url') or pick_placeholder(product.product_id) }}" alt="{{ product.name }}" loading="lazy">
+        {% if _p_sold_out %}
+        <div style="position:absolute;inset:0;background:rgba(26,20,16,.55);display:flex;align-items:center;justify-content:center">
+          <div style="background:var(--yb-red);color:var(--yb-paper);border:3px solid var(--yb-ink);padding:8px 14px;font-family:var(--yb-font-display);font-size:16px;letter-spacing:.04em;text-transform:uppercase;transform:rotate(-6deg);box-shadow:4px 4px 0 var(--yb-ink)">★ Sold out ★</div>
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
       <div class="yb-product-card__body">
         <div class="yb-product-card__name">{{ product.name }}</div>
-        {% if product.get('description') %}
-        <p class="yb-product-card__desc">{{ product.description | truncate(80, True, '…') }}</p>
+        {% if product.get('short_description') %}
+        <p class="yb-product-card__desc">{{ product.short_description | truncate(80, True, '…') }}</p>
         {% endif %}
       </div>
       <div class="yb-product-card__footer">
-        <div class="yb-product-card__price">{{ product.price }}₪</div>
-        <a href="/products/{{ product.product_id }}.html" class="yb-btn yb-btn--primary yb-btn--sm">
-          {{ strings.products.buy }}
-        </a>
+        <div class="yb-product-card__price">{{ product.price_ils }}₪</div>
+        <span class="yb-btn yb-btn--primary yb-btn--sm">{{ strings.products.buy }}</span>
       </div>
-    </div>
+    </a>
     {% endfor %}
   </div>
 </section>

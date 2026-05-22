@@ -227,6 +227,19 @@ def generate_html_files(site_data, output_dir, templates_dir):
     # Create lookup maps (must be before env.globals so they can be referenced in templates)
     location_map = {loc['location_id']: loc for loc in locations}
 
+    _placeholder_images = [
+        '/static/placeholders/5.1.png',
+        '/static/placeholders/5.1-1.png',
+        '/static/placeholders/5.2.png',
+        '/static/placeholders/5.2-1.png',
+        '/static/placeholders/5.5.png',
+        '/static/placeholders/5.6.png',
+        '/static/placeholders/5.6-1.png',
+    ]
+
+    def pick_placeholder(id_str):
+        return _placeholder_images[hash(str(id_str)) % len(_placeholder_images)]
+
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
 
     # Date filters
@@ -248,6 +261,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
         'ga4_id': os.environ.get('GA4_ID'),
         'api_url': API_URL,
         'location_map': location_map,
+        'pick_placeholder': pick_placeholder,
     })
 
     pages_generated = 0
@@ -311,13 +325,31 @@ def generate_html_files(site_data, output_dir, templates_dir):
         (output_dir / 'locations' / f"{slug}.html").write_text(html, encoding='utf-8')
         pages_generated += 1
 
-    # Generate products listing page
+    # Generate products listing page + detail pages
     if products:
+        performer_map = {p['performer_id']: p for p in performers}
+
         print("Generating products.html...")
         template = env.get_template('pages/products.html')
         html = template.render(products=products, active_nav='')
         (output_dir / 'products.html').write_text(html, encoding='utf-8')
         pages_generated += 1
+
+        print(f"Generating {len(products)} product pages...")
+        (output_dir / 'products').mkdir(exist_ok=True)
+        product_template = env.get_template('pages/product_detail.html')
+        for product in products:
+            slug = product.get('slug', product['product_id'])
+            performer = performer_map.get(product.get('performer_id'))
+            other = [p for p in products if p['product_id'] != product['product_id']]
+            html = product_template.render(
+                product=product,
+                performer=performer,
+                other_products=other,
+                active_nav='',
+            )
+            (output_dir / 'products' / f"{slug}.html").write_text(html, encoding='utf-8')
+            pages_generated += 1
 
     # Generate performers listing page
     if performers:
