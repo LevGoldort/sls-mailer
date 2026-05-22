@@ -163,6 +163,8 @@ cat > /tmp/ticket-api-env.json <<EOF
     "PERFORMERS_TABLE": "yallabalagan-performers",
     "PRODUCTS_TABLE": "yallabalagan-products",
     "MERCHANDISE_ORDERS_TABLE": "yallabalagan-merchandise-orders",
+    "SHOWS_TABLE": "yallabalagan-shows",
+    "EPISODES_TABLE": "yallabalagan-episodes",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
     "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
   }
@@ -309,6 +311,8 @@ cat > /tmp/site-regen-env.json <<EOF
     "ORDERS_TABLE": "yallabalagan-orders",
     "COUPONS_TABLE": "yallabalagan-coupons",
     "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
+    "SHOWS_TABLE": "yallabalagan-shows",
+    "EPISODES_TABLE": "yallabalagan-episodes",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
     "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
   }

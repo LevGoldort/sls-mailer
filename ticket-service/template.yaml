@@ -112,6 +112,8 @@ Globals:
         PERFORMERS_TABLE: !Ref PerformersTable
         PRODUCTS_TABLE: !Ref ProductsTable
         MERCHANDISE_ORDERS_TABLE: !Ref MerchandiseOrdersTable
+        SHOWS_TABLE: !Ref ShowsTable
+        EPISODES_TABLE: !Ref EpisodesTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -528,6 +530,74 @@ Resources:
               KeyType: HASH
             - AttributeName: GSI2SK
               KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  ShowsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-shows
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  EpisodesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-episodes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+        - AttributeName: show_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ShowIndex
+          KeySchema:
+            - AttributeName: show_id
+              KeyType: HASH
           Projection:
             ProjectionType: ALL
       Tags:
