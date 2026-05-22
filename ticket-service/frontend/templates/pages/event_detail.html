@@ -223,8 +223,7 @@
       {{ ru_plural(event_performers | length, strings.plurals.people_1, strings.plurals.people_2_4, strings.plurals.people_many) }}
     </div>
   </div>
-  {% set _perf_count = [event_performers | length, 3] | min %}
-  <div class="yb-event-performers__list" style="grid-template-columns: repeat({{ _perf_count }}, 1fr)">
+  <div class="yb-event-performers__list">
     {% set _tilt = ['-1deg', '0.8deg', '-0.6deg'] %}
     {% for p in event_performers %}
     <a href="/performer/{{ p.get('slug', p.performer_id) }}/"

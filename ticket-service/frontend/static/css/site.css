@@ -30,6 +30,8 @@
 /* ─── Reset ─── */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+html { overflow-x: hidden; }
+body { overflow-x: hidden; max-width: 100vw; }
 a { color: inherit; }
 img { display: block; max-width: 100%; }
 button { font: inherit; }
@@ -384,7 +386,7 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 }
 .yb-section-head h2 {
   font-family: var(--yb-font-display);
-  font-size: 72px;
+  font-size: clamp(36px, 9vw, 72px);
   margin: 0;
   letter-spacing: -.03em;
   text-transform: uppercase;
@@ -888,10 +890,12 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 .yb-event-hero__h1 {
   margin: 0;
   font-family: var(--yb-font-display);
-  font-size: 62px;
+  font-size: clamp(28px, 8vw, 62px);
   line-height: .95;
   letter-spacing: -.025em;
   text-transform: uppercase;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .yb-event-hero__tags { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 
@@ -1146,7 +1150,7 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.yb-event-performers__list { display: grid; gap: 24px; }
+.yb-event-performers__list { display: grid; gap: 24px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .yb-event-performer {
   text-decoration: none;
   color: var(--yb-ink);
@@ -1178,7 +1182,10 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   letter-spacing: -.01em;
   text-transform: uppercase;
   line-height: 1.05;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
+.yb-event-performer > div { min-width: 0; }
 .yb-event-performer__role {
   font-family: var(--yb-font-mono);
   font-size: 11px;
@@ -1301,10 +1308,12 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 .yb-podcast__name {
   margin: 0;
   font-family: var(--yb-font-display);
-  font-size: 78px;
+  font-size: clamp(36px, 9vw, 78px);
   line-height: .88;
   letter-spacing: -.035em;
   text-transform: uppercase;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .yb-podcast__desc {
   font-size: 16px;
@@ -1665,6 +1674,7 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 .yb-performer-hero__role {
   font-family: var(--yb-font-mono);
@@ -1676,10 +1686,12 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 .yb-performer-hero__name {
   margin: 0;
   font-family: var(--yb-font-display);
-  font-size: 72px;
+  font-size: clamp(36px, 7vw, 72px);
   line-height: .88;
   letter-spacing: -.04em;
   text-transform: uppercase;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .yb-performer-hero__tagline {
   font-size: 18px;
@@ -1735,27 +1747,49 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-footer__grid { grid-template-columns: 1fr 1fr; }
   .yb-socials__grid { grid-template-columns: repeat(2, 1fr); }
   .yb-performer-grid { grid-template-columns: repeat(2, 1fr); }
-  .yb-event-body { grid-template-columns: 1fr; }
+  .yb-event-body { grid-template-columns: 1fr; padding: 24px 24px 16px; }
   .yb-ticket-widget { position: static; }
   .yb-venue__box { grid-template-columns: 1fr; }
+  .yb-venue__map { border-right: none; border-bottom: var(--yb-border); }
   .yb-podcast__box { grid-template-columns: 1fr; }
   .yb-home-hero__h1 { font-size: 80px; }
   .yb-home-hero__sub { grid-template-columns: 1fr; }
   .yb-event-meta__grid { grid-template-columns: 1fr 1fr; }
   .yb-performer-hero__box { grid-template-columns: 1fr; }
   .yb-performer-hero__portrait { height: 360px; }
+  .yb-performer-hero { padding: 4px 24px 0; }
+  .yb-event-hero { padding: 4px 24px 0; }
+  .yb-event-hero__title-card { margin: -60px 16px 0; }
+  .yb-event-meta { padding: 24px 24px 8px; }
+  .yb-venue { padding: 16px 24px 24px; }
+  .yb-performers-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 600px) {
   .yb-pad, .yb-pad-x { padding-left: 16px; padding-right: 16px; }
   .yb-home-hero { padding: 32px 16px 20px; }
   .yb-home-hero__h1 { font-size: 56px; }
-  .yb-page-hero__h1 { font-size: 64px; }
+  .yb-page-hero__h1 { font-size: 56px; }
+  .yb-page-hero { padding: 32px 16px 16px; }
   .yb-footer__grid { grid-template-columns: 1fr; }
-  .yb-performer-grid { grid-template-columns: 1fr; }
+  .yb-performers-grid { grid-template-columns: 1fr; }
   .yb-products-grid { grid-template-columns: 1fr; }
   .yb-event-meta__grid { grid-template-columns: 1fr; }
   .yb-header__ticker { padding: 6px 16px; flex-direction: column; gap: 2px; }
+  .yb-podcast { padding: 24px 16px; }
+  .yb-podcast__box { padding: 28px 22px; }
+  .yb-performer-hero { padding: 4px 16px 0; }
+  .yb-performer-hero__portrait { height: 260px; }
+  .yb-performer-hero__info { padding: 24px 20px; }
+  .yb-event-hero { padding: 4px 16px 0; }
+  .yb-event-hero__title-card { margin: -50px 0 0; }
+  .yb-event-meta { padding: 16px 16px 8px; }
+  .yb-event-body { padding: 20px 16px 16px; }
+  .yb-venue { padding: 12px 16px 20px; }
+  .yb-venue__map { height: 240px; }
+  .yb-event-performer { gap: 14px; padding: 14px; }
+  .yb-event-performer__avatar { width: 72px; height: 72px; }
+  .yb-ticket-widget { padding: 18px 18px 20px; }
 }
 
 /* ─── Tape color variants ─── */
