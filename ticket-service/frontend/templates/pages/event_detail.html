@@ -159,7 +159,7 @@
 
     <div class="yb-ticket-widget__tiers" id="widget-tiers">
       {% for tier in _ticket_types %}
-      <div class="yb-ticket-widget__tier" data-tier-id="{{ tier.ticket_type_id }}" data-price="{{ tier.price }}">
+      <div class="yb-ticket-widget__tier" data-tier-id="{{ tier.id }}" data-price="{{ tier.price }}">
         <div>
           <div class="yb-ticket-widget__tier-name">{{ tier.name }}</div>
           <div class="yb-ticket-widget__tier-sub">
@@ -167,9 +167,9 @@
           </div>
         </div>
         <div class="yb-ticket-widget__qty">
-          <button class="yb-qty-dec" aria-label="Уменьшить" data-tier="{{ tier.ticket_type_id }}">−</button>
-          <div class="yb-ticket-widget__qty-num yb-qty-num" data-tier="{{ tier.ticket_type_id }}">0</div>
-          <button class="yb-qty-inc" aria-label="Увеличить" data-tier="{{ tier.ticket_type_id }}">+</button>
+          <button class="yb-qty-dec" aria-label="Уменьшить" data-tier="{{ tier.id }}">−</button>
+          <div class="yb-ticket-widget__qty-num yb-qty-num" data-tier="{{ tier.id }}">0</div>
+          <button class="yb-qty-inc" aria-label="Увеличить" data-tier="{{ tier.id }}">+</button>
         </div>
       </div>
       {% endfor %}
