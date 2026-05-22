@@ -1,0 +1,87 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}{{ episode.title }} — {{ show.name }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ episode.description | truncate(160, True, '…') }}{% endblock %}
+
+{% block content %}
+
+{# ── Hero ── #}
+<section class="yb-pad" style="padding-top:60px">
+  <div class="yb-episode-hero">
+
+    <div class="yb-episode-hero__thumb">
+      <img src="{{ episode.get('thumbnail_url') or pick_placeholder(episode.episode_id) }}" alt="{{ episode.title }}">
+      <div class="yb-halftone yb-halftone--cyan" aria-hidden="true"></div>
+    </div>
+
+    <div class="yb-episode-hero__info">
+      <div class="yb-performer-hero__breadcrumb">
+        <a href="/">{{ strings.shows.breadcrumb_home }}</a>
+        <span> ► </span>
+        <a href="/shows.html">{{ strings.shows.breadcrumb_self }}</a>
+        <span> ► </span>
+        <a href="/shows/{{ show.slug }}.html">{{ show.name }}</a>
+        <span> ► </span>
+        <b style="opacity:1">Эп. {{ episode.number }}</b>
+      </div>
+
+      <div style="font-family:var(--yb-font-mono);font-size:12px;letter-spacing:.1em;opacity:.6;margin-top:16px">
+        {{ strings.shows.episode_label | upper }} {{ episode.number }}
+      </div>
+
+      <h1 class="yb-performer-hero__name" style="font-size:clamp(28px,5vw,52px)">
+        <span class="yb-riso">
+          <span class="yb-riso__shadow" style="color:var(--yb-magenta)" aria-hidden="true">{{ episode.title }}</span>
+          {{ episode.title }}
+        </span>
+      </h1>
+
+      {% if episode.get('description') %}
+      <p class="yb-performer-hero__bio">{{ episode.description }}</p>
+      {% endif %}
+
+      {% if episode.get('url') %}
+      <div style="margin-top:24px">
+        <a href="{{ episode.url }}" class="yb-btn yb-btn--primary" target="_blank" rel="noopener">
+          {{ strings.shows.watch }} ↗
+        </a>
+        <a href="/shows/{{ show.slug }}.html" class="yb-btn yb-btn--paper" style="margin-left:10px">
+          {{ strings.shows.back_to_show }}
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
+
+{# ── Performers ── #}
+{% if performers %}
+<section class="yb-pad" style="padding-top:32px">
+  <h2 class="yb-section-heading">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.shows.performers_heading | upper }}</span>
+      {{ strings.shows.performers_heading | upper }}
+    </span>
+  </h2>
+
+  <div class="yb-performers-grid" style="margin-top:24px">
+    {% for performer in performers %}
+    <a href="/performers/{{ performer.slug }}.html" class="yb-performer-card">
+      <div class="yb-performer-card__tape yb-tape--magenta" aria-hidden="true"></div>
+      <div class="yb-performer-card__photo">
+        <img src="{{ performer.get('photo_url') or pick_placeholder(performer.performer_id) }}" alt="{{ performer.name }}" loading="lazy">
+      </div>
+      <div class="yb-performer-card__body">
+        <div class="yb-performer-card__name">{{ performer.name }}</div>
+        {% if performer.get('tagline') %}
+        <p class="yb-performer-card__tagline">{{ performer.tagline }}</p>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

@@ -1833,3 +1833,90 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .cookie-consent-buttons { width: 100%; flex-direction: column; }
   .cookie-consent-btn { width: 100%; text-align: center; }
 }
+
+/* ─── Episode card (show detail list) ─── */
+.yb-episode-card {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 0;
+  border: var(--yb-border);
+  box-shadow: var(--yb-shadow);
+  background: var(--yb-paper);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .15s;
+}
+.yb-episode-card:hover { transform: translate(-2px, -2px); }
+.yb-episode-card__thumb {
+  position: relative;
+  background: var(--yb-ink);
+  border-right: var(--yb-border);
+  overflow: hidden;
+  min-height: 120px;
+}
+.yb-episode-card__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.yb-episode-card__play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--yb-paper);
+  background: rgba(26,20,16,.35);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.yb-episode-card:hover .yb-episode-card__play { opacity: 1; }
+.yb-episode-card__body { padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; }
+.yb-episode-card__num {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  opacity: .55;
+  text-transform: uppercase;
+}
+.yb-episode-card__title {
+  font-family: var(--yb-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.yb-episode-card__desc { font-size: 14px; opacity: .75; margin: 0; }
+.yb-episode-card__performers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.yb-episode-card__performer-tag {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1.5px solid var(--yb-ink);
+  background: var(--yb-cyan);
+  letter-spacing: .04em;
+}
+
+/* ─── Episode hero ─── */
+.yb-episode-hero {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 0;
+  border: var(--yb-border);
+  box-shadow: var(--yb-shadow);
+  background: var(--yb-paper);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.yb-episode-hero__thumb {
+  position: relative;
+  background: var(--yb-ink);
+  border-right: var(--yb-border);
+  min-height: 420px;
+  overflow: hidden;
+}
+.yb-episode-hero__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.yb-episode-hero__info { padding: 40px 48px; }
+
+@media (max-width: 768px) {
+  .yb-episode-card { grid-template-columns: 100px 1fr; }
+  .yb-episode-hero { grid-template-columns: 1fr; }
+  .yb-episode-hero__thumb { min-height: 240px; border-right: none; border-bottom: var(--yb-border); }
+  .yb-episode-hero__info { padding: 24px; }
+}

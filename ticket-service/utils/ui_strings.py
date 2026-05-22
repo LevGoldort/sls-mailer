@@ -149,6 +149,18 @@ UI_STRINGS = {
             'map_label': '★ карта · MAP ★',
             'open_maps': 'Открыть в Google Maps →',
         },
+        'shows': {
+            'breadcrumb_home': 'Главная',
+            'breadcrumb_self': 'Контент',
+            'hero_line1': 'шоу',
+            'hero_line2': 'и контент',
+            'hero_sub': 'Подкасты, шоу и видео от наших комиков и друзей объединения.',
+            'episodes_heading': 'Эпизоды',
+            'episode_label': 'Эпизод',
+            'watch': '▶ Смотреть',
+            'performers_heading': 'В этом эпизоде',
+            'back_to_show': '← К шоу',
+        },
         'products': {
             'breadcrumb_home': 'Главная',
             'breadcrumb_self': 'Продукты',

@@ -1,0 +1,93 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}{{ show.name }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ show.short_description }}{% endblock %}
+
+{% block content %}
+
+{# ── Hero ── #}
+<section class="yb-performer-hero yb-pad">
+  <div class="yb-performer-hero__box">
+
+    <div class="yb-performer-hero__portrait">
+      <img src="{{ show.get('photo_url') or pick_placeholder(show.show_id) }}" alt="{{ show.name }}">
+      <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
+    </div>
+
+    <div class="yb-performer-hero__info">
+      <div class="yb-performer-hero__breadcrumb">
+        <a href="/">{{ strings.shows.breadcrumb_home }}</a>
+        <span> ► </span>
+        <a href="/shows.html">{{ strings.shows.breadcrumb_self }}</a>
+        <span> ► </span>
+        <b style="opacity:1">{{ show.name }}</b>
+      </div>
+
+      <h1 class="yb-performer-hero__name">
+        <span class="yb-riso">
+          <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ show.name }}</span>
+          {{ show.name }}
+        </span>
+      </h1>
+
+      {% if show.get('description') %}
+      <p class="yb-performer-hero__bio">{{ show.description }}</p>
+      {% endif %}
+
+      {% if show.get('links') %}
+      <div class="yb-performer-hero__socials" style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+        {% for link in show.links %}
+        <a href="{{ link.url }}" class="yb-btn yb-btn--paper yb-btn--sm" target="_blank" rel="noopener">
+          {{ link.label }} ↗
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
+
+{# ── Episodes ── #}
+{% if episodes %}
+<section class="yb-pad" style="padding-top:32px">
+  <h2 class="yb-section-heading">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.shows.episodes_heading | upper }}</span>
+      {{ strings.shows.episodes_heading | upper }}
+    </span>
+  </h2>
+
+  <div style="display:flex;flex-direction:column;gap:16px;margin-top:24px">
+    {% for ep in episodes %}
+    {% set ep_performers = [] %}
+    {% for pid in ep.get('performer_ids', []) %}
+      {% if performer_map.get(pid) %}{% set _ = ep_performers.append(performer_map[pid]) %}{% endif %}
+    {% endfor %}
+
+    <a href="/episodes/{{ ep.slug }}.html" class="yb-episode-card">
+      <div class="yb-episode-card__thumb">
+        <img src="{{ ep.get('thumbnail_url') or pick_placeholder(ep.episode_id) }}" alt="{{ ep.title }}" loading="lazy">
+        <div class="yb-episode-card__play">▶</div>
+      </div>
+      <div class="yb-episode-card__body">
+        <div class="yb-episode-card__num">{{ strings.shows.episode_label }} {{ ep.number }}</div>
+        <div class="yb-episode-card__title">{{ ep.title }}</div>
+        {% if ep.get('description') %}
+        <p class="yb-episode-card__desc">{{ ep.description | truncate(120, True, '…') }}</p>
+        {% endif %}
+        {% if ep_performers %}
+        <div class="yb-episode-card__performers">
+          {% for p in ep_performers %}
+          <span class="yb-episode-card__performer-tag">{{ p.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

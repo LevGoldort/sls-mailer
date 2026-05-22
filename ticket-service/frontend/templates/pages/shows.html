@@ -1,0 +1,61 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}{{ strings.shows.hero_line1 | capitalize }} {{ strings.shows.hero_line2 }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ strings.shows.hero_sub }}{% endblock %}
+
+{% block content %}
+
+{# ── Page hero ── #}
+<section class="yb-page-hero">
+  <div class="yb-page-hero__breadcrumb">
+    <a href="/">{{ strings.shows.breadcrumb_home }}</a>
+    <span> ► </span>
+    <b style="opacity:1">{{ strings.shows.breadcrumb_self }}</b>
+  </div>
+
+  <h1 class="yb-page-hero__h1">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.shows.hero_line1 | upper }}</span>
+      {{ strings.shows.hero_line1 | upper }}
+    </span>
+    <span class="yb-riso" style="color:var(--yb-magenta)">
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.shows.hero_line2 | upper }}</span>
+      {{ strings.shows.hero_line2 | upper }}
+    </span>
+  </h1>
+
+  <div class="yb-page-hero__footer">
+    <p class="yb-page-hero__sub">{{ strings.shows.hero_sub }}</p>
+  </div>
+</section>
+
+{# ── Shows grid ── #}
+<section class="yb-pad" style="padding-top:40px">
+  <div class="yb-performers-grid">
+    {% for show in shows %}
+    <a href="/shows/{{ show.slug }}.html" class="yb-performer-card">
+      <div class="yb-performer-card__tape yb-tape--cyan" aria-hidden="true"></div>
+
+      <div class="yb-performer-card__photo">
+        <img src="{{ show.get('photo_url') or pick_placeholder(show.show_id) }}" alt="{{ show.name }}" loading="lazy">
+      </div>
+
+      <div class="yb-performer-card__body">
+        <div class="yb-performer-card__name">{{ show.name }}</div>
+        {% if show.get('short_description') %}
+        <p class="yb-performer-card__tagline">{{ show.short_description }}</p>
+        {% endif %}
+        {% if show_episode_counts %}
+        <div style="font-family:var(--yb-font-mono);font-size:11px;opacity:.6;margin-top:6px;letter-spacing:.06em">
+          {{ show_episode_counts.get(show.show_id, 0) }} ЭП.
+        </div>
+        {% endif %}
+      </div>
+    </a>
+    {% else %}
+    <p style="opacity:.5">Шоу появятся здесь.</p>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}
