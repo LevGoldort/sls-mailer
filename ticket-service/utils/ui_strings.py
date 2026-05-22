@@ -118,6 +118,11 @@ UI_STRINGS = {
             'venue_label': 'Площадка · VENUE',
             'open_maps': 'Открыть в Google Maps →',
             'about_venue': 'О площадке',
+            'select_seats': 'Выбрать места →',
+            'seats_breadcrumb': 'Выбор мест',
+            'seats_heading': 'ВЫБОР МЕСТ',
+            'seats_proceed': 'К оформлению →',
+            'seats_selected': 'мест выбрано',
         },
         'performers': {
             'breadcrumb_home': 'Главная',

@@ -1,0 +1,179 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}{{ strings.event_detail.seats_heading }} — {{ event.title }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ strings.event_detail.seats_heading }}: {{ event.title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/seat-picker.css">
+<style>
+  .yb-seats-strip {
+    padding: 20px var(--yb-pad-x) 16px;
+    background: var(--yb-paper);
+    border-bottom: 2px solid var(--yb-ink);
+  }
+  .yb-seats-strip__inner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    flex-wrap: wrap;
+  }
+  .yb-seats-strip__date {
+    flex-shrink: 0;
+    background: var(--yb-ink);
+    color: var(--yb-paper);
+    padding: 8px 14px;
+    text-align: center;
+    font-family: var(--yb-font-display);
+    line-height: 1;
+  }
+  .yb-seats-strip__date .num { font-size: 32px; display: block; }
+  .yb-seats-strip__date .month { font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .yb-seats-strip__info {
+    flex: 1;
+    min-width: 0;
+  }
+  .yb-seats-strip__title {
+    font-family: var(--yb-font-display);
+    font-size: clamp(18px, 4vw, 28px);
+    line-height: 1.1;
+    margin: 0 0 4px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .yb-seats-strip__meta {
+    font-family: var(--yb-font-mono);
+    font-size: 13px;
+    opacity: 0.7;
+  }
+  .yb-seats-section {
+    padding: 0;
+    max-width: 100%;
+  }
+  .yb-seats-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--yb-ink);
+    color: var(--yb-paper);
+    padding: 14px var(--yb-pad-x);
+    border-top: 2px solid var(--yb-ink);
+    z-index: 100;
+  }
+  .yb-seats-footer__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+    flex-wrap: wrap;
+  }
+  .yb-seats-footer__count {
+    font-family: var(--yb-font-mono);
+    font-size: 15px;
+  }
+  .yb-seats-footer__count strong {
+    font-size: 22px;
+    font-family: var(--yb-font-display);
+    color: var(--yb-yellow);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set _slug = event.get('slug') or event.event_id %}
+
+{# Breadcrumb #}
+<div class="yb-page-hero__breadcrumb yb-pad-x" style="padding-top:20px;padding-bottom:8px">
+  <a href="/">{{ strings.event_detail.breadcrumb_home }}</a>
+  <span> ► </span>
+  <a href="/events.html">{{ strings.event_detail.breadcrumb_events }}</a>
+  <span> ► </span>
+  <a href="/events/{{ _slug }}.html">{{ event.title }}</a>
+  <span> ► </span>
+  <b style="opacity:1">{{ strings.event_detail.seats_breadcrumb }}</b>
+</div>
+
+{# Event info strip #}
+<section class="yb-seats-strip">
+  <div class="yb-seats-strip__inner">
+    <div class="yb-seats-strip__date">
+      <span class="num">{{ event['date'] | date_num }}</span>
+      <span class="month">{{ event['date'] | month_abbr }}</span>
+    </div>
+    <div class="yb-seats-strip__info">
+      <h1 class="yb-seats-strip__title">{{ event.title }}</h1>
+      <div class="yb-seats-strip__meta">
+        {% if location %}<span>{{ location.name }}</span> · {% endif %}
+        {{ (event.get('date_formatted') or (event['date'] | format_date)) | upper }} · {{ event['date'] | format_time }}
+      </div>
+    </div>
+    <span class="yb-stamp yb-stamp--lg yb-stamp--magenta" style="transform:rotate(-1.5deg);flex-shrink:0">
+      {{ strings.event_detail.seats_heading }}
+    </span>
+  </div>
+</section>
+
+{# Seat picker mount point #}
+<section class="yb-seats-section">
+  <div id="seat-picker-container"></div>
+</section>
+
+{# Sticky footer CTA #}
+<div class="yb-seats-footer">
+  <div class="yb-seats-footer__inner">
+    <div class="yb-seats-footer__count">
+      <strong id="seat-count">0</strong> {{ strings.event_detail.seats_selected }}
+    </div>
+    <button id="proceed-btn"
+            class="yb-btn yb-btn--yellow yb-btn--lg"
+            style="opacity:.5;pointer-events:none">
+      {{ strings.event_detail.seats_proceed }}
+    </button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/seat-picker.js"></script>
+<script>
+var EVENT_ID = "{{ event.event_id }}";
+var API_URL  = "{{ api_url }}";
+var seatingMapConfig = null;
+
+fetch(API_URL + '/api/events/' + EVENT_ID + '/seating-map')
+  .then(function(r) { return r.json(); })
+  .then(function(d) { seatingMapConfig = d.seating_map; })
+  .catch(function() {});
+
+var picker = new SeatPicker('seat-picker-container', EVENT_ID, [], {
+  apiUrl: API_URL,
+  onSelectionChange: function(seats) {
+    var btn = document.getElementById('proceed-btn');
+    var badge = document.getElementById('seat-count');
+    var enabled = seats.length > 0;
+    btn.style.opacity = enabled ? '1' : '.5';
+    btn.style.pointerEvents = enabled ? '' : 'none';
+    if (badge) badge.textContent = seats.length;
+  }
+});
+picker.init();
+
+document.getElementById('seat-picker-container').addEventListener('seatPicker:seatsReserved', function(e) {
+  var orderData = {
+    event_id: EVENT_ID,
+    purchased_seats: e.detail.seatIds,
+    seating_map_config: seatingMapConfig
+  };
+  try { sessionStorage.setItem('orderData', JSON.stringify(orderData)); } catch(x) {}
+  window.location.href = '/checkout.html?event_id=' + EVENT_ID + '&seated=true';
+});
+
+document.getElementById('proceed-btn').addEventListener('click', function() {
+  if (picker.getSelectedSeats().length > 0) picker.reserveSeats();
+});
+</script>
+{% endblock %}

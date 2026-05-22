@@ -12,6 +12,7 @@
 {% set _slug = event.get('slug') or event.event_id %}
 {% set _sold_out = event.get('status') == 'sold_out' %}
 {% set _ticket_types = event.get('ticket_types', []) %}
+{% set _is_seated = location and location.get('venue_config', {}).get('venue_type') == 'seated' %}
 
 {# ── Breadcrumb ── #}
 <div class="yb-page-hero__breadcrumb yb-pad-x" style="padding-top:20px; padding-bottom:8px">
@@ -132,6 +133,53 @@
     <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tl" aria-hidden="true"></div>
     <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tr" aria-hidden="true"></div>
     <div class="yb-ticket-widget__sold-out">{{ strings.event_detail.sold_out }}</div>
+  </aside>
+
+  {# Ticket widget — seated venue: redirect to seat picker page #}
+  {% elif _is_seated %}
+  <aside class="yb-ticket-widget">
+    <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
+    <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tl" aria-hidden="true"></div>
+    <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tr" aria-hidden="true"></div>
+
+    <div class="yb-ticket-widget__header">
+      <span style="font-weight:700">{{ strings.event_detail.widget_admit }}</span>
+      <span style="opacity:.7">{{ strings.event_detail.widget_stub }} · №{{ event['date'] | date_num }}{{ event['date'] | month_abbr }}</span>
+    </div>
+    <div class="yb-ticket-widget__heading">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.event_detail.widget_heading }}</span>
+        {{ strings.event_detail.widget_heading }}
+      </span>
+    </div>
+    <div class="yb-ticket-widget__date">
+      {{ (event.get('date_formatted') or (event['date'] | format_date)) | upper }} · {{ event['date'] | format_time }}
+    </div>
+
+    <div class="yb-ticket-widget__tiers">
+      {% for tier in _ticket_types %}
+      <div class="yb-ticket-widget__tier">
+        <div>
+          <div class="yb-ticket-widget__tier-name">{{ tier.name }}</div>
+          <div class="yb-ticket-widget__tier-sub">
+            {% if tier.get('description') %}{{ tier.description }} · {% endif %}{{ tier.price }}₪
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="yb-ticket-widget__cta" style="margin-top:24px">
+      <a href="/seats/{{ _slug }}.html"
+         class="yb-btn yb-btn--primary yb-btn--lg yb-btn--full">
+        {{ strings.event_detail.select_seats }}
+      </a>
+    </div>
+
+    <div class="yb-ticket-widget__fine">
+      {{ strings.event_detail.email_note }}<br>
+      {{ strings.event_detail.refund_note }}
+    </div>
   </aside>
 
   {# Ticket widget — normal #}

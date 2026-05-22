@@ -772,3 +772,135 @@
         color: #b0b0b0;
     }
 }
+
+/* ============================================
+   YallaBalagan design overrides
+   ============================================ */
+
+.seat-picker-wrapper {
+    background: #f3eee1;
+    border-radius: 0;
+    box-shadow: none;
+    border: 2px solid #1a1410;
+}
+
+.seat-picker-sidebar {
+    background: #1a1410;
+    border-right: 2px solid #1a1410;
+    color: #f3eee1;
+}
+
+.seat-map-container {
+    background: #f3eee1;
+}
+
+.seat-legend {
+    background: #1a1410;
+    border-bottom: 2px solid #333;
+}
+
+.legend-item {
+    color: #f3eee1;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+}
+
+.summary-header {
+    font-family: 'Archivo Black', sans-serif;
+    color: #ffd400;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.summary-row {
+    color: #f3eee1;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+}
+
+.summary-value {
+    color: #f3eee1;
+}
+
+.summary-value.highlight {
+    color: #ffd400;
+}
+
+.selected-seats-details {
+    color: #f3eee1;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+}
+
+.seat-summary {
+    color: #f3eee1;
+}
+
+.summary-content p,
+.summary-content div,
+.summary-content span {
+    color: #f3eee1;
+}
+
+.row-label {
+    fill: #1a1410;
+    font-weight: 700;
+}
+
+.stage {
+    fill: #1a1410;
+}
+
+.stage-label {
+    fill: #ffd400;
+    font-family: 'Archivo Black', sans-serif;
+    letter-spacing: 6px;
+}
+
+.control-btn {
+    background: #1a1410;
+    color: #f3eee1;
+    border: 2px solid #1a1410;
+    border-radius: 4px;
+}
+
+.control-btn:hover {
+    background: #2a2018;
+}
+
+.seat.seat-selected {
+    filter: drop-shadow(0 0 6px rgba(255, 212, 0, 0.8));
+}
+
+.seat.seat-selected:hover {
+    filter: drop-shadow(0 0 8px rgba(255, 212, 0, 1));
+}
+
+.seat.seat-sold {
+    fill: #1a1410;
+    stroke: #0a0a0a;
+    opacity: 0.6;
+}
+
+.seat.seat-reserved {
+    fill: #ff8c00;
+    stroke: #cc7000;
+    opacity: 0.7;
+}
+
+.seat-label {
+    fill: #1a1410;
+}
+
+.reservation-timer {
+    background: #1a1410;
+    color: #ffd400;
+    font-family: 'Space Mono', monospace;
+    border: 2px solid #ffd400;
+    border-radius: 4px;
+}
+
+.seat-picker-notification {
+    font-family: 'Space Mono', monospace;
+    border-radius: 4px;
+}

@@ -64,16 +64,15 @@ class SeatPicker {
 
     generateTicketTypeColors() {
         // Generate distinct colors for each ticket type
-        // Note: Purple (#9333ea) is reserved for selected seats
+        // Note: Yellow (#ffd400) is reserved for selected seats
         const colors = [
-            '#10b981', // green
-            '#3b82f6', // blue
-            '#f59e0b', // amber
+            '#e535ab', // yb-magenta
+            '#00b5d8', // yb-cyan
             '#ec4899', // pink
-            '#06b6d4', // cyan
             '#f97316', // orange
             '#14b8a6', // teal
-            '#84cc16'  // lime
+            '#84cc16', // lime
+            '#a78bfa'  // violet
         ];
 
         const colorMap = {};
@@ -368,7 +367,7 @@ class SeatPicker {
         const { seatWidth, seatHeight } = this.options;
         const status = this.getSeatStatus(seatId);
         const ticketTypeId = this.seatAllocation[seatId];
-        const color = this.ticketTypeColors[ticketTypeId] || '#10b981';
+        const color = this.ticketTypeColors[ticketTypeId] || '#e535ab';
 
         // Parse seatId to get row and seat indices
         const [rowId, seatCol] = seatId.split('-');
@@ -398,17 +397,17 @@ class SeatPicker {
             rect.setAttribute('stroke', this.darkenColor(color, 20));
             rect.setAttribute('stroke-width', '1');
         } else if (status === 'selected') {
-            // Purple fill for selected seats (reserved color, never used for ticket types)
-            rect.setAttribute('fill', '#9333ea');  // Purple
-            rect.setAttribute('stroke', '#7c3aed');  // Darker purple
+            // Yellow fill for selected seats (YallaBalagan palette)
+            rect.setAttribute('fill', '#ffd400');  // YB yellow
+            rect.setAttribute('stroke', '#1a1410');  // YB black
             rect.setAttribute('stroke-width', '2');
         } else if (status === 'sold') {
-            rect.setAttribute('fill', '#6c757d');
-            rect.setAttribute('stroke', '#5a6268');
+            rect.setAttribute('fill', '#1a1410');
+            rect.setAttribute('stroke', '#0a0a0a');
             rect.setAttribute('stroke-width', '1');
         } else if (status === 'reserved') {
-            rect.setAttribute('fill', '#ffc107');
-            rect.setAttribute('stroke', '#e0a800');
+            rect.setAttribute('fill', '#ff8c00');
+            rect.setAttribute('stroke', '#cc7000');
             rect.setAttribute('stroke-width', '1');
         }
 
@@ -421,7 +420,7 @@ class SeatPicker {
         text.setAttribute('font-size', '12');
         text.setAttribute('class', 'seat-label');
         text.setAttribute('pointer-events', 'none');
-        text.setAttribute('fill', 'white');  // White text for selected seats
+        text.setAttribute('fill', '#1a1410');  // Dark text on yellow selected seat
 
         // Only show number if seat is selected
         if (status === 'selected') {
@@ -569,9 +568,9 @@ class SeatPicker {
 
         // Add status legend items
         const statusItems = [
-            { status: 'selected', label: 'Выбрано', color: '#9333ea' },
-            { status: 'reserved', label: 'Зарезервировано', color: '#ffc107' },
-            { status: 'sold', label: 'Продано', color: '#6c757d' }
+            { status: 'selected', label: 'Выбрано', color: '#ffd400' },
+            { status: 'reserved', label: 'Зарезервировано', color: '#ff8c00' },
+            { status: 'sold', label: 'Продано', color: '#1a1410' }
         ];
 
         statusItems.forEach(item => {
@@ -748,7 +747,7 @@ class SeatPicker {
         const rect = seatElement.querySelector('rect');
         const text = seatElement.querySelector('text');
         const ticketTypeId = seatElement.getAttribute('data-ticket-type');
-        const color = this.ticketTypeColors[ticketTypeId] || '#10b981';
+        const color = this.ticketTypeColors[ticketTypeId] || '#e535ab';
 
         if (this.selectedSeats.includes(seatId)) {
             // Deselect
@@ -769,8 +768,8 @@ class SeatPicker {
             this.selectedSeats.push(seatId);
             seatElement.classList.remove('seat-available');
             seatElement.classList.add('seat-selected');
-            rect.setAttribute('fill', '#9333ea');  // Purple for selected
-            rect.setAttribute('stroke', '#7c3aed');  // Darker purple
+            rect.setAttribute('fill', '#ffd400');  // YB yellow for selected
+            rect.setAttribute('stroke', '#1a1410');  // YB black
             rect.setAttribute('stroke-width', '2');
             // Show seat number when selected
             if (text) text.style.display = 'block';
@@ -1046,7 +1045,7 @@ class SeatPicker {
                     const rect = seatElement.querySelector('rect');
                     const text = seatElement.querySelector('text');
                     const ticketTypeId = seatElement.getAttribute('data-ticket-type');
-                    const color = this.ticketTypeColors[ticketTypeId] || '#10b981';
+                    const color = this.ticketTypeColors[ticketTypeId] || '#e535ab';
 
                     // Update classes
                     seatElement.classList.remove('seat-available', 'seat-selected', 'seat-sold', 'seat-reserved');
@@ -1060,20 +1059,20 @@ class SeatPicker {
                         // Hide number for available seats
                         if (text) text.style.display = 'none';
                     } else if (newStatus === 'selected') {
-                        rect.setAttribute('fill', '#9333ea');  // Purple for selected
-                        rect.setAttribute('stroke', '#7c3aed');  // Darker purple
+                        rect.setAttribute('fill', '#ffd400');  // YB yellow for selected
+                        rect.setAttribute('stroke', '#1a1410');  // YB black
                         rect.setAttribute('stroke-width', '2');
                         // Show number for selected seats
                         if (text) text.style.display = 'block';
                     } else if (newStatus === 'sold') {
-                        rect.setAttribute('fill', '#6c757d');
-                        rect.setAttribute('stroke', '#5a6268');
+                        rect.setAttribute('fill', '#1a1410');
+                        rect.setAttribute('stroke', '#0a0a0a');
                         rect.setAttribute('stroke-width', '1');
                         // Hide number for sold seats
                         if (text) text.style.display = 'none';
                     } else if (newStatus === 'reserved') {
-                        rect.setAttribute('fill', '#ffc107');
-                        rect.setAttribute('stroke', '#e0a800');
+                        rect.setAttribute('fill', '#ff8c00');
+                        rect.setAttribute('stroke', '#cc7000');
                         rect.setAttribute('stroke-width', '1');
                         // Hide number for reserved seats
                         if (text) text.style.display = 'none';
