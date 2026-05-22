@@ -456,19 +456,19 @@ def generate_html_files(site_data, output_dir, templates_dir):
         pages_generated += 1
 
     # Generate shows listing + detail + episode detail pages
+    performer_map = {p['performer_id']: p for p in performers}
+
+    print("Generating shows.html...")
+    template = env.get_template('pages/shows.html')
+    html = template.render(
+        shows=shows,
+        show_episode_counts=show_episode_counts,
+        active_nav='',
+    )
+    (output_dir / 'shows.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
+
     if shows or episodes:
-        performer_map = {p['performer_id']: p for p in performers}
-
-        print("Generating shows.html...")
-        template = env.get_template('pages/shows.html')
-        html = template.render(
-            shows=shows,
-            show_episode_counts=show_episode_counts,
-            active_nav='',
-        )
-        (output_dir / 'shows.html').write_text(html, encoding='utf-8')
-        pages_generated += 1
-
         print(f"Generating {len(shows)} show pages...")
         (output_dir / 'shows').mkdir(exist_ok=True)
         show_template = env.get_template('pages/show_detail.html')

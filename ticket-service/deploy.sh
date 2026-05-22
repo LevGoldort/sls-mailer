@@ -412,6 +412,61 @@ aws lambda update-function-configuration \
   --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
 rm -f /tmp/event-updater-env.json
 
+# Ensure Shows and Episodes DynamoDB tables exist + Lambda policies are attached
+echo ""
+echo "Ensuring Shows/Episodes tables and policies..."
+
+# Helper: create DynamoDB table if it doesn't exist
+ensure_table() {
+  local table_name=$1
+  local exists
+  exists=$(aws dynamodb describe-table --table-name "$table_name" --region "$REGION" --profile "$PROFILE" --query 'Table.TableName' --output text 2>/dev/null || echo "")
+  if [ -z "$exists" ]; then
+    echo "  Creating table: $table_name"
+    aws dynamodb create-table \
+      --table-name "$table_name" \
+      --billing-mode PAY_PER_REQUEST \
+      --region "$REGION" --profile "$PROFILE" --no-cli-pager "${@:2}" > /dev/null
+    aws dynamodb wait table-exists --table-name "$table_name" --region "$REGION" --profile "$PROFILE"
+    echo "  Table created"
+  else
+    echo "  Table exists: $table_name"
+  fi
+}
+
+ensure_table "yallabalagan-shows" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S AttributeName=slug,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+  --global-secondary-indexes '[{"IndexName":"SlugIndex","KeySchema":[{"AttributeName":"slug","KeyType":"HASH"}],"Projection":{"ProjectionType":"ALL"}}]'
+
+ensure_table "yallabalagan-episodes" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S AttributeName=slug,AttributeType=S AttributeName=show_id,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+  --global-secondary-indexes '[{"IndexName":"SlugIndex","KeySchema":[{"AttributeName":"slug","KeyType":"HASH"}],"Projection":{"ProjectionType":"ALL"}},{"IndexName":"ShowIndex","KeySchema":[{"AttributeName":"show_id","KeyType":"HASH"}],"Projection":{"ProjectionType":"ALL"}}]'
+
+# Helper: attach inline policy granting DynamoDB CRUD on a table to a Lambda role
+ensure_dynamodb_policy() {
+  local role_name=$1
+  local table_name=$2
+  local policy_name="DynamoDB-${table_name}"
+  local account_id
+  account_id=$(aws sts get-caller-identity --profile "$PROFILE" --query Account --output text)
+  local table_arn="arn:aws:dynamodb:${REGION}:${account_id}:table/${table_name}"
+  aws iam put-role-policy \
+    --role-name "$role_name" \
+    --policy-name "$policy_name" \
+    --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"dynamodb:GetItem\",\"dynamodb:PutItem\",\"dynamodb:UpdateItem\",\"dynamodb:DeleteItem\",\"dynamodb:Scan\",\"dynamodb:Query\",\"dynamodb:BatchGetItem\",\"dynamodb:BatchWriteItem\"],\"Resource\":[\"${table_arn}\",\"${table_arn}/index/*\"]}]}" \
+    --profile "$PROFILE" 2>/dev/null && echo "  Policy attached: $role_name → $table_name" || true
+}
+
+TICKET_API_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-ticket-api --region "$REGION" --profile "$PROFILE" --query 'Role' --output text | sed 's|.*/||')
+REGEN_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-site-regenerator --region "$REGION" --profile "$PROFILE" --query 'Role' --output text | sed 's|.*/||')
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-shows"
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-episodes"
+ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-shows"
+ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-episodes"
+
 # Sync S3
 echo ""
 echo "Syncing admin files to S3..."
