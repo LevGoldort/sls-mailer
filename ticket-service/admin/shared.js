@@ -116,6 +116,20 @@ const API = {
     createProduct: (data) => apiCall('/api/products', 'POST', data),
     updateProduct: (id, data) => apiCall(`/api/products/${id}`, 'PUT', data),
     deleteProduct: (id) => apiCall(`/api/products/${id}`, 'DELETE'),
+
+    // Shows (admin only)
+    getShows: () => apiCall('/api/shows'),
+    getShow: (id) => apiCall(`/api/shows/${id}`),
+    createShow: (data) => apiCall('/api/shows', 'POST', data),
+    updateShow: (id, data) => apiCall(`/api/shows/${id}`, 'PUT', data),
+    deleteShow: (id) => apiCall(`/api/shows/${id}`, 'DELETE'),
+
+    // Episodes (admin only)
+    getEpisodes: (showId = null) => apiCall(`/api/episodes${showId ? `?show_id=${showId}` : ''}`),
+    getEpisode: (id) => apiCall(`/api/episodes/${id}`),
+    createEpisode: (data) => apiCall('/api/episodes', 'POST', data),
+    updateEpisode: (id, data) => apiCall(`/api/episodes/${id}`, 'PUT', data),
+    deleteEpisode: (id) => apiCall(`/api/episodes/${id}`, 'DELETE'),
 };
 
 // ===== Formatting Functions =====
