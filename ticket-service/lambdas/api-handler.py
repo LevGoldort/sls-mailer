@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from models import Event, Location, Order, Customer, OrderTicket, TicketType, Coupon, Address, Coordinates, Parking, Media, Contact, SeatingMapConfig, VenueConfig
 from models.performer import Performer, SocialLinks
 from models.product import Product
+from models.show import Show, Episode, ShowLink
 from models.merchandise_order import MerchandiseOrder, BuyerInfo
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
@@ -138,6 +139,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = handle_performers(event, http_method, path)
         elif path.startswith('/api/products'):
             response = handle_products(event, http_method, path)
+        elif path.startswith('/api/shows'):
+            response = handle_shows(event, http_method, path)
+        elif path.startswith('/api/episodes'):
+            response = handle_episodes(event, http_method, path)
         elif path.startswith('/api/merchandise'):
             response = handle_merchandise(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
@@ -3628,6 +3633,227 @@ def handle_allpay_webhook(event: Dict) -> Dict:
         import traceback
         traceback.print_exc()
         return error_response(500, f"Webhook processing failed: {str(e)}")
+
+
+# ──────────────────────────────────────────────
+# Shows & Episodes handlers
+# ──────────────────────────────────────────────
+
+def handle_shows(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET' and path == '/api/shows':
+        return list_shows()
+    if method == 'GET' and path.startswith('/api/shows/'):
+        show_id = path.split('/')[-1]
+        return get_show(show_id)
+    if method == 'POST' and path == '/api/shows':
+        return create_show(event)
+    if method == 'PUT' and path.startswith('/api/shows/'):
+        show_id = path.split('/')[-1]
+        return update_show(show_id, event)
+    if method == 'DELETE' and path.startswith('/api/shows/'):
+        show_id = path.split('/')[-1]
+        return delete_show(show_id, event)
+    return error_response(404, 'Not found')
+
+
+def list_shows() -> Dict:
+    items = db.list_shows()
+    shows = []
+    for item in items:
+        try:
+            shows.append(Show.from_dynamodb_item(item).to_dynamodb_item())
+        except Exception as e:
+            print(f"Error parsing show: {e}")
+    shows.sort(key=lambda s: s.get('name', ''))
+    return success_response({'shows': shows, 'count': len(shows)})
+
+
+def get_show(show_id: str) -> Dict:
+    item = db.get_show(show_id) or db.get_show_by_slug(show_id)
+    if not item:
+        return error_response(404, 'Show not found')
+    show = Show.from_dynamodb_item(item)
+    episodes = db.list_episodes_by_show(show.show_id)
+    return success_response({
+        'show': show.to_dynamodb_item(),
+        'episodes': sorted(episodes, key=lambda e: int(e.get('number', 0)), reverse=True),
+    })
+
+
+def create_show(request_event: Dict) -> Dict:
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, 'Unauthorized')
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        required = ['name', 'description', 'short_description']
+        for f in required:
+            if not body.get(f):
+                return error_response(400, f'Missing required field: {f}')
+        show_id = Show.generate_id()
+        slug = body.get('slug') or Show.generate_slug(body['name'])
+        if db.get_show_by_slug(slug):
+            return error_response(400, f'Slug already taken: {slug}')
+        show = Show(
+            show_id=show_id,
+            name=body['name'],
+            slug=slug,
+            description=body['description'],
+            short_description=body['short_description'],
+            photo_url=body.get('photo_url'),
+            links=[ShowLink.from_dict(l) for l in body.get('links', [])],
+        )
+        db.put_show(show.to_dynamodb_item())
+        return success_response({'show': show.to_dynamodb_item()}, 201)
+    except json.JSONDecodeError:
+        return error_response(400, 'Invalid JSON')
+    except Exception as e:
+        return error_response(500, f'Failed to create show: {e}')
+
+
+def update_show(show_id: str, request_event: Dict) -> Dict:
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, 'Unauthorized')
+    item = db.get_show(show_id)
+    if not item:
+        return error_response(404, 'Show not found')
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        show = Show.from_dynamodb_item(item)
+        show.name = body.get('name', show.name)
+        show.description = body.get('description', show.description)
+        show.short_description = body.get('short_description', show.short_description)
+        show.photo_url = body.get('photo_url', show.photo_url)
+        if 'links' in body:
+            show.links = [ShowLink.from_dict(l) for l in body['links']]
+        if 'slug' in body and body['slug'] != show.slug:
+            if db.get_show_by_slug(body['slug']):
+                return error_response(400, f'Slug already taken: {body["slug"]}')
+            show.slug = body['slug']
+        show.updated_at = datetime.utcnow().isoformat()
+        db.put_show(show.to_dynamodb_item())
+        return success_response({'show': show.to_dynamodb_item()})
+    except json.JSONDecodeError:
+        return error_response(400, 'Invalid JSON')
+    except Exception as e:
+        return error_response(500, f'Failed to update show: {e}')
+
+
+def delete_show(show_id: str, request_event: Dict) -> Dict:
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, 'Unauthorized')
+    if not db.get_show(show_id):
+        return error_response(404, 'Show not found')
+    db.delete_show(show_id)
+    return success_response({'deleted': show_id})
+
+
+def handle_episodes(event: Dict, method: str, path: str) -> Dict:
+    parts = path.split('/')
+    # /api/episodes or /api/episodes/{id}
+    if method == 'GET' and path == '/api/episodes':
+        show_id = event.get('queryStringParameters', {}) or {}
+        show_id = show_id.get('show_id')
+        if show_id:
+            items = db.list_episodes_by_show(show_id)
+            items.sort(key=lambda e: int(e.get('number', 0)), reverse=True)
+            return success_response({'episodes': items, 'count': len(items)})
+        items = db.list_all_episodes()
+        return success_response({'episodes': items, 'count': len(items)})
+    if method == 'GET' and len(parts) == 4:
+        episode_id = parts[-1]
+        return get_episode(episode_id)
+    if method == 'POST' and path == '/api/episodes':
+        return create_episode(event)
+    if method == 'PUT' and len(parts) == 4:
+        return update_episode(parts[-1], event)
+    if method == 'DELETE' and len(parts) == 4:
+        return delete_episode_handler(parts[-1], event)
+    return error_response(404, 'Not found')
+
+
+def get_episode(episode_id: str) -> Dict:
+    item = db.get_episode(episode_id) or db.get_episode_by_slug(episode_id)
+    if not item:
+        return error_response(404, 'Episode not found')
+    return success_response({'episode': item})
+
+
+def create_episode(request_event: Dict) -> Dict:
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, 'Unauthorized')
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        required = ['show_id', 'number', 'title', 'description', 'url']
+        for f in required:
+            if f not in body or body[f] == '':
+                return error_response(400, f'Missing required field: {f}')
+        show_item = db.get_show(body['show_id'])
+        if not show_item:
+            return error_response(404, f'Show not found: {body["show_id"]}')
+        show = Show.from_dynamodb_item(show_item)
+        episode_id = Episode.generate_id()
+        slug = body.get('slug') or Episode.generate_slug(show.slug, body['number'], body['title'])
+        if db.get_episode_by_slug(slug):
+            slug = f'{slug}-{episode_id[:6]}'
+        episode = Episode(
+            episode_id=episode_id,
+            show_id=body['show_id'],
+            number=int(body['number']),
+            title=body['title'],
+            slug=slug,
+            description=body['description'],
+            url=body['url'],
+            thumbnail_url=body.get('thumbnail_url'),
+            performer_ids=body.get('performer_ids', []),
+            published_at=body.get('published_at', datetime.utcnow().isoformat()),
+        )
+        db.put_episode(episode.to_dynamodb_item())
+        return success_response({'episode': episode.to_dynamodb_item()}, 201)
+    except json.JSONDecodeError:
+        return error_response(400, 'Invalid JSON')
+    except Exception as e:
+        return error_response(500, f'Failed to create episode: {e}')
+
+
+def update_episode(episode_id: str, request_event: Dict) -> Dict:
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, 'Unauthorized')
+    item = db.get_episode(episode_id)
+    if not item:
+        return error_response(404, 'Episode not found')
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        ep = Episode.from_dynamodb_item(item)
+        ep.title = body.get('title', ep.title)
+        ep.description = body.get('description', ep.description)
+        ep.url = body.get('url', ep.url)
+        ep.thumbnail_url = body.get('thumbnail_url', ep.thumbnail_url)
+        ep.performer_ids = body.get('performer_ids', ep.performer_ids)
+        ep.published_at = body.get('published_at', ep.published_at)
+        if 'number' in body:
+            ep.number = int(body['number'])
+        ep.updated_at = datetime.utcnow().isoformat()
+        db.put_episode(ep.to_dynamodb_item())
+        return success_response({'episode': ep.to_dynamodb_item()})
+    except json.JSONDecodeError:
+        return error_response(400, 'Invalid JSON')
+    except Exception as e:
+        return error_response(500, f'Failed to update episode: {e}')
+
+
+def delete_episode_handler(episode_id: str, request_event: Dict) -> Dict:
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, 'Unauthorized')
+    if not db.get_episode(episode_id):
+        return error_response(404, 'Episode not found')
+    db.delete_episode(episode_id)
+    return success_response({'deleted': episode_id})
 
 
 # For local testing
