@@ -155,12 +155,126 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_css %}
 <style>
-@keyframes spin {
-    to { transform: rotate(360deg); }
+/* ── Variable bridge (old → yb-*) ── */
+:root {
+  --primary:   var(--yb-magenta);
+  --secondary: var(--yb-cyan);
+  --danger:    var(--yb-red);
+  --success:   #059669;
+  --warning:   var(--yb-yellow);
+  --gray-50:   var(--yb-paper-dark);
+  --gray-100:  #e0d9c8;
+  --gray-200:  rgba(26,20,16,.12);
+  --gray-300:  rgba(26,20,16,.2);
+  --gray-500:  rgba(26,20,16,.5);
+  --gray-600:  rgba(26,20,16,.6);
 }
+
+/* ── Layout ── */
+.checkout-container {
+  max-width: 640px;
+  margin: 3rem auto;
+  padding: 0 1.5rem 4rem;
+}
+
+.checkout-card {
+  background: white;
+  border: var(--yb-border);
+  box-shadow: var(--yb-shadow);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-family: var(--yb-font-display);
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Form ── */
+.form-group { margin-bottom: 1.25rem; }
+
+.form-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-family: var(--yb-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: var(--yb-border);
+  background: var(--yb-paper);
+  font-family: var(--yb-font-body);
+  font-size: 1rem;
+  outline: none;
+  transition: box-shadow 0.15s;
+}
+
+.form-input:focus,
+.form-select:focus { box-shadow: var(--yb-shadow-sm); }
+
+/* ── Order summary ── */
+.order-summary {
+  background: var(--yb-paper-dark);
+  border: var(--yb-border-thin);
+  padding: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: var(--yb-border-thin);
+  font-size: 0.9375rem;
+}
+
+.summary-row:last-child { border-bottom: none; }
+
+.summary-row.total {
+  font-family: var(--yb-font-display);
+  font-size: 1.25rem;
+  padding-top: 0.75rem;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border: var(--yb-border);
+  font-family: var(--yb-font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn:hover {
+  box-shadow: var(--yb-shadow-sm);
+  transform: translate(-2px, -2px);
+}
+
+.btn-primary { background: var(--yb-magenta); color: white; }
+.btn-large   { width: 100%; padding: 1rem; font-size: 1rem; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
+{% endblock %}
+
+{% block extra_js %}
 
 <!-- AllPay Hosted Fields Library -->
 <script src="https://allpay.to/js/allpay-hf.js"></script>

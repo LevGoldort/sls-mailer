@@ -8,6 +8,8 @@
 
 {# ── Hero ── #}
 <section class="yb-home-hero yb-pad">
+  <div style="font-family:var(--yb-font-serif);font-weight:900;color:var(--yb-cyan);font-size:28px;letter-spacing:.04em;margin-bottom:8px;transform:rotate(-2deg);display:inline-block;direction:rtl">· יאללה בלגן · יאללה בלגן ·</div>
+
   <h1 class="yb-home-hero__h1">
     <div>
       <span class="yb-riso">
@@ -16,8 +18,8 @@
       </span>
     </div>
     <div style="margin-left: clamp(40px, 8%, 140px)">
-      <span class="yb-riso">
-        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.hero_line2 }}</span>
+      <span class="yb-riso" style="color:var(--yb-magenta)">
+        <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.home.hero_line2 }}</span>
         {{ strings.home.hero_line2 }}
       </span>
     </div>
@@ -25,10 +27,6 @@
 
   <div class="yb-home-hero__sub">
     <p class="yb-home-hero__desc">{{ strings.home.hero_sub }}</p>
-    <div class="yb-home-hero__ctas">
-      <a href="#programma" class="yb-btn yb-btn--primary">{{ strings.header.cta }}</a>
-      <a href="#podcast" class="yb-btn yb-btn--paper yb-btn--sm">{{ strings.home.subscribe }}</a>
-    </div>
   </div>
 </section>
 

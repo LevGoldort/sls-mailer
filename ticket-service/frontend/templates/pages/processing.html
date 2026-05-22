@@ -309,8 +309,8 @@ function fireAnalytics(order) {
 .processing-card, .success-card, .error-card {
     background: white;
     padding: 3rem 2rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border: var(--yb-border);
+    box-shadow: var(--yb-shadow);
     text-align: center;
 }
 
@@ -318,8 +318,8 @@ function fireAnalytics(order) {
 .spinner {
     width: 60px;
     height: 60px;
-    border: 4px solid var(--gray-200);
-    border-top-color: var(--primary);
+    border: 4px solid rgba(26,20,16,.12);
+    border-top-color: var(--yb-magenta);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto 2rem;
@@ -332,7 +332,7 @@ function fireAnalytics(order) {
 .progress-bar {
     width: 100%;
     height: 8px;
-    background: var(--gray-200);
+    background: rgba(26,20,16,.12);
     border-radius: 4px;
     overflow: hidden;
     margin-top: 2rem;
@@ -341,7 +341,7 @@ function fireAnalytics(order) {
 .progress-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    background: linear-gradient(90deg, var(--yb-magenta), var(--yb-cyan));
     transition: width 0.3s ease;
 }
 
@@ -352,14 +352,14 @@ function fireAnalytics(order) {
 }
 
 .success-message {
-    color: var(--gray-600);
+    color: rgba(26,20,16,.6);
     margin-bottom: 2rem;
 }
 
 .order-details {
-    background: var(--gray-50);
+    background: var(--yb-paper-dark);
     padding: 1.5rem;
-    border-radius: 0.5rem;
+    border: var(--yb-border-thin);
     margin-bottom: 2rem;
     text-align: left;
 }
@@ -368,7 +368,7 @@ function fireAnalytics(order) {
     display: flex;
     justify-content: space-between;
     padding: 0.75rem 0;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: var(--yb-border-thin);
 }
 
 .detail-row:last-child {
@@ -390,9 +390,9 @@ function fireAnalytics(order) {
 }
 
 .qr-item {
-    background: var(--gray-50);
+    background: var(--yb-paper-dark);
     padding: 1rem;
-    border-radius: 0.5rem;
+    border: var(--yb-border-thin);
 }
 
 .qr-placeholder {
@@ -405,13 +405,12 @@ function fireAnalytics(order) {
     height: 150px;
     display: block;
     margin: 0 auto 0.5rem;
-    border-radius: 0.5rem;
 }
 
 .qr-code {
-    font-family: monospace;
+    font-family: var(--yb-font-mono);
     font-size: 0.75rem;
-    color: var(--gray-600);
+    color: rgba(26,20,16,.6);
     word-break: break-all;
 }
 
@@ -422,12 +421,32 @@ function fireAnalytics(order) {
 }
 
 .error-message {
-    color: var(--danger);
+    color: var(--yb-red);
     margin-bottom: 2rem;
 }
 
 .actions {
     margin-top: 2rem;
+}
+
+/* Button */
+.btn-primary {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    background: var(--yb-magenta);
+    color: white;
+    border: var(--yb-border);
+    font-family: var(--yb-font-mono);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    transition: box-shadow 0.15s, transform 0.1s;
+}
+
+.btn-primary:hover {
+    box-shadow: var(--yb-shadow-sm);
+    transform: translate(-2px, -2px);
 }
 </style>
 {% endblock %}
