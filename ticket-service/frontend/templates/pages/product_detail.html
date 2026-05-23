@@ -1,0 +1,204 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}{{ product.name }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ product.short_description or product.name }}{% endblock %}
+{% block og_image %}{{ product.get('photo_url') or super() }}{% endblock %}
+
+{% block content %}
+
+{% set _is_group = product.get('product_type', 'personal') == 'group' %}
+{% set _sold = product.get('sold_slots', 0) %}
+{% set _total = product.get('total_slots', 0) %}
+{% set _available = [_total - _sold, 0] | max %}
+{% set _sold_out = _available <= 0 %}
+{% set _pct = ((_sold / _total * 100) | round | int) if _total > 0 else 0 %}
+
+{# ── Breadcrumb ── #}
+<div class="yb-breadcrumb">
+  <a href="/">Главная</a>
+  <span> ► </span>
+  {% if performer %}
+  <a href="/performer/{{ performer.get('slug', performer.performer_id) }}/">{{ performer.name }}</a>
+  {% else %}
+  <a href="/products.html">Мерч</a>
+  {% endif %}
+  <span> ► </span>
+  <b style="opacity:1">{{ product.name }}</b>
+</div>
+
+{# ── Hero ── #}
+<section class="yb-product-hero">
+  <div class="yb-product-hero__box">
+
+    {# ── Photo ── #}
+    <div class="yb-product-hero__photo">
+      <img src="{{ product.get('photo_url') or pick_placeholder(product.product_id) }}" alt="{{ product.name }}">
+      <div class="yb-halftone yb-halftone--{{ 'magenta' if _is_group else 'cyan' }}" aria-hidden="true"></div>
+
+      {% if _sold_out %}
+      <div class="yb-product-hero__sold-overlay">
+        <div class="yb-product-hero__sold-stamp">★ Sold out ★</div>
+      </div>
+      {% endif %}
+
+      <div class="yb-product-card__type-stamp" style="top:22px;left:22px;right:auto;transform:rotate(-4deg);font-size:11px;padding:6px 12px;box-shadow:4px 4px 0 var(--yb-ink);background:{{ 'var(--yb-cyan)' if _is_group else 'var(--yb-magenta)' }};color:{{ 'var(--yb-ink)' if _is_group else 'var(--yb-paper)' }}">
+        {{ '🎭' if _is_group else '★' }} {{ 'Групповой' if _is_group else 'Персональный' }}
+      </div>
+
+      <div class="yb-product-hero__price-sticker">
+        {{ product.price_ils }}<span style="font-size:20px">₪</span>
+      </div>
+    </div>
+
+    {# ── Info ── #}
+    <div class="yb-product-hero__info">
+      <div style="position:absolute;top:-14px;left:60px;width:130px;height:24px;background:rgba(255,212,0,.85);transform:rotate(-4deg);border:1px solid var(--yb-ink)" aria-hidden="true"></div>
+
+      <h1 class="yb-product-hero__name">
+        <span class="yb-riso">
+          <span class="yb-riso__shadow" aria-hidden="true">{{ product.name }}</span>
+          {{ product.name }}
+        </span>
+      </h1>
+
+      {% if product.get('short_description') %}
+      <p class="yb-product-hero__teaser">{{ product.short_description }}</p>
+      {% endif %}
+
+      {% if performer %}
+      <div class="yb-product-hero__from">
+        <span>От кого ·</span>
+        <a href="/performer/{{ performer.get('slug', performer.performer_id) }}/">{{ performer.name }}</a>
+      </div>
+      {% endif %}
+
+      {# Stock block #}
+      <div class="yb-product-hero__stock" style="background:{{ 'var(--yb-cyan)' if _is_group else 'var(--yb-paper)' }}">
+        <div class="yb-halftone yb-halftone--ink" aria-hidden="true" style="opacity:.06"></div>
+
+        {% if _is_group and product.get('group_size') %}
+        <div style="position:relative">
+          <div class="yb-product-stock__label">Размер группы</div>
+          <div class="yb-product-stock__value">{{ product.group_size }} {{ ru_plural(product.group_size, 'человек', 'человека', 'человек') }}</div>
+        </div>
+        {% endif %}
+
+        {% if _is_group and _total > 0 %}
+        <p style="position:relative;font-family:var(--yb-font-serif);font-weight:700;font-size:16px;line-height:1.35;margin:0">
+          🔥 В текущей группе: <b>{{ _sold }}/{{ _total }}</b> человек.
+          {% if _available > 0 %}
+          Осталось <b>{{ _available }}</b> {{ ru_plural(_available, 'место', 'места', 'мест') }} до старта.
+          {% else %}
+          Группа собрана!
+          {% endif %}
+        </p>
+        {% endif %}
+
+        {% if _total > 0 %}
+        <div style="position:relative">
+          <div class="yb-product-stock__meta">
+            <span>Продано: <b>{{ _sold }}/{{ _total }}</b> · {{ _pct }}%</span>
+            <span>{{ '— sold out' if _sold_out else 'Доступно: ' ~ _available }}</span>
+          </div>
+          <div class="yb-product-stock__bar">
+            <div class="yb-product-stock__fill" style="width:{{ _pct }}%;background:{{ 'var(--yb-red)' if _sold_out else 'var(--yb-magenta)' }}"></div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {# CTA #}
+      <div class="yb-product-hero__cta">
+        {% if _sold_out %}
+        <div class="yb-product-hero__sold-cta">★ Все места заняты ★</div>
+        {% else %}
+        <a href="/checkout.html?product={{ product.product_id }}" class="yb-btn yb-btn--primary yb-btn--lg yb-btn--full">
+          ► Купить за {{ product.price_ils }}₪
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Description ── #}
+{% if product.get('full_description') or product.get('what_you_get') %}
+<section class="yb-product-desc yb-pad">
+  <div class="yb-product-desc__grid">
+    {% if product.get('full_description') %}
+    <div>
+      <div style="display:flex;align-items:baseline;gap:18px;border-bottom:var(--yb-border);padding-bottom:12px;margin-bottom:16px">
+        <h2 style="margin:0;font-family:var(--yb-font-display);font-size:36px;letter-spacing:-.02em;text-transform:uppercase">
+          <span class="yb-riso">
+            <span class="yb-riso__shadow" aria-hidden="true">Описание</span>
+            Описание
+          </span>
+        </h2>
+      </div>
+      <p style="font-family:var(--yb-font-serif);font-size:18px;line-height:1.55;margin:0">{{ product.full_description }}</p>
+    </div>
+    {% endif %}
+    {% if product.get('what_you_get') %}
+    <div>
+      <div style="display:flex;align-items:baseline;gap:18px;border-bottom:var(--yb-border);padding-bottom:12px;margin-bottom:16px">
+        <h2 style="margin:0;font-family:var(--yb-font-display);font-size:36px;letter-spacing:-.02em;text-transform:uppercase">
+          <span class="yb-riso" style="color:var(--yb-cyan)">
+            <span class="yb-riso__shadow" style="color:var(--yb-magenta)" aria-hidden="true">Что получите</span>
+            Что получите
+          </span>
+        </h2>
+      </div>
+      <p style="font-family:var(--yb-font-body);font-weight:500;font-size:17px;line-height:1.55;margin:0">{{ product.what_you_get }}</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Related products ── #}
+{% if other_products %}
+<section class="yb-pad" style="padding-bottom:60px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:22px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">Другие продукты</span>
+        Другие продукты
+      </span>
+    </h2>
+    <span style="font-family:var(--yb-font-mono);font-size:12px;opacity:.65;letter-spacing:.12em;text-transform:uppercase">/ возможно понравятся</span>
+  </div>
+
+  <div class="yb-products-grid">
+    {% set _tilts = ['-0.8deg', '0.6deg', '-0.4deg', '0.7deg', '-0.5deg'] %}
+    {% for rel in other_products[:5] %}
+    {% set _rel_sold = rel.get('sold_slots', 0) %}
+    {% set _rel_avail = [rel.get('total_slots', 0) - _rel_sold, 0] | max %}
+    {% set _rel_sold_out = _rel_avail <= 0 %}
+    <a href="/products/{{ rel.get('slug', rel.product_id) }}.html"
+       class="yb-product-card"
+       style="transform:rotate({{ _tilts[loop.index0 % 5] }})">
+      <div class="yb-product-card__photo">
+        <img src="{{ rel.get('photo_url') or pick_placeholder(rel.product_id) }}" alt="{{ rel.name }}" loading="lazy">
+        <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
+        {% if _rel_sold_out %}
+        <div style="position:absolute;inset:0;background:rgba(26,20,16,.55);display:flex;align-items:center;justify-content:center">
+          <div style="font-family:var(--yb-font-display);color:var(--yb-red);font-size:14px;letter-spacing:.08em;text-transform:uppercase;transform:rotate(-4deg)">★ Sold out ★</div>
+        </div>
+        {% endif %}
+        <div style="position:absolute;top:-10px;right:8px;background:var(--yb-red);color:var(--yb-paper);border:3px solid var(--yb-ink);padding:4px 8px 3px;font-family:var(--yb-font-display);font-size:14px;line-height:1;transform:rotate(6deg);box-shadow:2px 2px 0 var(--yb-ink);z-index:3">
+          {{ rel.price_ils }}<span style="font-size:9px">₪</span>
+        </div>
+      </div>
+      <div class="yb-product-card__body">
+        <div class="yb-product-card__name">{{ rel.name }}</div>
+        {% if rel.get('short_description') %}
+        <p class="yb-product-card__desc">{{ rel.short_description | truncate(80, True, '…') }}</p>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

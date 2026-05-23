@@ -1,0 +1,34 @@
+{% set _active = active_nav | default('') %}
+<header class="yb-header">
+  <div class="yb-header__main">
+
+    <a href="/" class="yb-header__logo" aria-label="{{ strings.site.name }}">
+      <span class="yb-header__logo-box">ЯЛЛА<br>БАЛАГАН</span>
+    </a>
+
+    <nav class="yb-header__nav" aria-label="Основная навигация">
+      <a href="/events.html"{% if _active == 'events' %} class="is-active" aria-current="page"{% endif %}>
+        {{ strings.header.nav_events }}
+      </a>
+      <a href="/performers.html"{% if _active == 'performers' %} class="is-active" aria-current="page"{% endif %}>
+        {{ strings.header.nav_performers }}
+      </a>
+      <a href="/products.html"{% if _active == 'merch' %} class="is-active" aria-current="page"{% endif %}>
+        {{ strings.header.nav_merch }}
+      </a>
+      <a href="/shows.html"{% if _active == 'content' %} class="is-active" aria-current="page"{% endif %}>
+        {{ strings.header.nav_content }}
+      </a>
+      <a href="#" onclick="return false" style="opacity:.45;cursor:default">
+        {{ strings.header.nav_about }}
+      </a>
+    </nav>
+
+  </div>
+
+  <div class="yb-header__ticker" aria-hidden="true">
+    <span>{{ strings.header.ticker_left }}</span>
+    <span class="yb-header__ticker-center">{{ strings.header.ticker_center }}</span>
+    <span class="yb-header__ticker-right">{{ strings.header.ticker_right }}</span>
+  </div>
+</header>

@@ -72,6 +72,7 @@ htmlcov/
 # Lambda deployment artifacts
 lambda-package/
 site-output/
+site/
 
 # Deployment status files with real endpoints
 AWS_DEPLOYED_INFO.md
@@ -111,3 +112,20 @@ node_modules/
 # tasks/ 
 /.mcp.json
 /.taskmaster/
+
+# Claude Code tool artifacts
+.playwright-mcp/
+.claude-memory
+.claude/settings.local.json
+.claude/worktrees/
+
+# Local data / SQLite
+data/
+
+# Temp files
+ticket-service/tmp/
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg

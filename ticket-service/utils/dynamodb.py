@@ -17,12 +17,22 @@ class DynamoDBClient:
         self.orders_table_name = os.environ.get('ORDERS_TABLE', 'yallabalagan-orders')
         self.coupons_table_name = os.environ.get('COUPONS_TABLE', 'yallabalagan-coupons')
         self.seat_reservations_table_name = os.environ.get('SEAT_RESERVATIONS_TABLE', 'yallabalagan-seat-reservations')
+        self.performers_table_name = os.environ.get('PERFORMERS_TABLE', 'yallabalagan-performers')
+        self.products_table_name = os.environ.get('PRODUCTS_TABLE', 'yallabalagan-products')
+        self.merchandise_orders_table_name = os.environ.get('MERCHANDISE_ORDERS_TABLE', 'yallabalagan-merchandise-orders')
+        self.shows_table_name = os.environ.get('SHOWS_TABLE', 'yallabalagan-shows')
+        self.episodes_table_name = os.environ.get('EPISODES_TABLE', 'yallabalagan-episodes')
 
         self.events_table = self.dynamodb.Table(self.events_table_name)
         self.locations_table = self.dynamodb.Table(self.locations_table_name)
         self.orders_table = self.dynamodb.Table(self.orders_table_name)
         self.coupons_table = self.dynamodb.Table(self.coupons_table_name)
         self.seat_reservations_table = self.dynamodb.Table(self.seat_reservations_table_name)
+        self.performers_table = self.dynamodb.Table(self.performers_table_name)
+        self.products_table = self.dynamodb.Table(self.products_table_name)
+        self.merchandise_orders_table = self.dynamodb.Table(self.merchandise_orders_table_name)
+        self.shows_table = self.dynamodb.Table(self.shows_table_name)
+        self.episodes_table = self.dynamodb.Table(self.episodes_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -76,6 +86,15 @@ class DynamoDBClient:
         if exclude_event_id and item.get('event_id') == exclude_event_id:
             return False
         return True
+
+    def list_events_by_owner(self, owner_id: str) -> List[Dict]:
+        """Получает события принадлежащие конкретному владельцу (OwnerIndex GSI)"""
+        response = self.events_table.query(
+            IndexName='OwnerIndex',
+            KeyConditionExpression='owner_id = :owner_id',
+            ExpressionAttributeValues={':owner_id': owner_id}
+        )
+        return response.get('Items', [])
 
     def delete_event(self, event_id: str):
         """Удаляет событие"""
@@ -432,6 +451,122 @@ class DynamoDBClient:
             }
         )
 
+    # ===== Performers =====
+    def put_performer(self, performer_item: Dict):
+        return self.performers_table.put_item(Item=performer_item)
+
+    def get_performer(self, performer_id: str) -> Optional[Dict]:
+        response = self.performers_table.get_item(
+            Key={'PK': f'PERFORMER#{performer_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_performer_by_slug(self, slug: str) -> Optional[Dict]:
+        response = self.performers_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def list_performers(self, tenant_id: str = 'yallabalagan', status: str = None) -> List[Dict]:
+        gsi1pk = f'TENANT#{tenant_id}'
+        kwargs = {
+            'IndexName': 'TenantIndex',
+            'KeyConditionExpression': 'GSI1PK = :pk',
+            'ExpressionAttributeValues': {':pk': gsi1pk},
+        }
+        if status:
+            kwargs['KeyConditionExpression'] += ' AND begins_with(GSI1SK, :status_prefix)'
+            kwargs['ExpressionAttributeValues'][':status_prefix'] = f'{status}#'
+        response = self.performers_table.query(**kwargs)
+        return response.get('Items', [])
+
+    def delete_performer(self, performer_id: str):
+        return self.performers_table.delete_item(
+            Key={'PK': f'PERFORMER#{performer_id}', 'SK': 'METADATA'}
+        )
+
+    # ===== Products =====
+    def put_product(self, product_item: Dict):
+        return self.products_table.put_item(Item=product_item)
+
+    def get_product(self, product_id: str) -> Optional[Dict]:
+        response = self.products_table.get_item(
+            Key={'PK': f'PRODUCT#{product_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_product_by_slug(self, slug: str) -> Optional[Dict]:
+        response = self.products_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def list_products(self, status: str = 'active') -> List[Dict]:
+        response = self.products_table.query(
+            IndexName='StatusIndex',
+            KeyConditionExpression='GSI2PK = :status',
+            ExpressionAttributeValues={':status': status},
+            ScanIndexForward=False
+        )
+        return response.get('Items', [])
+
+    def list_products_by_performer(self, performer_id: str) -> List[Dict]:
+        response = self.products_table.query(
+            IndexName='PerformerIndex',
+            KeyConditionExpression='GSI1PK = :pk',
+            ExpressionAttributeValues={':pk': f'PERFORMER#{performer_id}'},
+            ScanIndexForward=False
+        )
+        return response.get('Items', [])
+
+    def increment_sold_slots(self, product_id: str) -> Dict:
+        from datetime import datetime
+        response = self.products_table.update_item(
+            Key={'PK': f'PRODUCT#{product_id}', 'SK': 'METADATA'},
+            UpdateExpression='SET sold_slots = sold_slots + :inc, updated_at = :now',
+            ExpressionAttributeValues={':inc': 1, ':now': datetime.utcnow().isoformat()},
+            ReturnValues='ALL_NEW'
+        )
+        return response.get('Attributes', {})
+
+    def delete_product(self, product_id: str):
+        return self.products_table.delete_item(
+            Key={'PK': f'PRODUCT#{product_id}', 'SK': 'METADATA'}
+        )
+
+    # ===== Merchandise Orders =====
+    def put_merchandise_order(self, order_item: Dict):
+        return self.merchandise_orders_table.put_item(Item=order_item)
+
+    def get_merchandise_order(self, order_id: str) -> Optional[Dict]:
+        response = self.merchandise_orders_table.get_item(
+            Key={'PK': f'MERCH_ORDER#{order_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def update_merchandise_order_status(self, order_id: str, status: str, payment_id: str = None):
+        from datetime import datetime
+        update_expr = 'SET #status = :status'
+        expr_names = {'#status': 'status'}
+        expr_values = {':status': status}
+        if payment_id:
+            update_expr += ', payment_id = :pid'
+            expr_values[':pid'] = payment_id
+        return self.merchandise_orders_table.update_item(
+            Key={'PK': f'MERCH_ORDER#{order_id}', 'SK': 'METADATA'},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_values,
+        )
+
     # ===== Seat Reservations =====
     def get_seat_reservations(self, event_id: str) -> List[Dict]:
         """Получает все активные резервации для события"""
@@ -522,3 +657,72 @@ class DynamoDBClient:
             if self.release_seat(event_id, seat_id, session_id):
                 released_count += 1
         return released_count
+
+    # ===== Shows =====
+
+    def put_show(self, show_item: Dict):
+        return self.shows_table.put_item(Item=show_item)
+
+    def get_show(self, show_id: str) -> Optional[Dict]:
+        response = self.shows_table.get_item(
+            Key={'PK': f'SHOW#{show_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_show_by_slug(self, slug: str) -> Optional[Dict]:
+        response = self.shows_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def list_shows(self) -> List[Dict]:
+        response = self.shows_table.scan()
+        return response.get('Items', [])
+
+    def delete_show(self, show_id: str):
+        return self.shows_table.delete_item(
+            Key={'PK': f'SHOW#{show_id}', 'SK': 'METADATA'}
+        )
+
+    # ===== Episodes =====
+
+    def put_episode(self, episode_item: Dict):
+        return self.episodes_table.put_item(Item=episode_item)
+
+    def get_episode(self, episode_id: str) -> Optional[Dict]:
+        response = self.episodes_table.get_item(
+            Key={'PK': f'EPISODE#{episode_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_episode_by_slug(self, slug: str) -> Optional[Dict]:
+        response = self.episodes_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1
+        )
+        items = response.get('Items', [])
+        return items[0] if items else None
+
+    def list_episodes_by_show(self, show_id: str) -> List[Dict]:
+        response = self.episodes_table.query(
+            IndexName='ShowIndex',
+            KeyConditionExpression='show_id = :sid',
+            ExpressionAttributeValues={':sid': show_id},
+            ScanIndexForward=False
+        )
+        return response.get('Items', [])
+
+    def list_all_episodes(self) -> List[Dict]:
+        response = self.episodes_table.scan()
+        return response.get('Items', [])
+
+    def delete_episode(self, episode_id: str):
+        return self.episodes_table.delete_item(
+            Key={'PK': f'EPISODE#{episode_id}', 'SK': 'METADATA'}
+        )

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактировать шоу - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            background: white; padding: 24px 30px; border-radius: 12px;
+            margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 16px; font-size: 22px; }
+        .nav { display: flex; gap: 12px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 8px 16px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .card {
+            background: white; border-radius: 12px; padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 15px; font-weight: 700; color: #444;
+            border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;
+            margin-bottom: 20px; margin-top: 24px;
+        }
+        .section-title:first-child { margin-top: 0; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
+        label .req { color: #e53e3e; }
+        input[type="text"], input[type="url"], textarea {
+            width: 100%; padding: 10px 12px; border: 1.5px solid #ddd;
+            border-radius: 8px; font-size: 14px; outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus { border-color: #667eea; }
+        textarea { resize: vertical; min-height: 90px; }
+        .photo-section { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+        .photo-preview {
+            width: 120px; height: 120px; border-radius: 10px;
+            object-fit: cover; background: #e2e8f0;
+            border: 2px solid #e2e8f0; flex-shrink: 0;
+        }
+        .photo-placeholder {
+            width: 120px; height: 120px; border-radius: 10px;
+            background: #e2e8f0; display: flex; align-items: center;
+            justify-content: center; font-size: 36px; flex-shrink: 0;
+        }
+        .photo-upload-area {
+            flex: 1; border: 2px dashed #c3c9f0; border-radius: 8px;
+            padding: 16px; text-align: center; cursor: pointer;
+            font-size: 13px; color: #888; transition: all 0.2s; min-width: 200px;
+        }
+        .photo-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        input[type="file"] { display: none; }
+        .link-row {
+            display: flex; gap: 8px; margin-bottom: 10px; align-items: center;
+        }
+        .link-row input { flex: 1; }
+        .link-row .remove-link {
+            padding: 8px 12px; background: #fee2e2; color: #dc2626;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 13px;
+            flex-shrink: 0;
+        }
+        .link-row .remove-link:hover { background: #fecaca; }
+        .add-link-btn {
+            padding: 8px 16px; background: #f3e8ff; color: #7c3aed;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 13px;
+            margin-top: 4px;
+        }
+        .add-link-btn:hover { background: #e9d5ff; }
+        .btn {
+            padding: 12px 28px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-save { background: #667eea; color: white; }
+        .btn-save:hover { background: #5568d3; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-cancel { background: #f1f5f9; color: #666; margin-left: 10px; }
+        .btn-cancel:hover { background: #e2e8f0; }
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert {
+            padding: 12px 14px; border-radius: 8px; font-size: 14px;
+            margin-bottom: 18px; display: none;
+        }
+        .alert-error { background: #fff0f0; border: 1px solid #fca5a5; color: #dc2626; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #323232;
+            color: white; padding: 16px 24px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="page-title">Новое шоу</h1>
+            <div class="nav">
+                <a href="shows.html" class="nav-btn">← Назад</a>
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div id="alert-error" class="alert alert-error"></div>
+
+            <div class="section-title">Обложка</div>
+            <div class="photo-section">
+                <div id="photo-placeholder" class="photo-placeholder">📺</div>
+                <img id="photo-preview" class="photo-preview" style="display:none" src="" alt="">
+                <div class="photo-upload-area" onclick="document.getElementById('photo-file').click()">
+                    Нажмите для загрузки обложки<br>
+                    <small style="color:#aaa">JPG, PNG до 5MB</small>
+                </div>
+                <input type="file" id="photo-file" accept="image/*">
+                <input type="hidden" id="photo-url">
+            </div>
+
+            <div class="section-title">Основная информация</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Название <span class="req">*</span></label>
+                    <input type="text" id="name" placeholder="Название шоу">
+                </div>
+                <div class="form-group">
+                    <label>Slug <span class="req">*</span></label>
+                    <input type="text" id="slug" placeholder="show-name">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Краткое описание</label>
+                <input type="text" id="short-description" placeholder="Одна строка для карточки">
+            </div>
+            <div class="form-group">
+                <label>Полное описание</label>
+                <textarea id="description" placeholder="Полное описание шоу..."></textarea>
+            </div>
+
+            <div class="section-title">Ссылки</div>
+            <div id="links-container"></div>
+            <button type="button" class="add-link-btn" onclick="addLink()">+ Добавить ссылку</button>
+
+            <div style="margin-top: 28px;">
+                <button class="btn btn-save" id="save-btn" onclick="save()">Сохранить</button>
+                <button class="btn btn-cancel" onclick="location.href='shows.html'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script src="shared-image-upload.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const showId = urlParams.get('id');
+
+        document.getElementById('name').addEventListener('input', function() {
+            if (showId) return;
+            const slug = this.value.toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+            document.getElementById('slug').value = slug;
+        });
+
+        document.getElementById('photo-file').addEventListener('change', async function() {
+            const file = this.files[0];
+            if (!file) return;
+            const url = await uploadFile(file);
+            if (!url) return;
+            document.getElementById('photo-url').value = url;
+            document.getElementById('photo-preview').src = url;
+            document.getElementById('photo-preview').style.display = 'block';
+            document.getElementById('photo-placeholder').style.display = 'none';
+        });
+
+        function addLink(label = '', url = '') {
+            const container = document.getElementById('links-container');
+            const row = document.createElement('div');
+            row.className = 'link-row';
+            row.innerHTML = `
+                <input type="text" placeholder="Метка (напр. YouTube)" value="${escapeHtml(label)}" class="link-label">
+                <input type="url" placeholder="https://..." value="${escapeHtml(url)}" class="link-url">
+                <button type="button" class="remove-link" onclick="this.parentElement.remove()">✕</button>`;
+            container.appendChild(row);
+        }
+
+        function getLinks() {
+            return Array.from(document.querySelectorAll('.link-row')).map(row => ({
+                label: row.querySelector('.link-label').value.trim(),
+                url: row.querySelector('.link-url').value.trim(),
+            })).filter(l => l.label && l.url);
+        }
+
+        async function loadShow() {
+            if (!showId) return;
+            document.getElementById('page-title').textContent = 'Редактировать шоу';
+            try {
+                const data = await API.getShow(showId);
+                const s = data.show;
+                document.getElementById('name').value = s.name || '';
+                document.getElementById('slug').value = s.slug || '';
+                document.getElementById('short-description').value = s.short_description || '';
+                document.getElementById('description').value = s.description || '';
+                if (s.photo_url) {
+                    document.getElementById('photo-url').value = s.photo_url;
+                    document.getElementById('photo-preview').src = s.photo_url;
+                    document.getElementById('photo-preview').style.display = 'block';
+                    document.getElementById('photo-placeholder').style.display = 'none';
+                }
+                (s.links || []).forEach(l => addLink(l.label, l.url));
+            } catch (e) {
+                showAlert('Ошибка загрузки: ' + (e.message || e));
+            }
+        }
+
+        async function save() {
+            const name = document.getElementById('name').value.trim();
+            const slug = document.getElementById('slug').value.trim();
+            if (!name || !slug) { showAlert('Заполните название и slug'); return; }
+
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Сохранение...';
+
+            const payload = {
+                name,
+                slug,
+                short_description: document.getElementById('short-description').value.trim(),
+                description: document.getElementById('description').value.trim(),
+                photo_url: document.getElementById('photo-url').value.trim() || null,
+                links: getLinks(),
+            };
+
+            try {
+                if (showId) {
+                    await API.updateShow(showId, payload);
+                } else {
+                    await API.createShow(payload);
+                }
+                showToast('Сохранено', 'success');
+                setTimeout(() => location.href = 'shows.html', 800);
+            } catch (e) {
+                showAlert('Ошибка: ' + (e.message || e));
+                btn.disabled = false;
+                btn.textContent = 'Сохранить';
+            }
+        }
+
+        function showAlert(msg) {
+            const el = document.getElementById('alert-error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function showToast(msg, type = '') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast toast-show' + (type ? ` toast-${type}` : '');
+            setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        initAdmin().then(loadShow);
+    </script>
+</body>
+</html>

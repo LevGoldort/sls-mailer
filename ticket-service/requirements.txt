@@ -19,3 +19,9 @@ pydantic==2.5.3
 
 # Timezone handling
 pytz==2024.1
+
+# Password hashing
+argon2-cffi>=23.1.0
+
+# JWT authentication
+PyJWT>=2.8.0

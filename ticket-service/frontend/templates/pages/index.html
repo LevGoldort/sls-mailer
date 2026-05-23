@@ -1,0 +1,147 @@
+{% extends 'shared/_base.html' %}
+{% from 'macros/_macros.html' import event_card, filter_bar %}
+
+{% block title %}{{ strings.site.name }} — стендап и события в Израиле{% endblock %}
+{% block description %}Стендап-концерты, шоу, опен-микрофоны и вечеринки в Тель-Авиве, Яффо и Бат-Яме. Покупай билеты онлайн.{% endblock %}
+
+{% block content %}
+
+{# ── Hero ── #}
+<section class="yb-home-hero yb-pad">
+  <div style="font-family:var(--yb-font-serif);font-weight:900;color:var(--yb-cyan);font-size:28px;letter-spacing:.04em;margin-bottom:8px;transform:rotate(-2deg);display:inline-block;direction:rtl">· יאללה בלגן · יאללה בלגן ·</div>
+
+  <h1 class="yb-home-hero__h1">
+    <div style="margin-left: 0.42em">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.hero_line1 }}</span>
+        {{ strings.home.hero_line1 }}
+      </span>
+    </div>
+    <div style="margin-left: clamp(40px, 8%, 140px)">
+      <span class="yb-riso" style="color:var(--yb-magenta)">
+        <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.home.hero_line2 }}</span>
+        {{ strings.home.hero_line2 }}
+      </span>
+    </div>
+  </h1>
+
+  <div class="yb-home-hero__sub">
+    <p class="yb-home-hero__desc">{{ strings.home.hero_sub }}</p>
+  </div>
+</section>
+
+{# ── Programme section ── #}
+<section id="programma" class="yb-pad">
+
+  {# Build unique tags from events #}
+  {% set ns = namespace(tags=['ВСЕ']) %}
+  {% for event in events %}
+    {% for tag in event.get('tags', []) %}
+      {% if tag not in ns.tags %}{% set ns.tags = ns.tags + [tag] %}{% endif %}
+    {% endfor %}
+  {% endfor %}
+
+  {{ filter_bar(ns.tags) }}
+
+  <div class="yb-section-head">
+    <h2>
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.section_programme }}</span>
+        {{ strings.home.section_programme }}
+      </span>
+    </h2>
+    <div class="yb-section-head__meta">
+      <span>{{ events | length }}</span>
+      <span>{{ ru_plural(events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}</span>
+    </div>
+  </div>
+
+  {% if events %}
+  <div class="yb-events-list" id="events-list" data-empty-tag="{{ strings.filter.no_events }}" data-empty-sub="{{ strings.filter.no_events_sub }}">
+    {% for event in events[:7] %}
+    {% set _loc = location_map.get(event.get('location_id', '')) %}
+    {{ event_card(event, location=_loc, index=loop.index0) }}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="padding: 80px 0; text-align: center; font-family: var(--yb-font-mono); font-size: 14px; letter-spacing: .1em; opacity: .6; text-transform: uppercase;">
+    <p>Пока нет ближайших событий.</p>
+    <p style="opacity: .7; margin-top: 8px;">Следите за обновлениями.</p>
+  </div>
+  {% endif %}
+
+  <div class="yb-all-events-link">
+    <a href="/events.html">
+      <span class="yb-riso">
+        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.all_events }}</span>
+        {{ strings.home.all_events }}
+      </span>
+      <span>→</span>
+    </a>
+  </div>
+
+</section>
+
+{# ── Podcast block ── #}
+<section id="podcast" class="yb-podcast">
+  <div class="yb-podcast__box">
+    <div style="position:absolute; top:-16px; right:60px; width:130px; height:26px; background:rgba(255,212,0,.85); transform:rotate(4deg); border:3px solid var(--yb-ink);" aria-hidden="true"></div>
+
+    <div style="position:relative">
+      <div class="yb-podcast__eyebrow">{{ strings.podcast.eyebrow }}</div>
+      <h2 class="yb-podcast__name">{{ strings.podcast.name }}</h2>
+      <p class="yb-podcast__desc">{{ strings.podcast.description }}</p>
+    </div>
+
+    <div class="yb-podcast__right">
+      <div class="yb-podcast__latest">
+        <div class="yb-podcast__latest-label">{{ strings.podcast.latest_label }}</div>
+        <div class="yb-podcast__latest-title">«Что происходит в Израиле — снова обо всём»</div>
+      </div>
+      <div class="yb-podcast__ctas">
+        <a href="https://youtube.com/@yallabalagan" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener">
+          {{ strings.podcast.watch_youtube }}
+        </a>
+        <a href="https://open.spotify.com" class="yb-btn yb-btn--paper yb-btn--full" target="_blank" rel="noopener">
+          {{ strings.podcast.listen_spotify }}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Socials grid ── #}
+<section class="yb-socials yb-pad">
+  <div class="yb-socials__head">
+    <h3>{{ strings.socials.heading }}</h3>
+    <span class="yb-socials__sub">{{ strings.socials.sub }}</span>
+  </div>
+  <div class="yb-socials__grid">
+    <a href="https://instagram.com/yallabala" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">IG</div>
+      <div class="yb-socials__tile-name">Instagram</div>
+      <div class="yb-socials__tile-handle">@yallabala</div>
+    </a>
+    <a href="https://t.me/yallabala" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">TG</div>
+      <div class="yb-socials__tile-name">Telegram</div>
+      <div class="yb-socials__tile-handle">@yallabala</div>
+    </a>
+    <a href="https://youtube.com/@yallabalagan" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">YT</div>
+      <div class="yb-socials__tile-name">YouTube</div>
+      <div class="yb-socials__tile-handle">@yallabalagan</div>
+    </a>
+    <a href="https://facebook.com/YallaBalaganIsrael" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">
+      <div class="yb-socials__tile-glyph">FB</div>
+      <div class="yb-socials__tile-name">Facebook</div>
+      <div class="yb-socials__tile-handle">YallaBalaganIsrael</div>
+    </a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/filter.js"></script>
+{% endblock %}

@@ -292,6 +292,153 @@ def api_gateway_event():
 
 
 @pytest.fixture
+def performers_table(dynamodb_mock):
+    """Create mocked performers table"""
+    table = dynamodb_mock.create_table(
+        TableName='yallabalagan-performers-test',
+        KeySchema=[
+            {'AttributeName': 'PK', 'KeyType': 'HASH'},
+            {'AttributeName': 'SK', 'KeyType': 'RANGE'}
+        ],
+        AttributeDefinitions=[
+            {'AttributeName': 'PK', 'AttributeType': 'S'},
+            {'AttributeName': 'SK', 'AttributeType': 'S'},
+            {'AttributeName': 'slug', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI1PK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI1SK', 'AttributeType': 'S'},
+        ],
+        BillingMode='PAY_PER_REQUEST',
+        GlobalSecondaryIndexes=[
+            {
+                'IndexName': 'SlugIndex',
+                'KeySchema': [{'AttributeName': 'slug', 'KeyType': 'HASH'}],
+                'Projection': {'ProjectionType': 'ALL'}
+            },
+            {
+                'IndexName': 'TenantIndex',
+                'KeySchema': [
+                    {'AttributeName': 'GSI1PK', 'KeyType': 'HASH'},
+                    {'AttributeName': 'GSI1SK', 'KeyType': 'RANGE'}
+                ],
+                'Projection': {'ProjectionType': 'ALL'}
+            }
+        ]
+    )
+    return table
+
+
+@pytest.fixture
+def products_table(dynamodb_mock):
+    """Create mocked products table"""
+    table = dynamodb_mock.create_table(
+        TableName='yallabalagan-products-test',
+        KeySchema=[
+            {'AttributeName': 'PK', 'KeyType': 'HASH'},
+            {'AttributeName': 'SK', 'KeyType': 'RANGE'}
+        ],
+        AttributeDefinitions=[
+            {'AttributeName': 'PK', 'AttributeType': 'S'},
+            {'AttributeName': 'SK', 'AttributeType': 'S'},
+            {'AttributeName': 'slug', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI1PK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI1SK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI2PK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI2SK', 'AttributeType': 'S'},
+        ],
+        BillingMode='PAY_PER_REQUEST',
+        GlobalSecondaryIndexes=[
+            {
+                'IndexName': 'SlugIndex',
+                'KeySchema': [{'AttributeName': 'slug', 'KeyType': 'HASH'}],
+                'Projection': {'ProjectionType': 'ALL'}
+            },
+            {
+                'IndexName': 'PerformerIndex',
+                'KeySchema': [
+                    {'AttributeName': 'GSI1PK', 'KeyType': 'HASH'},
+                    {'AttributeName': 'GSI1SK', 'KeyType': 'RANGE'}
+                ],
+                'Projection': {'ProjectionType': 'ALL'}
+            },
+            {
+                'IndexName': 'StatusIndex',
+                'KeySchema': [
+                    {'AttributeName': 'GSI2PK', 'KeyType': 'HASH'},
+                    {'AttributeName': 'GSI2SK', 'KeyType': 'RANGE'}
+                ],
+                'Projection': {'ProjectionType': 'ALL'}
+            }
+        ]
+    )
+    return table
+
+
+@pytest.fixture
+def merchandise_orders_table(dynamodb_mock):
+    """Create mocked merchandise orders table"""
+    table = dynamodb_mock.create_table(
+        TableName='yallabalagan-merchandise-orders-test',
+        KeySchema=[
+            {'AttributeName': 'PK', 'KeyType': 'HASH'},
+            {'AttributeName': 'SK', 'KeyType': 'RANGE'}
+        ],
+        AttributeDefinitions=[
+            {'AttributeName': 'PK', 'AttributeType': 'S'},
+            {'AttributeName': 'SK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI1PK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI1SK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI2PK', 'AttributeType': 'S'},
+            {'AttributeName': 'GSI2SK', 'AttributeType': 'S'},
+        ],
+        BillingMode='PAY_PER_REQUEST',
+        GlobalSecondaryIndexes=[
+            {
+                'IndexName': 'EmailIndex',
+                'KeySchema': [
+                    {'AttributeName': 'GSI1PK', 'KeyType': 'HASH'},
+                    {'AttributeName': 'GSI1SK', 'KeyType': 'RANGE'}
+                ],
+                'Projection': {'ProjectionType': 'ALL'}
+            },
+            {
+                'IndexName': 'ProductIndex',
+                'KeySchema': [
+                    {'AttributeName': 'GSI2PK', 'KeyType': 'HASH'},
+                    {'AttributeName': 'GSI2SK', 'KeyType': 'RANGE'}
+                ],
+                'Projection': {'ProjectionType': 'ALL'}
+            }
+        ]
+    )
+    return table
+
+
+@pytest.fixture
+def phase4_db_client(events_table, locations_table, orders_table, seat_reservations_table,
+                     performers_table, products_table, merchandise_orders_table):
+    """DynamoDB client with all Phase 4 tables"""
+    os.environ['EVENTS_TABLE'] = 'yallabalagan-events-test'
+    os.environ['LOCATIONS_TABLE'] = 'yallabalagan-locations-test'
+    os.environ['ORDERS_TABLE'] = 'yallabalagan-orders-test'
+    os.environ['SEAT_RESERVATIONS_TABLE'] = 'yallabalagan-seat-reservations-test'
+    os.environ['PERFORMERS_TABLE'] = 'yallabalagan-performers-test'
+    os.environ['PRODUCTS_TABLE'] = 'yallabalagan-products-test'
+    os.environ['MERCHANDISE_ORDERS_TABLE'] = 'yallabalagan-merchandise-orders-test'
+    os.environ['JWT_SECRET'] = 'test-secret-phase4-32chars!!'
+
+    from utils.dynamodb import DynamoDBClient
+    return DynamoDBClient()
+
+
+@pytest.fixture
+def phase4_handler(phase4_db_client):
+    """api-handler module with all Phase 4 tables"""
+    module = import_api_handler()
+    module.db = phase4_db_client
+    return module
+
+
+@pytest.fixture
 def api_handler(db_client):
     """Import and return api-handler module with mocked db and auth"""
     # Import module

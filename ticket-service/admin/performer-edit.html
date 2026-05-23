@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактировать перформера - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            background: white; padding: 24px 30px; border-radius: 12px;
+            margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 16px; font-size: 22px; }
+        .nav { display: flex; gap: 12px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 8px 16px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .card {
+            background: white; border-radius: 12px; padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 15px; font-weight: 700; color: #444;
+            border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;
+            margin-bottom: 20px; margin-top: 24px;
+        }
+        .section-title:first-child { margin-top: 0; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
+        label .req { color: #e53e3e; }
+        input[type="text"], input[type="url"], input[type="email"], input[type="tel"],
+        textarea, select {
+            width: 100%; padding: 10px 12px; border: 1.5px solid #ddd;
+            border-radius: 8px; font-size: 14px; outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus, select:focus { border-color: #667eea; }
+        textarea { resize: vertical; min-height: 90px; }
+        .photo-section { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+        .photo-preview {
+            width: 120px; height: 120px; border-radius: 10px;
+            object-fit: cover; background: #e2e8f0;
+            border: 2px solid #e2e8f0; flex-shrink: 0;
+        }
+        .photo-placeholder {
+            width: 120px; height: 120px; border-radius: 10px;
+            background: #e2e8f0; display: flex; align-items: center;
+            justify-content: center; font-size: 36px; flex-shrink: 0;
+        }
+        .photo-upload-area {
+            flex: 1; border: 2px dashed #c3c9f0; border-radius: 8px;
+            padding: 16px; text-align: center; cursor: pointer;
+            font-size: 13px; color: #888; transition: all 0.2s; min-width: 200px;
+        }
+        .photo-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        .gallery-grid {
+            display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+        }
+        .gallery-item {
+            position: relative; width: 80px; height: 80px;
+        }
+        .gallery-item img {
+            width: 80px; height: 80px; object-fit: cover;
+            border-radius: 8px; border: 1px solid #e2e8f0;
+        }
+        .gallery-item .remove-btn {
+            position: absolute; top: -6px; right: -6px;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #ef4444; color: white; border: none;
+            font-size: 12px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; line-height: 1;
+        }
+        .add-photo-btn {
+            width: 80px; height: 80px; border: 2px dashed #c3c9f0;
+            border-radius: 8px; background: #f8f9ff;
+            font-size: 24px; color: #667eea; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .add-photo-btn:hover { border-color: #667eea; background: #eff1ff; }
+        input[type="file"] { display: none; }
+        .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .btn {
+            padding: 12px 28px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-save { background: #667eea; color: white; }
+        .btn-save:hover { background: #5568d3; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-cancel { background: #f1f5f9; color: #666; margin-left: 10px; }
+        .btn-cancel:hover { background: #e2e8f0; }
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert {
+            padding: 12px 14px; border-radius: 8px; font-size: 14px;
+            margin-bottom: 18px; display: none;
+        }
+        .alert-error { background: #fff0f0; border: 1px solid #fca5a5; color: #dc2626; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #323232;
+            color: white; padding: 16px 24px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="page-title">Новый перформер</h1>
+            <div class="nav">
+                <a href="performers.html" class="nav-btn">← Назад</a>
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div id="alert-error" class="alert alert-error"></div>
+
+            <div class="section-title">Основное фото</div>
+            <div class="photo-section">
+                <div id="main-photo-placeholder" class="photo-placeholder">🎤</div>
+                <img id="main-photo-preview" class="photo-preview" style="display:none" src="" alt="">
+                <div class="photo-upload-area" onclick="document.getElementById('main-photo-file').click()">
+                    Нажмите для загрузки основного фото<br>
+                    <small style="color:#aaa">JPG, PNG до 5MB</small>
+                </div>
+                <input type="file" id="main-photo-file" accept="image/*">
+                <input type="hidden" id="photo-url">
+            </div>
+
+            <div class="section-title">Основная информация</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Имя <span class="req">*</span></label>
+                    <input type="text" id="name" placeholder="Имя перформера">
+                </div>
+                <div class="form-group">
+                    <label>Slug <span class="req">*</span></label>
+                    <input type="text" id="slug" placeholder="performer-name">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Роль <span class="req">*</span></label>
+                    <input type="text" id="role" placeholder="DJ, Музыкант, Художник...">
+                </div>
+                <div class="form-group">
+                    <label>Статус</label>
+                    <select id="status">
+                        <option value="active">Активен</option>
+                        <option value="inactive">Неактивен</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Биография <span class="req">*</span></label>
+                <textarea id="bio" placeholder="Расскажите о перформере..."></textarea>
+            </div>
+
+            <div class="section-title">YouTube</div>
+            <div class="form-group">
+                <label>Ссылка на YouTube (embed URL)</label>
+                <input type="url" id="youtube-embed" placeholder="https://www.youtube.com/embed/VIDEO_ID">
+            </div>
+
+            <div class="section-title">Социальные сети</div>
+            <div class="social-grid">
+                <div class="form-group">
+                    <label>Instagram</label>
+                    <input type="url" id="social-instagram" placeholder="https://instagram.com/...">
+                </div>
+                <div class="form-group">
+                    <label>Telegram</label>
+                    <input type="url" id="social-telegram" placeholder="https://t.me/...">
+                </div>
+                <div class="form-group">
+                    <label>YouTube</label>
+                    <input type="url" id="social-youtube" placeholder="https://youtube.com/...">
+                </div>
+                <div class="form-group">
+                    <label>Facebook</label>
+                    <input type="url" id="social-facebook" placeholder="https://facebook.com/...">
+                </div>
+            </div>
+
+            <div class="section-title">Контакт (для уведомлений о покупках)</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="contact-email" placeholder="contact@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="tel" id="contact-phone" placeholder="+972...">
+                </div>
+            </div>
+
+            <div class="section-title">Дополнительные фото</div>
+            <div class="gallery-grid" id="gallery-grid">
+                <button type="button" class="add-photo-btn" onclick="document.getElementById('gallery-file').click()">+</button>
+            </div>
+            <input type="file" id="gallery-file" accept="image/*" multiple>
+
+            <div style="margin-top: 28px;">
+                <button class="btn btn-save" id="save-btn" onclick="save()">Сохранить</button>
+                <button class="btn btn-cancel" onclick="location.href='performers.html'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const performerId = urlParams.get('id');
+        let galleryUrls = [];
+
+        // ===== Auto-generate slug from name =====
+        document.getElementById('name').addEventListener('input', function() {
+            if (performerId) return; // Don't auto-generate when editing
+            const slug = this.value.toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+            document.getElementById('slug').value = slug;
+        });
+
+        // ===== Main photo upload =====
+        document.getElementById('main-photo-file').addEventListener('change', async function() {
+            const file = this.files[0];
+            if (!file) return;
+            const url = await uploadFile(file);
+            if (!url) return;
+            document.getElementById('photo-url').value = url;
+            document.getElementById('main-photo-preview').src = url;
+            document.getElementById('main-photo-preview').style.display = 'block';
+            document.getElementById('main-photo-placeholder').style.display = 'none';
+        });
+
+        // ===== Gallery upload =====
+        document.getElementById('gallery-file').addEventListener('change', async function() {
+            const files = Array.from(this.files);
+            for (const file of files) {
+                const url = await uploadFile(file);
+                if (url) addGalleryPhoto(url);
+            }
+            this.value = '';
+        });
+
+        async function uploadFile(file) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/upload-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': file.type, 'Authorization': `Bearer ${Auth.getAccessToken()}` },
+                    body: file,
+                });
+                if (!res.ok) throw new Error('Upload failed');
+                const data = await res.json();
+                return data.url || data.image_url;
+            } catch (e) {
+                showToast('Ошибка загрузки фото', 'error');
+                return null;
+            }
+        }
+
+        function addGalleryPhoto(url) {
+            if (galleryUrls.includes(url)) return;
+            galleryUrls.push(url);
+            renderGallery();
+        }
+
+        function removeGalleryPhoto(url) {
+            galleryUrls = galleryUrls.filter(u => u !== url);
+            renderGallery();
+        }
+
+        function renderGallery() {
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = galleryUrls.map(url => `
+                <div class="gallery-item">
+                    <img src="${escapeHtml(url)}" alt="">
+                    <button class="remove-btn" onclick="removeGalleryPhoto('${escapeHtml(url)}')">&times;</button>
+                </div>
+            `).join('') + `<button type="button" class="add-photo-btn" onclick="document.getElementById('gallery-file').click()">+</button>`;
+        }
+
+        // ===== Load existing performer =====
+        async function loadPerformer() {
+            if (!performerId) return;
+            document.getElementById('page-title').textContent = 'Редактировать перформера';
+            try {
+                const data = await API.getPerformer(performerId);
+                const p = data.performer;
+                document.getElementById('name').value = p.name || '';
+                document.getElementById('slug').value = p.slug || '';
+                document.getElementById('bio').value = p.bio || '';
+                document.getElementById('role').value = p.role || '';
+                document.getElementById('status').value = p.status || 'active';
+                document.getElementById('youtube-embed').value = p.youtube_embed || '';
+                document.getElementById('contact-email').value = p.contact_email || '';
+                document.getElementById('contact-phone').value = p.contact_phone || '';
+                document.getElementById('photo-url').value = p.photo_url || '';
+
+                const social = p.social || {};
+                document.getElementById('social-instagram').value = social.instagram || '';
+                document.getElementById('social-telegram').value = social.telegram || '';
+                document.getElementById('social-youtube').value = social.youtube || '';
+                document.getElementById('social-facebook').value = social.facebook || '';
+
+                if (p.photo_url) {
+                    document.getElementById('main-photo-preview').src = p.photo_url;
+                    document.getElementById('main-photo-preview').style.display = 'block';
+                    document.getElementById('main-photo-placeholder').style.display = 'none';
+                }
+
+                galleryUrls = p.photos || [];
+                renderGallery();
+            } catch (e) {
+                handleError(e, 'Ошибка загрузки перформера');
+            }
+        }
+
+        // ===== Save =====
+        async function save() {
+            const btn = document.getElementById('save-btn');
+            const errorBox = document.getElementById('alert-error');
+            errorBox.style.display = 'none';
+
+            const name = document.getElementById('name').value.trim();
+            const slug = document.getElementById('slug').value.trim();
+            const bio = document.getElementById('bio').value.trim();
+            const role = document.getElementById('role').value.trim();
+            const photoUrl = document.getElementById('photo-url').value;
+
+            if (!name || !slug || !bio || !role) {
+                errorBox.textContent = 'Заполните все обязательные поля.';
+                errorBox.style.display = 'block';
+                return;
+            }
+
+
+            const payload = {
+                name, slug, bio, role,
+                status: document.getElementById('status').value,
+                photo_url: photoUrl,
+                photos: galleryUrls,
+                youtube_embed: document.getElementById('youtube-embed').value.trim() || null,
+                social: {
+                    instagram: document.getElementById('social-instagram').value.trim() || null,
+                    telegram: document.getElementById('social-telegram').value.trim() || null,
+                    youtube: document.getElementById('social-youtube').value.trim() || null,
+                    facebook: document.getElementById('social-facebook').value.trim() || null,
+                },
+                contact_email: document.getElementById('contact-email').value.trim() || null,
+                contact_phone: document.getElementById('contact-phone').value.trim() || null,
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Сохранение...';
+
+            try {
+                if (performerId) {
+                    await API.updatePerformer(performerId, payload);
+                } else {
+                    await API.createPerformer(payload);
+                }
+                showToast('Сохранено!');
+                setTimeout(() => location.href = 'performers.html', 800);
+            } catch (e) {
+                errorBox.textContent = e.message || 'Ошибка сохранения';
+                errorBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Сохранить';
+            }
+        }
+
+        initAdmin().then(loadPerformer);
+    </script>
+</body>
+</html>

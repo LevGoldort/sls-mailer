@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Эпизоды - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white; padding: 30px; border-radius: 12px;
+            margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 20px; }
+        .nav { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 10px 20px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 14px;
+            transition: all 0.3s; border: none; cursor: pointer;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .btn-primary { background: #4caf50; }
+        .btn-primary:hover { background: #45a049; }
+        .section {
+            background: white; border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 30px;
+        }
+        .show-filter {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+        }
+        .show-filter label { font-size: 14px; font-weight: 600; color: #555; }
+        .show-filter select {
+            padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
+            font-size: 14px; outline: none;
+        }
+        .show-filter select:focus { border-color: #667eea; }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left; padding: 10px 14px; border-bottom: 2px solid #f0f0f0;
+            font-size: 13px; color: #666; font-weight: 600;
+        }
+        td { padding: 12px 14px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+        tr:hover td { background: #fafafa; }
+        .thumb {
+            width: 60px; height: 40px; object-fit: cover; border-radius: 4px;
+            background: #e2e8f0;
+        }
+        .thumb-placeholder {
+            width: 60px; height: 40px; background: #e2e8f0; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: #aaa;
+        }
+        .ep-num { font-family: monospace; font-size: 13px; color: #888; }
+        .ep-title { font-weight: 600; color: #333; }
+        .ep-slug { font-size: 12px; color: #888; }
+        .show-tag {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; background: #f3e8ff; color: #7c3aed;
+        }
+        .action-btn {
+            padding: 6px 12px; border: none; border-radius: 6px;
+            font-size: 12px; cursor: pointer; transition: all 0.2s; margin-right: 4px;
+        }
+        .btn-edit { background: #dbeafe; color: #1d4ed8; }
+        .btn-edit:hover { background: #bfdbfe; }
+        .btn-delete { background: #fee2e2; color: #dc2626; }
+        .btn-delete:hover { background: #fecaca; }
+        .loading { text-align: center; padding: 60px; color: #666; }
+        .empty { text-align: center; padding: 60px; color: #999; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px;
+            background: #323232; color: white; padding: 16px 24px;
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Эпизоды</h1>
+            <div class="nav">
+                <a href="shows.html" class="nav-btn">← Шоу</a>
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+                <a href="performers.html" class="nav-btn">🎤 Перформеры</a>
+            </div>
+            <div id="user-bar" style="margin-top:14px;display:flex;align-items:center;gap:10px;font-size:14px;"></div>
+            <a id="add-btn" href="episodes-edit.html" class="nav-btn btn-primary" style="display:inline-block;margin-top:14px;">+ Добавить эпизод</a>
+        </div>
+
+        <div class="section">
+            <div class="show-filter">
+                <label>Шоу:</label>
+                <select id="show-select" onchange="filterByShow()">
+                    <option value="">Все шоу</option>
+                </select>
+            </div>
+            <div id="episodes-table">
+                <div class="loading">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script>
+        let allEpisodes = [];
+        let showMap = {};
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const preSelectedShowId = urlParams.get('show_id');
+
+        async function loadData() {
+            try {
+                const [episodesData, showsData] = await Promise.all([
+                    API.getEpisodes(),
+                    API.getShows(),
+                ]);
+                allEpisodes = episodesData.episodes || [];
+                const shows = showsData.shows || [];
+                shows.forEach(s => showMap[s.show_id] = s);
+
+                const sel = document.getElementById('show-select');
+                shows.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.show_id;
+                    opt.textContent = s.name;
+                    sel.appendChild(opt);
+                });
+
+                if (preSelectedShowId) {
+                    sel.value = preSelectedShowId;
+                    document.getElementById('add-btn').href = `episodes-edit.html?show_id=${preSelectedShowId}`;
+                }
+
+                filterByShow();
+            } catch (e) {
+                handleError(e, 'Ошибка загрузки');
+                document.getElementById('episodes-table').innerHTML = '<div class="empty">Ошибка загрузки</div>';
+            }
+        }
+
+        function filterByShow() {
+            const showId = document.getElementById('show-select').value;
+            const filtered = showId ? allEpisodes.filter(e => e.show_id === showId) : allEpisodes;
+            const sorted = filtered.slice().sort((a, b) => (a.show_id === b.show_id)
+                ? (a.number - b.number)
+                : (showMap[a.show_id]?.name || '').localeCompare(showMap[b.show_id]?.name || ''));
+            render(sorted);
+            if (showId) {
+                document.getElementById('add-btn').href = `episodes-edit.html?show_id=${showId}`;
+            } else {
+                document.getElementById('add-btn').href = 'episodes-edit.html';
+            }
+        }
+
+        function render(episodes) {
+            const container = document.getElementById('episodes-table');
+            if (!episodes.length) {
+                container.innerHTML = '<div class="empty">Нет эпизодов</div>';
+                return;
+            }
+            const rows = episodes.map(ep => {
+                const thumb = ep.thumbnail_url
+                    ? `<img class="thumb" src="${escapeHtml(ep.thumbnail_url)}" alt="">`
+                    : `<div class="thumb-placeholder">▶</div>`;
+                const show = showMap[ep.show_id];
+                const showTag = show ? `<span class="show-tag">${escapeHtml(show.name)}</span>` : '';
+                const performers = (ep.performer_ids || []).length;
+                return `
+                    <tr>
+                        <td>${thumb}</td>
+                        <td><span class="ep-num">Эп. ${ep.number}</span></td>
+                        <td>
+                            <div class="ep-title">${escapeHtml(ep.title)}</div>
+                            <div class="ep-slug">${escapeHtml(ep.slug || '')}</div>
+                        </td>
+                        <td>${showTag}</td>
+                        <td>${performers ? `${performers} перф.` : '—'}</td>
+                        <td>
+                            <button class="action-btn btn-edit" onclick="location.href='episodes-edit.html?id=${ep.episode_id}'">✏️ Ред.</button>
+                            <button class="action-btn btn-delete" onclick="deleteEpisode('${ep.episode_id}','${escapeHtml(ep.title).replace(/'/g,"\\&#039;")}')">🗑️</button>
+                        </td>
+                    </tr>`;
+            }).join('');
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th></th><th>№</th><th>Название</th><th>Шоу</th><th>Участники</th><th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+        }
+
+        async function deleteEpisode(id, title) {
+            if (!confirm(`Удалить эпизод "${title}"?`)) return;
+            try {
+                await API.deleteEpisode(id);
+                showToast('Эпизод удалён', 'success');
+                allEpisodes = allEpisodes.filter(e => e.episode_id !== id);
+                filterByShow();
+            } catch (e) {
+                handleError(e, 'Ошибка удаления');
+            }
+        }
+
+        function showToast(msg, type = '') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast toast-show' + (type ? ` toast-${type}` : '');
+            setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        initAdmin().then(loadData);
+    </script>
+</body>
+</html>

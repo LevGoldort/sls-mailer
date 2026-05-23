@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Перформеры - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: white; padding: 30px; border-radius: 12px;
+            margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 20px; }
+        .nav { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 10px 20px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 14px;
+            transition: all 0.3s; border: none; cursor: pointer;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .btn-primary { background: #4caf50; }
+        .btn-primary:hover { background: #45a049; }
+        .section {
+            background: white; border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 30px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            border-radius: 12px; overflow: hidden;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .card-photo {
+            width: 100%; height: 180px; object-fit: cover;
+            background: #e2e8f0;
+        }
+        .card-photo-placeholder {
+            width: 100%; height: 180px; background: #e2e8f0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 48px; color: #aaa;
+        }
+        .card-body { padding: 16px; }
+        .card-name { font-size: 17px; font-weight: 700; color: #333; margin-bottom: 4px; }
+        .card-role { font-size: 13px; color: #667eea; font-weight: 500; margin-bottom: 8px; }
+        .card-bio { font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 12px;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600;
+        }
+        .badge-active { background: #dcfce7; color: #16a34a; }
+        .badge-inactive { background: #fee2e2; color: #dc2626; }
+        .card-actions {
+            display: flex; gap: 8px; padding: 12px 16px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .action-btn {
+            flex: 1; padding: 8px; border: none; border-radius: 6px;
+            font-size: 13px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-edit { background: #dbeafe; color: #1d4ed8; }
+        .btn-edit:hover { background: #bfdbfe; }
+        .btn-delete { background: #fee2e2; color: #dc2626; }
+        .btn-delete:hover { background: #fecaca; }
+        .loading { text-align: center; padding: 60px; color: #666; }
+        .empty { text-align: center; padding: 80px; color: #999; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px;
+            background: #323232; color: white; padding: 16px 24px;
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Перформеры</h1>
+            <div class="nav">
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+                <a href="events.html" class="nav-btn">🎪 События</a>
+                <a href="locations.html" class="nav-btn">📍 Локации</a>
+                <a href="orders.html" class="nav-btn">🛒 Заказы</a>
+                <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
+                <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+                <a href="users.html" class="nav-btn" data-admin-only>👥 Пользователи</a>
+                <a href="performers.html" class="nav-btn" data-admin-only>🎤 Перформеры</a>
+                <a href="products.html" class="nav-btn" data-admin-only>🛍️ Мерч</a>
+            </div>
+            <div id="user-bar" style="margin-top:14px;display:flex;align-items:center;gap:10px;font-size:14px;"></div>
+            <a href="performer-edit.html" class="nav-btn btn-primary" style="display:inline-block;margin-top:14px;">+ Добавить перформера</a>
+        </div>
+
+        <div class="section">
+            <div id="performers-grid" class="grid">
+                <div class="loading">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script>
+        async function loadPerformers() {
+            try {
+                const data = await API.getPerformers();
+                render(data.performers || []);
+            } catch (e) {
+                handleError(e, 'Ошибка загрузки');
+                document.getElementById('performers-grid').innerHTML = '<div class="empty">Ошибка загрузки</div>';
+            }
+        }
+
+        function render(performers) {
+            const grid = document.getElementById('performers-grid');
+            if (!performers.length) {
+                grid.innerHTML = '<div class="empty">Нет перформеров</div>';
+                return;
+            }
+            grid.innerHTML = performers.map(p => {
+                const photo = p.photo_url
+                    ? `<img class="card-photo" src="${escapeHtml(p.photo_url)}" alt="">`
+                    : `<div class="card-photo-placeholder">🎤</div>`;
+                const badge = p.status === 'active'
+                    ? '<span class="badge badge-active">активен</span>'
+                    : '<span class="badge badge-inactive">неактивен</span>';
+                return `
+                    <div class="card">
+                        ${photo}
+                        <div class="card-body">
+                            <div class="card-name">${escapeHtml(p.name)} ${badge}</div>
+                            <div class="card-role">${escapeHtml(p.role || '')}</div>
+                            <div class="card-bio">${escapeHtml(p.bio || '')}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="action-btn btn-edit" onclick="location.href='performer-edit.html?id=${p.performer_id}'">✏️ Редактировать</button>
+                            <button class="action-btn btn-delete" onclick="deletePerformer('${p.performer_id}','${escapeHtml(p.name).replace(/'/g,"\\&#039;")}')">🗑️ Удалить</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function deletePerformer(id, name) {
+            if (!confirm(`Деактивировать перформера "${name}"?`)) return;
+            try {
+                await API.deletePerformer(id);
+                showToast('Перформер деактивирован');
+                loadPerformers();
+            } catch (e) {
+                handleError(e, 'Ошибка удаления');
+            }
+        }
+
+        initAdmin().then(loadPerformers);
+    </script>
+</body>
+</html>

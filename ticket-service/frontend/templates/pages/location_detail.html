@@ -1,0 +1,143 @@
+{% extends 'shared/_base.html' %}
+{% from 'macros/_macros.html' import event_card %}
+
+{% block title %}{{ location.name }} — {{ strings.site.name }}{% endblock %}
+{% block description %}{{ location.description | truncate(160, True, '…') if location.description else location.name }}{% endblock %}
+{% block og_image %}{{ (location.get('media', {}).get('photos', []) or [''])[0] or super() }}{% endblock %}
+
+{% block content %}
+
+{% set _addr = location.get('address', {}) %}
+{% set _coords = _addr.get('coordinates', {}) %}
+{% set _photos = location.get('media', {}).get('photos', []) %}
+{% set _parkings = location.get('parkings', []) %}
+
+{# ── Breadcrumb ── #}
+<div class="yb-breadcrumb">
+  <a href="/">{{ strings.locations.breadcrumb_home }}</a>
+  <span> ► </span>
+  <a href="/events.html">События</a>
+  <span> ► </span>
+  <b style="opacity:1">{{ location.name }}</b>
+</div>
+
+{# ── Hero: photo + info ── #}
+<section class="yb-performer-hero">
+  <div class="yb-performer-hero__box">
+
+    <div class="yb-performer-hero__portrait">
+      <img src="{{ _photos[0] if _photos else pick_placeholder(location.location_id) }}" alt="{{ location.name }}">
+      <div class="yb-halftone yb-halftone--cyan" aria-hidden="true"></div>
+
+      <div style="position:absolute;top:22px;left:22px;padding:6px 12px;background:var(--yb-cyan);border:3px solid var(--yb-ink);font-family:var(--yb-font-mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transform:rotate(-4deg);box-shadow:4px 4px 0 var(--yb-ink)">
+        ★ VENUE ★
+      </div>
+    </div>
+
+    <div class="yb-performer-hero__info" style="position:relative;overflow:hidden">
+      <div style="position:absolute;top:-14px;left:60px;width:130px;height:24px;background:rgba(0,181,216,.55);transform:rotate(-4deg);border:1px solid var(--yb-ink)" aria-hidden="true"></div>
+
+      <h1 class="yb-performer-hero__name" style="font-size:64px">
+        <span class="yb-riso">
+          <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ location.name }}</span>
+          {{ location.name }}
+        </span>
+      </h1>
+
+      {% if _addr %}
+      <div class="yb-venue__addr">
+        {{ _addr.get('street', '') }}{% if _addr.get('city') %} · {{ _addr.city }}{% endif %}
+      </div>
+      {% endif %}
+
+      {% if location.get('description') %}
+      <p class="yb-performer-hero__tagline">{{ location.description }}</p>
+      {% endif %}
+
+      {% if location.get('capacity') %}
+      <div style="font-family:var(--yb-font-mono);font-size:12px;letter-spacing:.1em;opacity:.7;text-transform:uppercase">
+        ▸ {{ location.capacity }}
+        {{ ru_plural(location.capacity, strings.plurals.people_1, strings.plurals.people_2_4, strings.plurals.people_many) }} вместимость
+      </div>
+      {% endif %}
+
+      <div class="yb-performer-hero__socials">
+        {% if _coords.get('lat') %}
+        <a href="https://www.google.com/maps?q={{ _coords.lat }},{{ _coords.lng }}"
+           class="yb-btn yb-btn--primary"
+           target="_blank" rel="noopener">
+          {{ strings.locations.open_maps }}
+        </a>
+        {% elif location.get('map_url') %}
+        <a href="{{ location.map_url }}"
+           class="yb-btn yb-btn--primary"
+           target="_blank" rel="noopener">
+          {{ strings.locations.open_maps }}
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{# ── Photo gallery ── #}
+{% if _photos | length > 1 %}
+<div class="yb-photo-gallery" style="margin:20px 0">
+  {% for photo in _photos[1:] %}
+  <div class="yb-photo-gallery__item">
+    <img src="{{ photo }}" alt="{{ location.name }} {{ loop.index }}" loading="lazy">
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Parking ── #}
+{% if _parkings %}
+<section class="yb-pad" style="padding-bottom:24px">
+  <h2 style="font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase;margin:0 0 20px">
+    {{ strings.locations.parking_heading }}
+  </h2>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    {% for parking in _parkings %}
+    <div style="padding:18px 24px;border:var(--yb-border);background:var(--yb-paper);box-shadow:4px 4px 0 var(--yb-ink);display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap">
+      <div>
+        <div style="font-family:var(--yb-font-display);font-size:18px;letter-spacing:-.01em">{{ parking.description }}</div>
+      </div>
+      {% set _pc = parking.get('coordinates', {}) %}
+      {% if _pc.get('lat') %}
+      <a href="https://www.google.com/maps?q={{ _pc.lat }},{{ _pc.lng }}"
+         class="yb-btn yb-btn--paper yb-btn--sm"
+         target="_blank" rel="noopener">Карта →</a>
+      {% elif parking.get('google_maps_url') %}
+      <a href="{{ parking.google_maps_url }}"
+         class="yb-btn yb-btn--paper yb-btn--sm"
+         target="_blank" rel="noopener">Карта →</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Events at this venue ── #}
+{% if upcoming_events %}
+<section class="yb-pad" style="padding-bottom:48px">
+  <div style="display:flex;align-items:baseline;gap:24px;border-bottom:var(--yb-border);padding-bottom:14px;margin-bottom:24px">
+    <h2 style="margin:0;font-family:var(--yb-font-display);font-size:48px;letter-spacing:-.02em;text-transform:uppercase">
+      {{ strings.locations.events_heading }}
+    </h2>
+    <span style="font-family:var(--yb-font-mono);font-size:12px;opacity:.65;letter-spacing:.12em;text-transform:uppercase">
+      / {{ upcoming_events | length }}
+      {{ ru_plural(upcoming_events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}
+    </span>
+  </div>
+  <div class="yb-events-list">
+    {% for event in upcoming_events %}
+    {{ event_card(event, location=location, index=loop.index0) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

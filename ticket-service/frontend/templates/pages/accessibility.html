@@ -1,0 +1,113 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}Accessibility Statement - YallaBalagan{% endblock %}
+{% block description %}YallaBalagan accessibility statement - We are committed to providing equal access to all users{% endblock %}
+
+{% block content %}
+<div class="content-page">
+    <style>
+        .content-page {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .content-page h1 {
+            color: var(--gray-900);
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary);
+        }
+        .content-page h2 {
+            color: var(--gray-800);
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+        .content-page p {
+            margin-bottom: 1rem;
+            line-height: 1.8;
+            color: var(--gray-700);
+        }
+        .content-page h3 {
+            color: var(--gray-800);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.125rem;
+        }
+        .content-page ul {
+            margin-bottom: 1rem;
+            margin-left: 2rem;
+            color: var(--gray-700);
+        }
+        .content-page li {
+            margin-bottom: 0.5rem;
+            line-height: 1.6;
+        }
+        .content-page a {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            .content-page {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+        }
+    </style>
+
+    <h1>הצהרת נגישות / Accessibility Statement</h1>
+
+    <p>אנו ב-Yalla Balagan מחויבים לספק נגישות שווה לכל המשתמשים.</p>
+    <p>We at Yalla Balagan are committed to providing equal access to all users.</p>
+
+    <p>האתר שלנו עומד בתקן הישראלי ת"י 5568 ברמת AA והמלצות WCAG 2.1.</p>
+    <p>Our website complies with Israeli Standard IS 5568 Level AA and WCAG 2.1 guidelines.</p>
+
+    <h2>כלי נגישות / Accessibility Toolbar</h2>
+    <p>באתר שלנו מותקן כלי נגישות מתקדם המאפשר התאמה אישית של חווית הגלישה. הכפתור הכחול בפינה התחתונה של המסך פותח תפריט עם האפשרויות הבאות:</p>
+    <p>Our website features an advanced accessibility toolbar that allows personalization of the browsing experience. The blue button in the bottom corner of the screen opens a menu with the following options:</p>
+
+    <h3>התאמות חזותיות / Visual Adjustments</h3>
+    <ul>
+        <li><strong>גודל גופן / Font Size:</strong> 4 רמות הגדלה (רגיל, בינוני, גדול, גדול מאוד) / 4 size levels (default, medium, large, extra large)</li>
+        <li><strong>ניגודיות / Contrast:</strong> מצבי ניגודיות גבוהה (כהה, בהיר, הפוך) / High contrast modes (dark, light, inverted)</li>
+        <li><strong>ריווח טקסט / Text Spacing:</strong> הגדלת המרווחים בין אותיות ושורות לקריאה נוחה / Increased spacing between letters and lines for comfortable reading</li>
+        <li><strong>הסתרת תמונות / Hide Images:</strong> הסרת תמונות לטעינה מהירה יותר / Remove images for faster loading</li>
+        <li><strong>הדגשת קישורים / Highlight Links:</strong> הדגשה ויזואלית של כל הקישורים / Visual highlighting of all links</li>
+    </ul>
+
+    <h3>עזרי ניווט / Navigation Aids</h3>
+    <ul>
+        <li><strong>ניגודיות מקלדת / Keyboard Navigation:</strong> מסגרות מודגשות בצהוב לניווט במקלדת / Enhanced yellow outlines for keyboard navigation</li>
+        <li><strong>מדריך קריאה / Reading Guide:</strong> קו אופקי העוקב אחר סמן העכבר / Horizontal line following the mouse cursor</li>
+        <li><strong>דלגלתוכן הראשי / Skip to Content:</strong> קיצור דרך לדלג על התפריט / Keyboard shortcut to skip navigation</li>
+    </ul>
+
+    <h3>תמיכה קוגניטיבית / Cognitive Support</h3>
+    <ul>
+        <li><strong>תמיכה בדיסלקציה / Dyslexia Support:</strong> גופן OpenDyslexic מיוחד לקריאה קלה יותר / OpenDyslexic font for easier reading</li>
+        <li><strong>גובה שורה / Line Height:</strong> 3 רמות של ריווח בין שורות / 3 levels of line spacing</li>
+        <li><strong>ביטול הנפשות / Reduced Motion:</strong> הפחתה או עצירה של אנימציות / Reduction or stopping of animations</li>
+    </ul>
+
+    <p><strong>שמירת העדפות:</strong> כל ההגדרות נשמרות באופן אוטומטי ונשארות פעילות בין ביקורים באתר.</p>
+    <p><strong>Preference Saving:</strong> All settings are automatically saved and remain active between visits to the site.</p>
+
+    <h2>רכז נגישות / Accessibility Coordinator</h2>
+    <p>
+        שם: לב גולדורט<br>
+        Name: Lev Goldort<br>
+        דוא"ל: <a href="mailto:yalla@yallabalagan.org">yalla@yallabalagan.org</a><br>
+        Email: <a href="mailto:yalla@yallabalagan.org">yalla@yallabalagan.org</a><br>
+        טלפון: <a href="tel:+972506491680">+972-50-649-1680</a><br>
+        Phone: <a href="tel:+972506491680">+972-50-649-1680</a>
+    </p>
+
+    <p>אם נתקלתם בבעיית נגישות באתר, אנא צרו קשר ונטפל בכך.</p>
+    <p>If you encounter any accessibility issues, please contact us and we will address them.</p>
+
+    <p>עדכון אחרון: דצמבר 2025 / Last updated: December 2025</p>
+</div>
+{% endblock %}

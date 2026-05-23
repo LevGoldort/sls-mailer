@@ -12,57 +12,53 @@ function escapeHtml(str) {
 }
 
 // Auto-detect environment based on hostname
-const isDev = window.location.hostname.includes('-dev');
+const isDev = window.location.hostname.includes('-dev') || window.location.hostname === 'localhost';
 const API_BASE_URL = isDev
     ? 'https://d4xhvmdzbg.execute-api.eu-north-1.amazonaws.com/dev'
     : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 
-// ===== API Helper =====
-async function apiCall(endpoint, method = 'GET', body = null) {
-    // Get admin API key from localStorage or prompt
-    let adminKey = localStorage.getItem('admin_api_key');
+// Make API_BASE_URL available to auth.js (loaded after shared.js on some pages,
+// but login.html sets it inline before auth.js)
+window.API_BASE_URL = API_BASE_URL;
 
-    if (!adminKey) {
-        adminKey = prompt('🔑 Enter admin API key:');
-        if (!adminKey) {
-            throw new Error('Admin key required');
-        }
-        localStorage.setItem('admin_api_key', adminKey);
+// ===== API Helper =====
+async function apiCall(endpoint, method = 'GET', body = null, _retry = false) {
+    const token = Auth.getAccessToken();
+    if (!token) {
+        window.location.href = 'login.html';
+        throw new Error('Not authenticated');
     }
 
     const options = {
         method,
         headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': adminKey  // Send API key in header
-        }
+            'Authorization': `Bearer ${token}`,
+        },
     };
 
-    if (body) {
-        options.body = JSON.stringify(body);
+    if (body) options.body = JSON.stringify(body);
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+
+    if (response.status === 401 && !_retry) {
+        // Try to refresh once, then retry
+        try {
+            await Auth.refreshToken();
+            return apiCall(endpoint, method, body, true);
+        } catch {
+            await Auth.logout();
+            throw new Error('Session expired');
+        }
     }
 
-    try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    const data = await response.json().catch(() => ({}));
 
-        // Handle 401 - invalid API key
-        if (response.status === 401) {
-            localStorage.removeItem('admin_api_key');  // Clear invalid key
-            alert('❌ Invalid admin key. Please refresh and try again.');
-            throw new Error('Unauthorized: Invalid admin key');
-        }
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-
-        return data;
-    } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+    if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
     }
+
+    return data;
 }
 
 // ===== API Methods =====
@@ -98,7 +94,44 @@ const API = {
     createCoupon: (data) => apiCall('/api/coupons', 'POST', data),
     validateCoupon: (code, eventId, amount) => apiCall('/api/coupons/validate', 'POST', { coupon_code: code, event_id: eventId, amount }),
     updateCoupon: (code, data) => apiCall(`/api/coupons/${code}`, 'PUT', data),
-    deleteCoupon: (code) => apiCall(`/api/coupons/${code}`, 'DELETE')
+    deleteCoupon: (code) => apiCall(`/api/coupons/${code}`, 'DELETE'),
+
+    // Users (admin only)
+    getUsers: () => apiCall('/api/users'),
+    getUser: (id) => apiCall(`/api/users/${id}`),
+    createUser: (data) => apiCall('/api/users', 'POST', data),
+    updateUser: (id, data) => apiCall(`/api/users/${id}`, 'PUT', data),
+    deactivateUser: (id) => apiCall(`/api/users/${id}`, 'DELETE'),
+    resetUserPassword: (id, newPassword) => apiCall(`/api/users/${id}/reset-password`, 'POST', { new_password: newPassword }),
+    changePassword: (data) => apiCall('/api/auth/change-password', 'POST', data),
+
+    // Performers (admin only)
+    getPerformers: () => apiCall('/api/performers'),
+    getPerformer: (id) => apiCall(`/api/performers/${id}`),
+    createPerformer: (data) => apiCall('/api/performers', 'POST', data),
+    updatePerformer: (id, data) => apiCall(`/api/performers/${id}`, 'PUT', data),
+    deletePerformer: (id) => apiCall(`/api/performers/${id}`, 'DELETE'),
+
+    // Products (admin only)
+    getProducts: (performerId = null) => apiCall(`/api/products${performerId ? `?performer_id=${performerId}` : ''}`),
+    getProduct: (id) => apiCall(`/api/products/${id}`),
+    createProduct: (data) => apiCall('/api/products', 'POST', data),
+    updateProduct: (id, data) => apiCall(`/api/products/${id}`, 'PUT', data),
+    deleteProduct: (id) => apiCall(`/api/products/${id}`, 'DELETE'),
+
+    // Shows (admin only)
+    getShows: () => apiCall('/api/shows'),
+    getShow: (id) => apiCall(`/api/shows/${id}`),
+    createShow: (data) => apiCall('/api/shows', 'POST', data),
+    updateShow: (id, data) => apiCall(`/api/shows/${id}`, 'PUT', data),
+    deleteShow: (id) => apiCall(`/api/shows/${id}`, 'DELETE'),
+
+    // Episodes (admin only)
+    getEpisodes: (showId = null) => apiCall(`/api/episodes${showId ? `?show_id=${showId}` : ''}`),
+    getEpisode: (id) => apiCall(`/api/episodes/${id}`),
+    createEpisode: (data) => apiCall('/api/episodes', 'POST', data),
+    updateEpisode: (id, data) => apiCall(`/api/episodes/${id}`, 'PUT', data),
+    deleteEpisode: (id) => apiCall(`/api/episodes/${id}`, 'DELETE'),
 };
 
 // ===== Formatting Functions =====
@@ -356,29 +389,20 @@ async function regenerateSite() {
     `;
 
     try {
-        // Get admin API key from localStorage or prompt
-        let adminKey = localStorage.getItem('admin_api_key');
-
-        if (!adminKey) {
-            adminKey = prompt('🔑 Enter admin API key:');
-            if (!adminKey) {
-                throw new Error('Admin key required');
-            }
-            localStorage.setItem('admin_api_key', adminKey);
-        }
+        const token = Auth.getAccessToken();
+        if (!token) { window.location.href = 'login.html'; return; }
 
         const response = await fetch(`${API_BASE_URL}/api/admin/regenerate-site`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-API-Key': adminKey  // Send API key in header
-            }
+                'Authorization': `Bearer ${token}`,
+            },
         });
 
-        // Handle 401 - invalid API key
         if (response.status === 401) {
-            localStorage.removeItem('admin_api_key');
-            throw new Error('Unauthorized: Invalid admin key. Please refresh and try again.');
+            await Auth.logout();
+            return;
         }
 
         const data = await response.json();
@@ -425,14 +449,51 @@ async function regenerateSite() {
 // Export for global use
 window.regenerateSite = regenerateSite;
 
+// ===== User bar styles (injected once) =====
+(function injectUserBarStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .user-name { font-weight: 600; color: #444; }
+        .user-role { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .role-admin { background: #ede9fe; color: #7c3aed; }
+        .role-organizer { background: #dbeafe; color: #1d4ed8; }
+        .logout-btn { padding: 6px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .logout-btn:hover { background: #e2e8f0; }
+    `;
+    document.head.appendChild(style);
+})();
+
+// ===== User info bar =====
+function renderUserBar() {
+    const user = Auth.getUser();
+    if (!user) return;
+
+    const bar = document.getElementById('user-bar');
+    if (!bar) return;
+
+    bar.innerHTML = `
+        <span class="user-name">${escapeHtml(user.name)}</span>
+        <span class="user-role role-${escapeHtml(user.role)}">${escapeHtml(user.role)}</span>
+        <button onclick="Auth.logout()" class="logout-btn">Выйти</button>
+    `;
+
+    // Hide Users nav link for non-admins (Task 15)
+    document.querySelectorAll('[data-admin-only]').forEach(el => {
+        el.style.display = Auth.isAdmin() ? '' : 'none';
+    });
+}
+
 // ===== Init function to be called on page load =====
-function initAdmin() {
-    console.log('Admin panel initialized');
+async function initAdmin() {
+    await Auth.requireAuth();
+    Auth.startAutoRefresh();
 
     // Add global error handler
     window.addEventListener('unhandledrejection', (event) => {
         handleError(event.reason);
     });
+
+    renderUserBar();
 }
 
 // Auto-init when DOM is ready

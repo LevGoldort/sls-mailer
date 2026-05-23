@@ -1,3 +1,4 @@
+# DEPRECATED — will be removed in Task 17 after full JWT migration
 """Simple API key authentication for admin endpoints"""
 import os
 import hmac
@@ -32,8 +33,20 @@ class AdminAuthenticator:
             print("WARNING: No admin API keys configured!")
 
     def verify_admin_key(self, api_key: str) -> bool:
-        """Verify admin API key with constant-time comparison"""
-        if not api_key or not self.admin_keys:
+        """Verify admin API key or JWT Bearer token with admin role."""
+        if not api_key:
+            return False
+
+        # Accept JWT tokens (eyJ…) that carry an admin role
+        if api_key.startswith('eyJ'):
+            try:
+                from utils.auth_jwt import decode_access_token
+                payload = decode_access_token(api_key)
+                return payload.get('role') == 'admin'
+            except Exception:
+                return False
+
+        if not self.admin_keys:
             return False
 
         # Use constant-time comparison to prevent timing attacks

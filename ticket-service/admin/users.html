@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользователи — Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 { color: #667eea; margin-bottom: 10px; }
+
+        .nav { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+
+        .nav-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .nav-btn:hover { background: #5568d3; }
+
+        #user-bar { margin-top: 14px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+        .user-name { font-weight: 600; color: #444; }
+        .user-role { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .role-admin { background: #ede9fe; color: #7c3aed; }
+        .role-organizer { background: #dbeafe; color: #1d4ed8; }
+        .logout-btn { padding: 6px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .logout-btn:hover { background: #e2e8f0; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-primary:hover { background: #5568d3; }
+
+        .btn-sm {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid;
+        }
+        .btn-edit   { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+        .btn-danger { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+        .btn-reset  { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        th { font-weight: 600; color: #888; font-size: 13px; background: #fafafa; }
+        tr:hover td { background: #fafafa; }
+
+        .badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-admin     { background: #ede9fe; color: #7c3aed; }
+        .badge-organizer { background: #dbeafe; color: #1d4ed8; }
+        .badge-active   { background: #dcfce7; color: #15803d; }
+        .badge-inactive { background: #fee2e2; color: #dc2626; }
+
+        /* Modal */
+        .modal-bg {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-bg.open { display: flex; }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal h2 { margin-bottom: 20px; color: #333; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 500; color: #444; margin-bottom: 6px; }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        .form-group input:focus,
+        .form-group select:focus { border-color: #667eea; }
+
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+        .btn-cancel { padding: 10px 20px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; }
+
+        .error-msg { color: #dc2626; font-size: 13px; margin-top: 12px; display: none; }
+
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast {
+            position: fixed; bottom: 24px; right: 24px;
+            padding: 12px 20px; border-radius: 8px; color: white;
+            font-size: 14px; font-weight: 500; z-index: 999;
+            transform: translateY(80px); transition: transform 0.3s;
+        }
+        .toast.show { transform: translateY(0); }
+        .toast-success { background: #16a34a; }
+        .toast-error   { background: #dc2626; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>👥 Управление пользователями</h1>
+        <div class="nav">
+            <a href="index.html" class="nav-btn">📊 Dashboard</a>
+            <a href="events.html" class="nav-btn">🎪 События</a>
+            <a href="locations.html" class="nav-btn">📍 Локации</a>
+            <a href="orders.html" class="nav-btn">🛒 Заказы</a>
+            <a href="analytics.html" class="nav-btn">📈 Аналитика</a>
+            <a href="coupons.html" class="nav-btn">🎟️ Купоны</a>
+            <a href="users.html" class="nav-btn" data-admin-only>👥 Пользователи</a>
+                <a href="performers.html" class="nav-btn" data-admin-only>🎤 Перформеры</a>
+                <a href="products.html" class="nav-btn" data-admin-only>🛍️ Мерч</a>
+        </div>
+        <div id="user-bar"></div>
+    </div>
+
+    <div class="card">
+        <div class="toolbar">
+            <h2>Пользователи</h2>
+            <button class="btn-primary" id="btn-create">+ Создать пользователя</button>
+        </div>
+        <table id="users-table">
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Email</th>
+                    <th>Роль</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="users-body">
+                <tr><td colspan="5" style="text-align:center;color:#888;padding:32px">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create/Edit modal -->
+<div class="modal-bg" id="modal-create">
+    <div class="modal">
+        <h2 id="modal-title">Создать пользователя</h2>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="f-email" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+            <label>Имя</label>
+            <input type="text" id="f-name" placeholder="Иван Иванов">
+        </div>
+        <div class="form-group">
+            <label>Роль</label>
+            <select id="f-role">
+                <option value="organizer">organizer</option>
+                <option value="admin">admin</option>
+            </select>
+        </div>
+        <div class="form-group" id="group-password">
+            <label>Пароль</label>
+            <input type="password" id="f-password" placeholder="Минимум 8 символов">
+        </div>
+        <div id="modal-error" class="error-msg"></div>
+        <div class="modal-actions">
+            <button class="btn-cancel" id="btn-cancel-create">Отмена</button>
+            <button class="btn-primary" id="btn-save">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reset password modal -->
+<div class="modal-bg" id="modal-reset">
+    <div class="modal">
+        <h2>Сбросить пароль</h2>
+        <p style="color:#666;margin-bottom:16px;font-size:14px">Введите новый пароль для пользователя.</p>
+        <div class="form-group">
+            <label>Новый пароль</label>
+            <input type="password" id="r-password" placeholder="Минимум 8 символов">
+        </div>
+        <div id="reset-error" class="error-msg"></div>
+        <div class="modal-actions">
+            <button class="btn-cancel" id="btn-cancel-reset">Отмена</button>
+            <button class="btn-primary" id="btn-do-reset">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js?v=2"></script>
+<script>
+    let _editUserId = null;
+    let _resetUserId = null;
+
+    // ── table ────────────────────────────────────────────────────────────────
+
+    async function loadUsers() {
+        try {
+            const data = await API.getUsers();
+            renderUsers(data.users || []);
+        } catch (e) {
+            document.getElementById('users-body').innerHTML =
+                `<tr><td colspan="5" style="text-align:center;color:#dc2626">${escapeHtml(e.message)}</td></tr>`;
+        }
+    }
+
+    function renderUsers(users) {
+        const tbody = document.getElementById('users-body');
+        if (!users.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:32px">Нет пользователей</td></tr>';
+            return;
+        }
+        tbody.innerHTML = users.map(u => `
+            <tr>
+                <td>${escapeHtml(u.name)}</td>
+                <td>${escapeHtml(u.email)}</td>
+                <td><span class="badge badge-${escapeHtml(u.role)}">${escapeHtml(u.role)}</span></td>
+                <td><span class="badge badge-${escapeHtml(u.status)}">${escapeHtml(u.status)}</span></td>
+                <td style="display:flex;gap:6px">
+                    <button class="btn-sm btn-edit"    onclick="openEdit('${escapeHtml(u.user_id)}', '${escapeHtml(u.name)}', '${escapeHtml(u.role)}')">Изменить</button>
+                    <button class="btn-sm btn-reset"   onclick="openReset('${escapeHtml(u.user_id)}')">Пароль</button>
+                    ${u.status === 'active'
+                        ? `<button class="btn-sm btn-danger" onclick="deactivate('${escapeHtml(u.user_id)}', '${escapeHtml(u.name)}')">Деактивировать</button>`
+                        : ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // ── create modal ─────────────────────────────────────────────────────────
+
+    function openCreate() {
+        _editUserId = null;
+        document.getElementById('modal-title').textContent = 'Создать пользователя';
+        document.getElementById('f-email').value = '';
+        document.getElementById('f-name').value = '';
+        document.getElementById('f-role').value = 'organizer';
+        document.getElementById('f-password').value = '';
+        document.getElementById('f-email').disabled = false;
+        document.getElementById('group-password').style.display = '';
+        document.getElementById('modal-error').style.display = 'none';
+        document.getElementById('modal-create').classList.add('open');
+    }
+
+    function openEdit(userId, name, role) {
+        _editUserId = userId;
+        document.getElementById('modal-title').textContent = 'Редактировать пользователя';
+        document.getElementById('f-email').value = '';
+        document.getElementById('f-email').disabled = true;
+        document.getElementById('f-name').value = name;
+        document.getElementById('f-role').value = role;
+        document.getElementById('group-password').style.display = 'none';
+        document.getElementById('modal-error').style.display = 'none';
+        document.getElementById('modal-create').classList.add('open');
+    }
+
+    function closeCreate() {
+        document.getElementById('modal-create').classList.remove('open');
+    }
+
+    document.getElementById('btn-create').onclick = openCreate;
+    document.getElementById('btn-cancel-create').onclick = closeCreate;
+
+    document.getElementById('btn-save').onclick = async () => {
+        const btn = document.getElementById('btn-save');
+        const errEl = document.getElementById('modal-error');
+        errEl.style.display = 'none';
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Сохранение...';
+
+            if (_editUserId) {
+                await API.updateUser(_editUserId, {
+                    name: document.getElementById('f-name').value.trim(),
+                    role: document.getElementById('f-role').value,
+                });
+                showToast('Пользователь обновлён', 'success');
+            } else {
+                await API.createUser({
+                    email:    document.getElementById('f-email').value.trim(),
+                    name:     document.getElementById('f-name').value.trim(),
+                    role:     document.getElementById('f-role').value,
+                    password: document.getElementById('f-password').value,
+                });
+                showToast('Пользователь создан', 'success');
+            }
+
+            closeCreate();
+            loadUsers();
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Сохранить';
+        }
+    };
+
+    // ── deactivate ───────────────────────────────────────────────────────────
+
+    async function deactivate(userId, name) {
+        if (!confirm(`Деактивировать пользователя "${name}"?`)) return;
+        try {
+            await API.deactivateUser(userId);
+            showToast('Пользователь деактивирован', 'success');
+            loadUsers();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    // ── reset password modal ─────────────────────────────────────────────────
+
+    function openReset(userId) {
+        _resetUserId = userId;
+        document.getElementById('r-password').value = '';
+        document.getElementById('reset-error').style.display = 'none';
+        document.getElementById('modal-reset').classList.add('open');
+    }
+
+    function closeReset() {
+        document.getElementById('modal-reset').classList.remove('open');
+    }
+
+    document.getElementById('btn-cancel-reset').onclick = closeReset;
+
+    document.getElementById('btn-do-reset').onclick = async () => {
+        const btn = document.getElementById('btn-do-reset');
+        const errEl = document.getElementById('reset-error');
+        errEl.style.display = 'none';
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Сохранение...';
+            await API.resetUserPassword(_resetUserId, document.getElementById('r-password').value);
+            showToast('Пароль обновлён', 'success');
+            closeReset();
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Сохранить';
+        }
+    };
+
+    // ── init ─────────────────────────────────────────────────────────────────
+
+    // Redirect organizers — this page is admin-only
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!Auth.isAdmin()) {
+            window.location.href = 'index.html';
+        } else {
+            loadUsers();
+        }
+    });
+</script>
+</body>
+</html>

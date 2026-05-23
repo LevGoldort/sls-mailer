@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="origin">
+  <title>{% block title %}{{ strings.site.name }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ strings.site.tagline }}{% endblock %}">
+
+  <meta name="keywords" content="{% block keywords %}стендап, комедия, события, Тель-Авив, Израиль, YallaBalagan{% endblock %}">
+  <meta name="author" content="Ялла Балаган">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{% block canonical %}https://yallabalagan.org/{% endblock %}">
+
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:url" content="{% block og_url %}https://yallabalagan.org/{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ self.description() }}{% endblock %}">
+  <meta property="og:image" content="{% block og_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:site_name" content="Ялла Балаган">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% block tw_title %}{{ self.title() }}{% endblock %}">
+  <meta name="twitter:description" content="{% block tw_desc %}{{ self.description() }}{% endblock %}">
+  <meta name="twitter:image" content="{% block tw_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Frank+Ruhl+Libre:wght@400;700;900&family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/css/site.css">
+  <link rel="stylesheet" href="/static/css/accessibility-toolbar.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Ялла Балаган",
+    "url": "https://yallabalagan.org",
+    "logo": "https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg",
+    "email": "yalla@yallabalagan.org",
+    "telephone": "+972506491680",
+    "sameAs": [
+      "https://instagram.com/yallabala",
+      "https://t.me/yallabala",
+      "https://youtube.com/@yallabalagan",
+      "https://facebook.com/YallaBalaganIsrael"
+    ]
+  }
+  </script>
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="yb-page">
+  <a href="#main-content" class="skip-link">К содержимому</a>
+
+  {% include 'shared/_header.html' %}
+
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include 'shared/_footer.html' %}
+
+  <div id="cookie-consent-banner" class="cookie-consent"
+       data-fb-pixel="{{ fb_pixel_id or '' }}"
+       data-ga4="{{ ga4_id or '' }}">
+    <div class="cookie-consent-content">
+      <div class="cookie-consent-text">
+        <h3>Мы используем cookies</h3>
+        <p>
+          Этот сайт использует cookies и аналитические сервисы (Google Analytics, Facebook Pixel)
+          для улучшения вашего опыта.
+          <a href="/privacy.html" target="_blank">Подробнее</a>
+        </p>
+      </div>
+      <div class="cookie-consent-buttons">
+        <button id="cookie-accept" class="cookie-consent-btn cookie-consent-btn-accept">Принять</button>
+        <button id="cookie-decline" class="cookie-consent-btn cookie-consent-btn-decline">Отклонить</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/cookie-consent.js"></script>
+  <script src="/static/js/accessibility-toolbar.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

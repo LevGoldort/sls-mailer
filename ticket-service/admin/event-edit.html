@@ -190,6 +190,37 @@
             margin-top: 5px;
         }
 
+        .event-type-toggle {
+            display: flex; gap: 0; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;
+        }
+        .event-type-btn {
+            flex: 1; padding: 10px 16px; border: none; background: #f5f5f5;
+            cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;
+        }
+        .event-type-btn.active { background: #667eea; color: white; }
+        .event-type-btn:hover:not(.active) { background: #e8e8e8; }
+        .performers-checklist {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px; max-height: 300px; overflow-y: auto;
+            padding: 4px; border: 1px solid #ddd; border-radius: 6px;
+        }
+        .performer-check-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px; border-radius: 6px; border: 1.5px solid #e2e8f0;
+            cursor: pointer; user-select: none; transition: all 0.15s;
+        }
+        .performer-check-item:hover { border-color: #667eea; background: #f0f4ff; }
+        .performer-check-item.selected { border-color: #667eea; background: #eff3ff; }
+        .performer-check-item img {
+            width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+        }
+        .performer-check-placeholder {
+            width: 36px; height: 36px; border-radius: 50%; background: #e2e8f0;
+            flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;
+        }
+        .performer-check-name { font-size: 13px; font-weight: 600; color: #333; }
+
         /* Orders table styles */
         .orders-section {
             background: white;
@@ -1617,6 +1648,21 @@
                         </select>
                     </div>
                 </div>
+
+                <div class="form-group">
+                    <label>Тип события</label>
+                    <div class="event-type-toggle">
+                        <button type="button" class="event-type-btn active" id="btn-internal" onclick="setEventType('internal')">🎪 Внутреннее (билеты)</button>
+                        <button type="button" class="event-type-btn" id="btn-external" onclick="setEventType('external')">🔗 Внешнее (ссылка)</button>
+                    </div>
+                    <div class="help-text">Внутреннее — продажа билетов через эту платформу. Внешнее — ссылка на сторонний сервис.</div>
+                </div>
+
+                <div class="form-group" id="external-url-group" style="display: none;">
+                    <label for="external_url">Ссылка на билеты *</label>
+                    <input type="url" id="external_url" name="external_url" placeholder="https://...">
+                    <div class="help-text">Публичная ссылка на страницу покупки билетов.</div>
+                </div>
             </div>
 
             <div class="form-section">
@@ -1629,6 +1675,17 @@
             </div>
 
             <div class="form-section">
+                <h2>Перформеры</h2>
+                <div class="form-group">
+                    <label>Участвующие перформеры</label>
+                    <div id="performers-checklist" class="performers-checklist">
+                        <div style="color:#999;font-size:13px;padding:8px;">Загрузка...</div>
+                    </div>
+                    <div class="help-text">Выберите перформеров, участвующих в этом событии.</div>
+                </div>
+            </div>
+
+            <div class="form-section" id="ticket-types-section">
                 <h2>Типы билетов</h2>
 
                 <!-- Sales warning banner -->
@@ -1749,6 +1806,7 @@
         </div>
     </div>
 
+    <script src="auth.js"></script>
     <script src="shared.js?v=1770602138"></script>
     <script src="order-modal.js?v=1770602149"></script>
     <script src="shared-image-upload.js"></script>
@@ -1776,6 +1834,9 @@
         let hasSalesWithoutSeats = false;
         let soldTicketsByType = {};  // {ticket_type_id: count} - only COMPLETED
         let pendingTicketsByType = {};  // {ticket_type_id: count} - only PENDING
+
+        let performers = [];  // Loaded from API
+        let currentEventType = 'internal';  // 'internal' | 'external'
 
         function slugify(value) {
             if (!value) return '';
@@ -1851,8 +1912,9 @@
         async function init() {
             initSlugHandlers();
 
-            // Load locations
+            // Load locations and performers
             await loadLocations();
+            await loadPerformers();
 
             // Check if editing existing event
             const urlParams = new URLSearchParams(window.location.search);
@@ -1874,6 +1936,55 @@
                 initImageUploadComponent();
                 addTicketType();
             }
+        }
+
+        async function loadPerformers() {
+            try {
+                const data = await API.getPerformers();
+                performers = data.performers || [];
+                renderPerformersChecklist([]);
+            } catch (e) {
+                console.warn('Could not load performers', e);
+                document.getElementById('performers-checklist').innerHTML =
+                    '<div style="color:#999;font-size:13px;padding:8px;">Не удалось загрузить перформеров</div>';
+            }
+        }
+
+        function renderPerformersChecklist(selectedIds) {
+            const container = document.getElementById('performers-checklist');
+            if (!performers.length) {
+                container.innerHTML = '<div style="color:#999;font-size:13px;padding:8px;">Нет перформеров</div>';
+                return;
+            }
+            container.innerHTML = performers.map(p => {
+                const isSelected = selectedIds.includes(p.performer_id);
+                const photoEl = p.photo_url
+                    ? `<img src="${escapeHtml(p.photo_url)}" alt="">`
+                    : `<div class="performer-check-placeholder">🎤</div>`;
+                return `<div class="performer-check-item${isSelected ? ' selected' : ''}"
+                             data-id="${p.performer_id}"
+                             onclick="togglePerformer(this)">
+                    ${photoEl}
+                    <span class="performer-check-name">${escapeHtml(p.name)}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function togglePerformer(el) {
+            el.classList.toggle('selected');
+        }
+
+        function getSelectedPerformerIds() {
+            return Array.from(document.querySelectorAll('.performer-check-item.selected'))
+                .map(el => el.dataset.id);
+        }
+
+        function setEventType(type) {
+            currentEventType = type;
+            document.getElementById('btn-internal').classList.toggle('active', type === 'internal');
+            document.getElementById('btn-external').classList.toggle('active', type === 'external');
+            document.getElementById('external-url-group').style.display = type === 'external' ? '' : 'none';
+            document.getElementById('ticket-types-section').style.display = type === 'internal' ? '' : 'none';
         }
 
         async function loadLocations() {
@@ -1923,6 +2034,15 @@
 
                 document.getElementById('location_id').value = event.location_id;
                 document.getElementById('status').value = event.status;
+
+                // Load event_type
+                if (event.event_type === 'external') {
+                    setEventType('external');
+                    document.getElementById('external_url').value = event.external_url || '';
+                }
+
+                // Load performer selection
+                renderPerformersChecklist(event.performer_ids || []);
 
                 // Load images if present
                 if (event.images && event.images.length > 0) {
@@ -2129,31 +2249,39 @@
                     ticketTypes.push({ id, name, price, total, available });
                 });
 
-                if (ticketTypes.length === 0) {
-                    throw new Error('Добавьте хотя бы один тип билета');
-                }
-
-                // Validate total >= sold for each ticket type
-                for (const tt of ticketTypes) {
-                    const sold = soldTicketsByType[tt.id] || 0;
-                    if (tt.total < sold) {
-                        throw new Error(
-                            `Количество билетов "${tt.name}" (${tt.total}) не может быть меньше уже проданных (${sold})`
-                        );
+                if (currentEventType === 'internal') {
+                    if (ticketTypes.length === 0) {
+                        throw new Error('Добавьте хотя бы один тип билета');
                     }
-                }
 
-                // Validate total tickets against location capacity
-                const locationId = document.getElementById('location_id').value;
-                const selectedLocation = locations.find(loc => loc.location_id === locationId);
+                    // Validate total >= sold for each ticket type
+                    for (const tt of ticketTypes) {
+                        const sold = soldTicketsByType[tt.id] || 0;
+                        if (tt.total < sold) {
+                            throw new Error(
+                                `Количество билетов "${tt.name}" (${tt.total}) не может быть меньше уже проданных (${sold})`
+                            );
+                        }
+                    }
 
-                if (selectedLocation) {
-                    const totalTickets = ticketTypes.reduce((sum, tt) => sum + tt.total, 0);
+                    // Validate total tickets against location capacity
+                    const locationId = document.getElementById('location_id').value;
+                    const selectedLocation = locations.find(loc => loc.location_id === locationId);
 
-                    if (totalTickets > selectedLocation.capacity) {
-                        throw new Error(
-                            `Общее количество билетов (${totalTickets}) превышает вместимость локации "${selectedLocation.name}" (${selectedLocation.capacity})`
-                        );
+                    if (selectedLocation) {
+                        const totalTickets = ticketTypes.reduce((sum, tt) => sum + tt.total, 0);
+
+                        if (totalTickets > selectedLocation.capacity) {
+                            throw new Error(
+                                `Общее количество билетов (${totalTickets}) превышает вместимость локации "${selectedLocation.name}" (${selectedLocation.capacity})`
+                            );
+                        }
+                    }
+                } else {
+                    // External: validate external_url
+                    const extUrl = document.getElementById('external_url').value.trim();
+                    if (!extUrl) {
+                        throw new Error('Укажите ссылку на билеты для внешнего события');
                     }
                 }
 
@@ -2168,10 +2296,17 @@
                     date: dateTime,
                     location_id: document.getElementById('location_id').value,
                     status: document.getElementById('status').value,
-                    ticket_types: ticketTypes,
                     images: imageUrls,
-                    currency: 'ILS'
+                    currency: 'ILS',
+                    event_type: currentEventType,
+                    performer_ids: getSelectedPerformerIds(),
                 };
+
+                if (currentEventType === 'internal') {
+                    eventData.ticket_types = ticketTypes;
+                } else {
+                    eventData.external_url = document.getElementById('external_url').value.trim();
+                }
 
                 const slugValue = document.getElementById('slug').value.trim();
                 if (slugValue) {

@@ -41,24 +41,9 @@
 - **TTL Behavior**: Items automatically deleted by DynamoDB ~48 hours after expiration
 - **Reservation Duration**: Typically 10-15 minutes
 
-## Known Issues
+## Naming Convention
 
-### Naming Inconsistency
-⚠️ **IMPORTANT**: The production `seat-reservations` table is named `yallabalagan-seat-reservations` (without environment suffix), which doesn't follow the naming convention of other tables.
-
-**Current State**:
-- ✅ Other tables: `yallabalagan-{table}-dev`
-- ❌ Seat reservations: `yallabalagan-seat-reservations` (no suffix)
-
-**Expected State**:
-- Should be: `yallabalagan-seat-reservations-dev`
-
-**Action Required**:
-- For new deployments, SAM template will create correctly named table
-- Existing table can be:
-  1. Manually renamed via AWS Console
-  2. Migrated using data pipeline
-  3. Left as-is (requires code to handle both naming patterns)
+Tables have no environment suffix — dev and prod are isolated via separate AWS accounts. All tables are named `yallabalagan-{table}` in both environments.
 
 ## Data Migration Notes
 

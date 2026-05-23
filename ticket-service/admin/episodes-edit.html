@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактировать эпизод - Ticket Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            background: white; padding: 24px 30px; border-radius: 12px;
+            margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; margin-bottom: 16px; font-size: 22px; }
+        .nav { display: flex; gap: 12px; flex-wrap: wrap; }
+        .nav-btn {
+            padding: 8px 16px; background: #667eea; color: white;
+            text-decoration: none; border-radius: 6px; font-size: 13px;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+        .nav-btn:hover { background: #5568d3; }
+        .card {
+            background: white; border-radius: 12px; padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 15px; font-weight: 700; color: #444;
+            border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;
+            margin-bottom: 20px; margin-top: 24px;
+        }
+        .section-title:first-child { margin-top: 0; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
+        label .req { color: #e53e3e; }
+        input[type="text"], input[type="url"], input[type="number"], textarea, select {
+            width: 100%; padding: 10px 12px; border: 1.5px solid #ddd;
+            border-radius: 8px; font-size: 14px; outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus, select:focus { border-color: #667eea; }
+        textarea { resize: vertical; min-height: 90px; }
+        .photo-section { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+        .photo-preview {
+            width: 160px; height: 90px; border-radius: 8px;
+            object-fit: cover; background: #e2e8f0;
+            border: 2px solid #e2e8f0; flex-shrink: 0;
+        }
+        .photo-placeholder {
+            width: 160px; height: 90px; border-radius: 8px;
+            background: #e2e8f0; display: flex; align-items: center;
+            justify-content: center; font-size: 32px; flex-shrink: 0;
+        }
+        .photo-upload-area {
+            flex: 1; border: 2px dashed #c3c9f0; border-radius: 8px;
+            padding: 16px; text-align: center; cursor: pointer;
+            font-size: 13px; color: #888; transition: all 0.2s; min-width: 200px;
+        }
+        .photo-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        input[type="file"] { display: none; }
+        .performers-list {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+        }
+        .performer-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 10px; background: #f3e8ff; border-radius: 20px;
+            font-size: 13px; color: #7c3aed;
+        }
+        .performer-chip button {
+            background: none; border: none; cursor: pointer;
+            color: #7c3aed; font-size: 14px; line-height: 1; padding: 0;
+        }
+        .performer-add {
+            display: flex; gap: 8px; margin-top: 10px; align-items: center;
+        }
+        .performer-add select {
+            flex: 1; padding: 8px 10px; border: 1.5px solid #ddd;
+            border-radius: 6px; font-size: 13px;
+        }
+        .performer-add button {
+            padding: 8px 14px; background: #f3e8ff; color: #7c3aed;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 13px;
+        }
+        .performer-add button:hover { background: #e9d5ff; }
+        .btn {
+            padding: 12px 28px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-save { background: #667eea; color: white; }
+        .btn-save:hover { background: #5568d3; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-cancel { background: #f1f5f9; color: #666; margin-left: 10px; }
+        .btn-cancel:hover { background: #e2e8f0; }
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert {
+            padding: 12px 14px; border-radius: 8px; font-size: 14px;
+            margin-bottom: 18px; display: none;
+        }
+        .alert-error { background: #fff0f0; border: 1px solid #fca5a5; color: #dc2626; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #323232;
+            color: white; padding: 16px 24px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast-show { transform: translateY(0); opacity: 1; }
+        .toast-success { background: #4caf50; }
+        .toast-error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="page-title">Новый эпизод</h1>
+            <div class="nav">
+                <a href="episodes.html" class="nav-btn" id="back-btn">← Назад</a>
+                <a href="shows.html" class="nav-btn">📺 Шоу</a>
+                <a href="index.html" class="nav-btn">📊 Dashboard</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div id="alert-error" class="alert alert-error"></div>
+
+            <div class="section-title">Основная информация</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Шоу <span class="req">*</span></label>
+                    <select id="show-id" onchange="onShowChange()">
+                        <option value="">— выберите шоу —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Номер эпизода <span class="req">*</span></label>
+                    <input type="number" id="number" placeholder="1" min="1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Название <span class="req">*</span></label>
+                    <input type="text" id="title" placeholder="Название эпизода" oninput="autoSlug()">
+                </div>
+                <div class="form-group">
+                    <label>Slug <span class="req">*</span></label>
+                    <input type="text" id="slug" placeholder="show-ep-1-title">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Описание</label>
+                <textarea id="description" placeholder="Описание эпизода..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Ссылка (YouTube / видео)</label>
+                <input type="url" id="url" placeholder="https://youtu.be/...">
+            </div>
+
+            <div class="section-title">Превью (thumbnail)</div>
+            <div class="photo-section">
+                <div id="thumb-placeholder" class="photo-placeholder">▶</div>
+                <img id="thumb-preview" class="photo-preview" style="display:none" src="" alt="">
+                <div class="photo-upload-area" onclick="document.getElementById('thumb-file').click()">
+                    Загрузить превью<br>
+                    <small style="color:#aaa">JPG, PNG · 16:9 рекомендуется</small>
+                </div>
+                <input type="file" id="thumb-file" accept="image/*">
+                <input type="hidden" id="thumbnail-url">
+            </div>
+
+            <div class="section-title">Участники</div>
+            <div id="performers-chips" class="performers-list"></div>
+            <div class="performer-add">
+                <select id="performer-select">
+                    <option value="">— добавить участника —</option>
+                </select>
+                <button type="button" onclick="addPerformer()">+ Добавить</button>
+            </div>
+
+            <div style="margin-top: 28px;">
+                <button class="btn btn-save" id="save-btn" onclick="save()">Сохранить</button>
+                <button class="btn btn-cancel" id="cancel-btn" onclick="location.href='episodes.html'">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="auth.js"></script>
+    <script src="shared.js"></script>
+    <script src="shared-image-upload.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const episodeId = urlParams.get('id');
+        const preShowId = urlParams.get('show_id');
+
+        let selectedPerformerIds = [];
+        let allPerformers = [];
+        let showSlugMap = {};
+
+        document.getElementById('thumb-file').addEventListener('change', async function() {
+            const file = this.files[0];
+            if (!file) return;
+            const url = await uploadFile(file);
+            if (!url) return;
+            document.getElementById('thumbnail-url').value = url;
+            document.getElementById('thumb-preview').src = url;
+            document.getElementById('thumb-preview').style.display = 'block';
+            document.getElementById('thumb-placeholder').style.display = 'none';
+        });
+
+        function onShowChange() {
+            autoSlug();
+        }
+
+        function autoSlug() {
+            if (episodeId) return;
+            const showId = document.getElementById('show-id').value;
+            const showSlug = showSlugMap[showId] || '';
+            const num = document.getElementById('number').value || '';
+            const title = document.getElementById('title').value.toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+            const parts = [showSlug, num ? `ep${num}` : '', title].filter(Boolean);
+            document.getElementById('slug').value = parts.join('-');
+        }
+
+        document.getElementById('number').addEventListener('input', autoSlug);
+
+        function renderChips() {
+            const container = document.getElementById('performers-chips');
+            container.innerHTML = selectedPerformerIds.map(pid => {
+                const p = allPerformers.find(x => x.performer_id === pid);
+                const name = p ? escapeHtml(p.name) : pid;
+                return `<span class="performer-chip">${name}<button onclick="removePerformer('${pid}')">✕</button></span>`;
+            }).join('');
+        }
+
+        function addPerformer() {
+            const sel = document.getElementById('performer-select');
+            const pid = sel.value;
+            if (!pid || selectedPerformerIds.includes(pid)) return;
+            selectedPerformerIds.push(pid);
+            sel.value = '';
+            renderChips();
+        }
+
+        function removePerformer(pid) {
+            selectedPerformerIds = selectedPerformerIds.filter(x => x !== pid);
+            renderChips();
+        }
+
+        async function loadData() {
+            const [showsData, performersData] = await Promise.all([
+                API.getShows(),
+                API.getPerformers(),
+            ]);
+
+            const shows = showsData.shows || [];
+            allPerformers = performersData.performers || [];
+
+            const showSel = document.getElementById('show-id');
+            shows.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.show_id;
+                opt.textContent = s.name;
+                showSel.appendChild(opt);
+                showSlugMap[s.show_id] = s.slug || '';
+            });
+
+            const perfSel = document.getElementById('performer-select');
+            allPerformers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.performer_id;
+                opt.textContent = p.name;
+                perfSel.appendChild(opt);
+            });
+
+            if (preShowId && !episodeId) {
+                showSel.value = preShowId;
+                document.getElementById('back-btn').href = `episodes.html?show_id=${preShowId}`;
+                document.getElementById('cancel-btn').onclick = () => location.href = `episodes.html?show_id=${preShowId}`;
+            }
+
+            if (episodeId) {
+                document.getElementById('page-title').textContent = 'Редактировать эпизод';
+                const data = await API.getEpisode(episodeId);
+                const ep = data.episode;
+                showSel.value = ep.show_id;
+                document.getElementById('number').value = ep.number;
+                document.getElementById('title').value = ep.title || '';
+                document.getElementById('slug').value = ep.slug || '';
+                document.getElementById('description').value = ep.description || '';
+                document.getElementById('url').value = ep.url || '';
+                if (ep.thumbnail_url) {
+                    document.getElementById('thumbnail-url').value = ep.thumbnail_url;
+                    document.getElementById('thumb-preview').src = ep.thumbnail_url;
+                    document.getElementById('thumb-preview').style.display = 'block';
+                    document.getElementById('thumb-placeholder').style.display = 'none';
+                }
+                selectedPerformerIds = ep.performer_ids || [];
+                renderChips();
+                document.getElementById('back-btn').href = `episodes.html?show_id=${ep.show_id}`;
+                document.getElementById('cancel-btn').onclick = () => location.href = `episodes.html?show_id=${ep.show_id}`;
+            }
+        }
+
+        async function save() {
+            const showId = document.getElementById('show-id').value;
+            const title = document.getElementById('title').value.trim();
+            const slug = document.getElementById('slug').value.trim();
+            const number = parseInt(document.getElementById('number').value, 10);
+
+            if (!showId) { showAlert('Выберите шоу'); return; }
+            if (!title || !slug) { showAlert('Заполните название и slug'); return; }
+            if (!number || number < 1) { showAlert('Укажите корректный номер эпизода'); return; }
+
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Сохранение...';
+
+            const payload = {
+                show_id: showId,
+                number,
+                title,
+                slug,
+                description: document.getElementById('description').value.trim(),
+                url: document.getElementById('url').value.trim() || null,
+                thumbnail_url: document.getElementById('thumbnail-url').value.trim() || null,
+                performer_ids: selectedPerformerIds,
+            };
+
+            try {
+                if (episodeId) {
+                    await API.updateEpisode(episodeId, payload);
+                } else {
+                    await API.createEpisode(payload);
+                }
+                showToast('Сохранено', 'success');
+                setTimeout(() => location.href = `episodes.html?show_id=${showId}`, 800);
+            } catch (e) {
+                showAlert('Ошибка: ' + (e.message || e));
+                btn.disabled = false;
+                btn.textContent = 'Сохранить';
+            }
+        }
+
+        function showAlert(msg) {
+            const el = document.getElementById('alert-error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function showToast(msg, type = '') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast toast-show' + (type ? ` toast-${type}` : '');
+            setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        initAdmin().then(loadData);
+    </script>
+</body>
+</html>
