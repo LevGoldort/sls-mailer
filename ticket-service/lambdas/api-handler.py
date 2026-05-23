@@ -127,6 +127,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         if path == '/api/events/quick' and http_method == 'POST':
             response = handle_quick_post(event)
+        elif path == '/api/locations/quick' and http_method == 'POST':
+            response = handle_quick_location(event)
+        elif path == '/api/url-preview' and http_method == 'POST':
+            response = handle_url_preview(event)
         elif path.startswith('/api/events'):
             response = handle_events(event, http_method, path)
         elif path.startswith('/api/locations'):
@@ -145,6 +149,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = handle_episodes(event, http_method, path)
         elif path.startswith('/api/merchandise'):
             response = handle_merchandise(event, http_method, path)
+        elif path == '/api/upload-image/quick' and http_method == 'POST':
+            response = handle_quick_image_upload(event)
         elif path == '/api/upload-image' and http_method == 'POST':
             response = handle_image_upload(event)
         elif path == '/api/admin/regenerate-site' and http_method == 'POST':
@@ -2563,6 +2569,53 @@ def delete_coupon_handler(coupon_code: str, request_event: Dict) -> Dict:
 
 
 # ===== Image Upload Handler =====
+def handle_quick_image_upload(request_event: Dict) -> Dict:
+    """POST /api/upload-image/quick — S3 upload authenticated with QUICK_POST_SECRET"""
+    import uuid as _uuid
+    quick_secret = os.environ.get('QUICK_POST_SECRET', '')
+    if not quick_secret:
+        return error_response(503, "Quick-post not configured")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    provided_secret = body.get('secret', '')
+    if not provided_secret or not hmac.compare_digest(provided_secret, quick_secret):
+        log_security_event('unauthorized_quick_upload', {'ip': get_client_identifier(request_event)})
+        return error_response(401, "Invalid secret")
+
+    filename = body.get('filename', 'upload.jpg')
+    content_type = body.get('contentType', 'image/jpeg')
+    base64_data = body.get('data', '')
+
+    allowed_ct = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+    if content_type not in allowed_ct:
+        return error_response(400, "Invalid content type")
+    if not base64_data:
+        return error_response(400, "Missing image data")
+
+    try:
+        image_data = base64.b64decode(base64_data)
+    except Exception:
+        return error_response(400, "Invalid base64 data")
+
+    if len(image_data) > 5 * 1024 * 1024:
+        return error_response(400, "Image too large. Maximum: 5MB")
+
+    safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', os.path.basename(filename))
+    safe_filename = f"{_uuid.uuid4().hex[:8]}_{safe_name}"
+
+    bucket = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
+    boto3.client('s3', region_name='eu-north-1').put_object(
+        Bucket=bucket, Key=safe_filename, Body=image_data,
+        ContentType=content_type, CacheControl='max-age=31536000',
+    )
+    url = f"https://{bucket}.s3.eu-north-1.amazonaws.com/{safe_filename}"
+    return success_response({'url': url, 'filename': safe_filename})
+
+
 def handle_image_upload(event: Dict) -> Dict:
     """ADMIN ONLY - Handles image upload to S3 bucket"""
 
@@ -2688,6 +2741,38 @@ def handle_regenerate_site(event: Dict) -> Dict:
         return error_response(500, f"Failed to regenerate site: {str(e)}")
 
 
+def _extract_maps_coords(url: str):
+    """Extract lat/lng from a Google Maps URL. Follows short links. Returns dict or None."""
+    def _parse(u):
+        m = re.search(r'/@(-?\d+\.\d+),(-?\d+\.\d+)', u)
+        if m:
+            return {'lat': float(m.group(1)), 'lng': float(m.group(2))}
+        m = re.search(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)', u)
+        if m:
+            return {'lat': float(m.group(1)), 'lng': float(m.group(2))}
+        m = re.search(r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)', u)
+        if m:
+            return {'lat': float(m.group(1)), 'lng': float(m.group(2))}
+        return None
+
+    coords = _parse(url)
+    if coords:
+        return coords
+
+    if 'goo.gl' in url or 'maps.app' in url:
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                coords = _parse(resp.url)
+                if coords:
+                    return coords
+        except Exception as e:
+            print(f"Maps short link resolve failed: {e}")
+
+    return None
+
+
 # ===== Quick-Post Handler =====
 def handle_quick_post(request_event: Dict) -> Dict:
     """POST /api/events/quick — no JWT; validates QUICK_POST_SECRET from env"""
@@ -2731,7 +2816,15 @@ def handle_quick_post(request_event: Dict) -> Dict:
         performer_ids=body.get('performer_ids', []),
         tenant_id='yallabalagan',
     )
-    db.put_event(evt.to_dynamodb_item())
+    item = evt.to_dynamodb_item()
+    maps_url = body.get('maps_url', '').strip() if body.get('maps_url') else ''
+    if maps_url:
+        item['maps_url'] = maps_url
+        coords = _extract_maps_coords(maps_url)
+        if coords:
+            item['coordinates'] = coords
+            print(f"Extracted coordinates {coords} from {maps_url}")
+    db.put_event(item)
 
     # Trigger site regeneration asynchronously
     try:
@@ -2745,6 +2838,122 @@ def handle_quick_post(request_event: Dict) -> Dict:
         print(f"Site regeneration trigger failed: {e}")
 
     return success_response({'event_id': evt.event_id, 'message': 'Event created'}, 201)
+
+
+def handle_url_preview(request_event: Dict) -> Dict:
+    """POST /api/url-preview — public, fetches OG tags and uploads image to S3"""
+    import urllib.request
+    import uuid
+    from html.parser import HTMLParser
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    url = body.get('url', '').strip()
+    if not url or not url.startswith(('http://', 'https://')):
+        return error_response(400, "Valid URL required")
+
+    class OGParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.og = {}
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'meta':
+                d = dict(attrs)
+                prop = d.get('property', '') or d.get('name', '')
+                if prop in ('og:title', 'og:description', 'og:image') and 'content' in d:
+                    self.og[prop] = d['content']
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html = resp.read(100_000).decode('utf-8', errors='ignore')
+    except Exception as e:
+        return error_response(502, f"Could not fetch URL: {e}")
+
+    parser = OGParser()
+    parser.feed(html)
+    og = parser.og
+
+    # Download OG image server-side and upload to S3 (avoids browser CORS)
+    s3_image_url = ''
+    og_image = og.get('og:image', '')
+    if og_image and og_image.startswith(('http://', 'https://')):
+        try:
+            img_req = urllib.request.Request(og_image, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(img_req, timeout=5) as img_resp:
+                ct = img_resp.headers.get('Content-Type', 'image/jpeg').split(';')[0].strip()
+                allowed_ct = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+                if ct not in allowed_ct:
+                    ct = 'image/jpeg'
+                image_data = img_resp.read(3 * 1024 * 1024)  # cap at 3 MB
+            ext = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'}.get(ct, 'jpg')
+            key = f"og_{uuid.uuid4().hex[:8]}.{ext}"
+            bucket = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
+            boto3.client('s3', region_name='eu-north-1').put_object(
+                Bucket=bucket, Key=key, Body=image_data,
+                ContentType=ct, CacheControl='max-age=31536000',
+            )
+            s3_image_url = f"https://{bucket}.s3.eu-north-1.amazonaws.com/{key}"
+        except Exception as img_err:
+            print(f"OG image upload failed: {img_err}")
+
+    return success_response({
+        'title':       og.get('og:title', ''),
+        'description': og.get('og:description', ''),
+        'image':       s3_image_url,
+    })
+
+
+def handle_quick_location(request_event: Dict) -> Dict:
+    """POST /api/locations/quick — creates a minimal location, auth via QUICK_POST_SECRET"""
+    quick_secret = os.environ.get('QUICK_POST_SECRET', '')
+    if not quick_secret:
+        return error_response(503, "Quick-post not configured")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    provided_secret = body.get('secret', '')
+    if not provided_secret or not hmac.compare_digest(provided_secret, quick_secret):
+        log_security_event('unauthorized_quick_location', {'ip': get_client_identifier(request_event)})
+        return error_response(401, "Invalid secret")
+
+    name = body.get('name', '').strip()
+    city = body.get('city', '').strip()
+    address_text = body.get('address', '').strip()
+    maps_url = body.get('maps_url', '').strip() if body.get('maps_url') else ''
+    if not name or not city or not address_text:
+        return error_response(400, "name, city and address are required")
+
+    coords = Coordinates(lat=0, lng=0)
+    if maps_url:
+        extracted = _extract_maps_coords(maps_url)
+        if extracted:
+            coords = Coordinates(lat=extracted['lat'], lng=extracted['lng'])
+
+    slug = re.sub(r'[^\w-]', '', re.sub(r'[\s]+', '-', name.lower()))[:80]
+
+    loc = Location(
+        location_id=Location.generate_id(),
+        name=name,
+        slug=slug,
+        address=Address(
+            street=address_text,
+            city=city,
+            coordinates=coords,
+        ),
+        description='',
+        short_description='',
+        capacity=0,
+    )
+    db.put_location(loc.to_dynamodb_item())
+    return success_response({'location': {'location_id': loc.location_id, 'name': loc.name}}, 201)
 
 
 # ===== Performers Handlers =====

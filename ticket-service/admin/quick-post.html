@@ -181,9 +181,50 @@
         .upload-area:hover { border-color: #667eea; background: #f8f9ff; }
 
         .upload-area.uploading { opacity: 0.6; pointer-events: none; }
+        #gate {
+            position: fixed; inset: 0;
+            background: #f5f6fa;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999;
+        }
+        #gate.hidden { display: none; }
+        .gate-box {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+        .gate-box h2 { font-size: 22px; font-weight: 700; color: #667eea; margin-bottom: 8px; }
+        .gate-box p  { color: #888; font-size: 14px; margin-bottom: 24px; }
+        .gate-box input {
+            width: 100%; padding: 12px 14px;
+            border: 1.5px solid #e0e0e0; border-radius: 8px;
+            font-size: 16px; margin-bottom: 12px; outline: none;
+        }
+        .gate-box input:focus { border-color: #667eea; }
+        .gate-box button {
+            width: 100%; padding: 12px;
+            background: #667eea; color: white;
+            border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+        }
+        .gate-box button:hover { background: #5568d3; }
+        .gate-error { color: #dc2626; font-size: 13px; margin-top: 8px; display: none; }
     </style>
 </head>
 <body>
+    <div id="gate">
+        <div class="gate-box">
+            <h2>YallaBalagan</h2>
+            <p>Введи код доступа</p>
+            <input type="password" id="gate-password" placeholder="Код доступа" autofocus>
+            <button onclick="checkGate()">Войти</button>
+            <div class="gate-error" id="gate-error">Неверный код</div>
+        </div>
+    </div>
     <div class="container">
         <div class="header">
             <h1>YallaBalagan</h1>
@@ -213,6 +254,7 @@
                 <div class="form-group">
                     <label>Ссылка на событие <span class="req">*</span></label>
                     <input type="url" id="external-url" placeholder="https://..." required>
+                    <div id="og-status" style="font-size:12px;color:#888;margin-top:4px;display:none"></div>
                 </div>
 
                 <div class="form-group">
@@ -234,13 +276,15 @@
 
                 <div class="form-group">
                     <label>Место проведения</label>
-                    <select id="location">
-                        <option value="">— не указано —</option>
-                    </select>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <select id="location" style="flex:1"></select>
+                        <button type="button" onclick="openLocationPopup()" style="white-space:nowrap;padding:9px 12px;background:#f0f0f0;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;cursor:pointer;color:#555">+ Локация</button>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label>Участники / перформеры</label>
+                    <input type="text" id="performer-search" placeholder="Поиск по имени..." style="margin-bottom:8px;padding:8px 10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;outline:none">
                     <div class="performer-list" id="performer-list">
                         <div style="color:#aaa; font-size:13px; padding:4px">Загрузка...</div>
                     </div>
@@ -248,6 +292,35 @@
 
                 <button type="submit" id="submit-btn" class="btn">Опубликовать событие</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Location popup -->
+    <div id="location-popup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:8888;align-items:center;justify-content:center">
+        <div style="background:white;border-radius:16px;padding:32px;width:100%;max-width:400px;margin:16px;box-shadow:0 4px 24px rgba(0,0,0,0.15)">
+            <h3 style="margin-bottom:20px;font-size:18px;color:#333">Новая локация</h3>
+            <div style="margin-bottom:14px">
+                <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Название <span style="color:#e53e3e">*</span></label>
+                <input type="text" id="loc-name" placeholder="Название площадки" style="width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none">
+            </div>
+            <div style="margin-bottom:14px">
+                <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Город <span style="color:#e53e3e">*</span></label>
+                <input type="text" id="loc-city" placeholder="Тель-Авив" style="width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none">
+            </div>
+            <div style="margin-bottom:20px">
+                <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Адрес <span style="color:#e53e3e">*</span></label>
+                <input type="text" id="loc-address" placeholder="ул. Дизенгоф, 50" style="width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none">
+            </div>
+            <div style="margin-bottom:20px">
+                <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:6px">Ссылка на Google Карты</label>
+                <input type="url" id="loc-maps-url" placeholder="https://maps.app.goo.gl/..." style="width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none">
+                <div id="loc-maps-status" style="font-size:12px;margin-top:4px;display:none"></div>
+            </div>
+            <div id="loc-error" style="color:#dc2626;font-size:13px;margin-bottom:12px;display:none"></div>
+            <div style="display:flex;gap:10px">
+                <button type="button" onclick="closeLocationPopup()" style="flex:1;padding:10px;background:#f0f0f0;border:none;border-radius:8px;font-size:14px;cursor:pointer;color:#555">Отмена</button>
+                <button type="button" onclick="saveLocation()" id="loc-save-btn" style="flex:1;padding:10px;background:#667eea;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:white">Сохранить</button>
+            </div>
         </div>
     </div>
 
@@ -266,17 +339,19 @@
         }
 
         // ===== Load locations =====
-        async function loadLocations() {
+        async function loadLocations(selectId) {
             try {
                 const res = await fetch(`${API_BASE}/api/locations`);
                 const data = await res.json();
                 const sel = document.getElementById('location');
+                sel.innerHTML = '<option value="">— не выбрано —</option>';
                 (data.locations || []).forEach(loc => {
                     const opt = document.createElement('option');
                     opt.value = loc.location_id || loc.PK?.replace('LOCATION#', '');
                     opt.textContent = loc.name;
                     sel.appendChild(opt);
                 });
+                if (selectId) sel.value = selectId;
             } catch (e) {
                 console.warn('Could not load locations', e);
             }
@@ -323,9 +398,40 @@
         // ===== Image upload =====
         document.getElementById('image-file').addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            if (!file) return;
-            await uploadImage(file);
+            if (file) await uploadImage(file);
         });
+
+        // Drag-and-drop
+        const _uploadArea = document.getElementById('upload-area');
+        _uploadArea.addEventListener('dragover', e => { e.preventDefault(); _uploadArea.style.borderColor = '#667eea'; _uploadArea.style.background = '#f8f9ff'; });
+        _uploadArea.addEventListener('dragleave', () => { _uploadArea.style.borderColor = ''; _uploadArea.style.background = ''; });
+        _uploadArea.addEventListener('drop', async e => {
+            e.preventDefault();
+            _uploadArea.style.borderColor = ''; _uploadArea.style.background = '';
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) await uploadImage(file);
+        });
+
+        // Paste anywhere on the page
+        document.addEventListener('paste', async e => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) { await uploadImage(file); break; }
+                }
+            }
+        });
+
+        async function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
 
         async function uploadImage(file) {
             const area = document.getElementById('upload-area');
@@ -333,19 +439,24 @@
             area.textContent = 'Загрузка...';
 
             try {
-                const res = await fetch(`${API_BASE}/api/upload-image`, {
+                const b64 = await fileToBase64(file);
+                const secret = document.getElementById('secret').value.trim();
+                const res = await fetch(`${API_BASE}/api/upload-image/quick`, {
                     method: 'POST',
-                    headers: { 'Content-Type': file.type },
-                    body: file,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        secret,
+                        filename: file.name || 'upload.jpg',
+                        contentType: file.type || 'image/jpeg',
+                        data: b64,
+                    }),
                 });
                 if (!res.ok) throw new Error('Upload failed');
                 const data = await res.json();
-                const url = data.url || data.image_url;
+                const url = data.url;
                 document.getElementById('image-url').value = url;
-
-                const preview = document.getElementById('image-preview');
                 document.getElementById('image-preview-img').src = url;
-                preview.style.display = 'block';
+                document.getElementById('image-preview').style.display = 'block';
                 area.textContent = 'Фото загружено. Нажмите для замены.';
             } catch (e) {
                 area.textContent = 'Ошибка загрузки. Попробуйте снова.';
@@ -432,6 +543,162 @@
 
         loadLocations();
         loadPerformers();
+
+        // ===== Password gate =====
+        const GATE_KEY = 'qp_access';
+        const gate = document.getElementById('gate');
+
+        if (localStorage.getItem(GATE_KEY) === '1') {
+            gate.classList.add('hidden');
+            prefillSecret();
+        }
+
+        document.getElementById('gate-password').addEventListener('keydown', e => {
+            if (e.key === 'Enter') checkGate();
+        });
+
+        function checkGate() {
+            const val = document.getElementById('gate-password').value;
+            if (val === 'yallafriend') {
+                localStorage.setItem(GATE_KEY, '1');
+                gate.classList.add('hidden');
+                prefillSecret();
+            } else {
+                document.getElementById('gate-error').style.display = 'block';
+            }
+        }
+
+        function prefillSecret() {
+            document.getElementById('secret').value = 'yallafriend';
+        }
+
+        // ===== Google Maps (в попапе локации) =====
+        function extractMapsCoords(url) {
+            let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+            if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+            m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+            if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+            m = url.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+            if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+            return null;
+        }
+
+        document.addEventListener('blur', function(e) {
+            if (e.target.id !== 'loc-maps-url') return;
+            const url = e.target.value.trim();
+            const status = document.getElementById('loc-maps-status');
+            if (!url) { status.style.display = 'none'; return; }
+            const coords = extractMapsCoords(url);
+            if (coords) {
+                status.textContent = `Координаты: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)} ✓`;
+                status.style.color = '#16a34a';
+            } else if (url.includes('goo.gl') || url.includes('maps.app')) {
+                status.textContent = 'Короткая ссылка — координаты будут извлечены при сохранении';
+                status.style.color = '#888';
+            } else {
+                status.textContent = 'Координаты не найдены в ссылке';
+                status.style.color = '#dc2626';
+            }
+            status.style.display = 'block';
+        }, true);
+
+        // ===== OG auto-fetch =====
+        document.getElementById('external-url').addEventListener('blur', async function() {
+            const url = this.value.trim();
+            if (!url) return;
+            const status = document.getElementById('og-status');
+            status.textContent = 'Загрузка данных из ссылки...';
+            status.style.display = 'block';
+            try {
+                const res = await fetch(`${API_BASE}/api/url-preview`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url }),
+                });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                if (!document.getElementById('title').value && data.title) {
+                    document.getElementById('title').value = data.title;
+                }
+                if (!document.getElementById('description').value && data.description) {
+                    document.getElementById('description').value = data.description;
+                }
+                if (!document.getElementById('image-url').value && data.image) {
+                    document.getElementById('image-url').value = data.image;
+                    document.getElementById('image-preview-img').src = data.image;
+                    document.getElementById('image-preview').style.display = 'block';
+                    document.getElementById('upload-area').textContent = 'Фото загружено. Нажмите для замены.';
+                }
+                status.textContent = data.title ? 'Данные подтянуты ✓' : '';
+                if (!data.title) status.style.display = 'none';
+            } catch (_) {
+                status.style.display = 'none';
+            }
+        });
+
+        // ===== Location popup =====
+        function openLocationPopup() {
+            const popup = document.getElementById('location-popup');
+            popup.style.display = 'flex';
+            document.getElementById('loc-name').value = '';
+            document.getElementById('loc-city').value = '';
+            document.getElementById('loc-address').value = '';
+            document.getElementById('loc-maps-url').value = '';
+            document.getElementById('loc-maps-status').style.display = 'none';
+            document.getElementById('loc-error').style.display = 'none';
+            document.getElementById('loc-name').focus();
+        }
+
+        function closeLocationPopup() {
+            document.getElementById('location-popup').style.display = 'none';
+        }
+
+        async function saveLocation() {
+            const name = document.getElementById('loc-name').value.trim();
+            const city = document.getElementById('loc-city').value.trim();
+            const address = document.getElementById('loc-address').value.trim();
+            const mapsUrl = document.getElementById('loc-maps-url').value.trim();
+            const errDiv = document.getElementById('loc-error');
+            const saveBtn = document.getElementById('loc-save-btn');
+
+            if (!name || !city || !address) {
+                errDiv.textContent = 'Заполните все поля';
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            const secret = document.getElementById('secret').value.trim();
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Сохранение...';
+            errDiv.style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/locations/quick`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret, name, city, address, maps_url: mapsUrl || null }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`);
+                closeLocationPopup();
+                await loadLocations(data.location.location_id);
+            } catch (err) {
+                errDiv.textContent = err.message || 'Ошибка при сохранении';
+                errDiv.style.display = 'block';
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Сохранить';
+            }
+        }
+
+        // ===== Performer search =====
+        document.getElementById('performer-search').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            document.querySelectorAll('#performer-list .performer-item').forEach(item => {
+                const name = item.querySelector('span')?.textContent.toLowerCase() || '';
+                item.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        });
     </script>
 </body>
 </html>

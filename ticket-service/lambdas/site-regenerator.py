@@ -127,6 +127,9 @@ def _enrich_event(event, performer_map):
         event['min_price'] = min(t['price'] for t in event['ticket_types'])
     event_performer_ids = event.get('performer_ids', [])
     event['performers'] = [performer_map[pid] for pid in event_performer_ids if pid in performer_map]
+    if 'photo_url' not in event:
+        imgs = event.get('images', [])
+        event['photo_url'] = imgs[0] if imgs else ''
 
 
 def fetch_data():
