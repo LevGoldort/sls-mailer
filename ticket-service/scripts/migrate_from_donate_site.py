@@ -254,7 +254,7 @@ def run(env: str):
         print("ERROR: NOTION_TOKEN, NOTION_DATABASE_ID_TALENTS, and NOTION_DATABASE_ID_PRODUCTS must be set")
         sys.exit(1)
 
-    profile = 'yallabalagan-prod' if env == 'prod' else f'yallabalagan-{env}'
+    profile = os.environ.get('AWS_PROFILE', 'prod' if env == 'prod' else f'yallabalagan-{env}')
     region = os.environ.get('AWS_REGION', 'eu-north-1')
     performers_table_name = os.environ.get('PERFORMERS_TABLE', 'yallabalagan-performers')
     products_table_name = os.environ.get('PRODUCTS_TABLE', 'yallabalagan-products')

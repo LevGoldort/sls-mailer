@@ -175,7 +175,7 @@ def run(env: str):
         print("ERROR: NOTION_TOKEN and NOTION_DATABASE_ID_EVENTS must be set")
         sys.exit(1)
 
-    profile = 'yallabalagan-prod' if env == 'prod' else f'yallabalagan-{env}'
+    profile = os.environ.get('AWS_PROFILE', 'prod' if env == 'prod' else f'yallabalagan-{env}')
     region = os.environ.get('AWS_REGION', 'eu-north-1')
     events_table_name = os.environ.get('EVENTS_TABLE', 'yallabalagan-events')
 
