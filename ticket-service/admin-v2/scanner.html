@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ralphy — Ticket Scanner</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .scanner-auth {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--purple);
+      padding: 20px;
+    }
+    .scanner-auth-card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px 32px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .scanner-auth-card h1 {
+      font-size: 32px; font-weight: 800;
+      color: var(--purple); margin-bottom: 6px; text-align: center;
+    }
+    .scanner-auth-card .sub {
+      color: var(--gray-mid); font-size: 14px;
+      text-align: center; margin-bottom: 28px;
+    }
+    .scanner-app { display: none; flex-direction: column; min-height: 100vh; }
+    .scanner-app.active { display: flex; }
+    .scanner-header {
+      background: var(--purple); color: white;
+      padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .scanner-header .brand { font-size: 20px; font-weight: 800; }
+    .scanner-header .event-name { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+    .scanner-tabs {
+      display: flex; background: white;
+      border-bottom: 1px solid var(--border);
+    }
+    .scanner-tab {
+      flex: 1; padding: 14px; background: transparent; border: none;
+      font-size: 15px; font-weight: 500; color: var(--gray-mid); cursor: pointer;
+      border-bottom: 3px solid transparent; transition: all 0.2s;
+    }
+    .scanner-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+    .scanner-panel { display: none; flex: 1; }
+    .scanner-panel.active { display: flex; flex-direction: column; }
+    #qr-reader { width: 100%; background: #000; }
+    .scan-controls {
+      padding: 16px 20px; background: white;
+      display: flex; gap: 10px; justify-content: center;
+      border-top: 1px solid var(--border);
+    }
+    .scan-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px; transition: background 0.15s;
+    }
+    .scan-overlay.hidden { display: none; }
+    .scan-overlay.success-bg { background: #1b5e20; }
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      70% { transform: scale(1.06); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .scan-result-card {
+      background: white; border-radius: 16px;
+      padding: 32px 24px; text-align: center;
+      max-width: 320px; width: 100%;
+      animation: popIn 0.25s ease;
+    }
+    .success-bg .scan-result-card { background: #2e7d32; color: white; }
+    .success-bg .scan-result-card .result-title { color: white; font-size: 26px; }
+    .success-bg .scan-result-card .result-sub { color: rgba(255,255,255,0.85); font-size: 16px; }
+    .success-bg .scan-result-card .scan-icon { font-size: 72px; }
+    .scan-icon { font-size: 52px; margin-bottom: 12px; display: block; }
+    .result-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .result-sub { font-size: 14px; color: var(--gray-mid); }
+    .result-warning .result-title { color: #e65100; }
+    .result-error .result-title { color: #c62828; }
+    .search-panel-bar {
+      padding: 16px; background: white;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-results-list { padding: 16px; flex: 1; overflow-y: auto; }
+    .guest-card {
+      background: white; border-radius: 12px; padding: 16px;
+      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .guest-name { font-size: 16px; font-weight: 700; color: var(--dark); }
+    .guest-phone { font-size: 13px; color: var(--gray-mid); margin-top: 2px; margin-bottom: 12px; }
+    .ticket-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-top: 1px solid var(--border); gap: 8px; flex-wrap: wrap;
+    }
+    .ticket-info { flex: 1; min-width: 0; }
+    .ticket-type { font-size: 14px; font-weight: 600; }
+    .ticket-seat { font-size: 12px; color: var(--gray-mid); }
+    .all-checked-banner {
+      background: #e8f5e9; color: #2e7d32;
+      border-radius: 8px; padding: 8px 12px;
+      font-size: 13px; font-weight: 600; text-align: center; margin-top: 8px;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-10px); }
+      40% { transform: translateX(10px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.4s ease; }
+  </style>
+</head>
+<body style="background:var(--page-bg);">
+
+<!-- AUTH SCREEN -->
+<div class="scanner-auth" id="auth-screen">
+  <div class="scanner-auth-card" id="auth-card">
+    <h1>Ralphy</h1>
+    <p class="sub">Ticket Scanner</p>
+    <div class="form-group">
+      <label class="form-label">Event</label>
+      <select class="form-select" id="event-select" onchange="onEventSelected()">
+        <option value="">Loading events…</option>
+      </select>
+    </div>
+    <div id="password-section" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="password-input" placeholder="Door staff password"
+               onkeydown="if(event.key==='Enter') signIn()">
+      </div>
+      <button class="btn btn-primary" id="signin-btn" onclick="signIn()" style="width:100%;">Sign in</button>
+    </div>
+    <div style="color:#e53935;font-size:13px;margin-top:10px;text-align:center;min-height:20px;" id="auth-error"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="scanner-app" id="app-screen">
+  <div class="scanner-header">
+    <div>
+      <div class="brand">Ralphy</div>
+      <div class="event-name" id="header-event-name">—</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="signOut()" style="color:white;border-color:rgba(255,255,255,0.3);">Sign out</button>
+  </div>
+
+  <div class="scanner-tabs">
+    <button class="scanner-tab active" id="tab-scan-btn" onclick="switchTab('scan')">📷 Scan</button>
+    <button class="scanner-tab" id="tab-search-btn" onclick="switchTab('search')">🔍 Search</button>
+  </div>
+
+  <div class="scanner-panel active" id="tab-scan">
+    <div id="qr-reader"></div>
+    <div class="scan-controls">
+      <button class="btn btn-primary" id="pause-btn" onclick="togglePause()">Pause</button>
+    </div>
+  </div>
+
+  <div class="scanner-panel" id="tab-search">
+    <div class="search-panel-bar">
+      <input class="form-input" type="text" id="search-input" placeholder="Name, email, or phone…"
+             oninput="onSearchInput()" onkeydown="if(event.key==='Enter') doSearch()">
+    </div>
+    <div class="search-results-list" id="search-results">
+      <div style="text-align:center;padding:40px;color:var(--gray-mid);">Search for a guest</div>
+    </div>
+  </div>
+</div>
+
+<div class="scan-overlay hidden" id="scan-overlay">
+  <div class="scan-result-card" id="scan-result-card">
+    <span class="scan-icon" id="result-icon">✅</span>
+    <div class="result-title" id="result-title">Valid</div>
+    <div class="result-sub" id="result-sub"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+        integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+"
+        crossorigin="anonymous"></script>
+<script>
+  const isDev = window.location.hostname.includes('-dev') || window.location.hostname === 'localhost';
+  const API_BASE = isDev
+    ? 'https://wcyt1odrnc.execute-api.eu-north-1.amazonaws.com/dev'
+    : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+
+  let html5QrCode = null, scannerPaused = false, scannerRunning = false, searchTimer = null;
+
+  function getToken()     { return sessionStorage.getItem('scannerToken'); }
+  function getEventId()   { return sessionStorage.getItem('scannerEventId'); }
+  function getEventName() { return sessionStorage.getItem('scannerEventName') || ''; }
+  function scanHeaders()  { return { 'Content-Type': 'application/json', 'X-Scanner-Token': getToken(), 'X-Scanner-Event': getEventId() }; }
+
+  function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(str) { return String(str || '').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+
+  window.addEventListener('load', async () => {
+    if (getToken() && getEventId()) { showApp(); } else { await loadEvents(); }
+  });
+
+  async function loadEvents() {
+    const sel = document.getElementById('event-select');
+    try {
+      const resp = await fetch(`${API_BASE}/api/events`);
+      const data = await resp.json();
+      const now = Date.now(), cutoff = now - 8 * 60 * 60 * 1000;
+      const events = (data.events || []).filter(e => e.status !== 'cancelled' && new Date(e.date).getTime() > cutoff);
+      sel.innerHTML = events.length
+        ? '<option value="">— Select event —</option>' + events.map(e => `<option value="${escAttr(e.event_id)}" data-name="${esc(e.title)}">${esc(e.title)}</option>`).join('')
+        : '<option value="">No upcoming events</option>';
+    } catch { sel.innerHTML = '<option value="">Failed to load events</option>'; }
+  }
+
+  function onEventSelected() {
+    document.getElementById('password-section').style.display = document.getElementById('event-select').value ? 'block' : 'none';
+    document.getElementById('auth-error').textContent = '';
+  }
+
+  async function signIn() {
+    const eventId = document.getElementById('event-select').value;
+    const token   = document.getElementById('password-input').value;
+    const btn     = document.getElementById('signin-btn');
+    const errEl   = document.getElementById('auth-error');
+    if (!eventId || !token) return;
+    btn.disabled = true; btn.textContent = 'Signing in…'; errEl.textContent = '';
+    try {
+      const resp = await fetch(`${API_BASE}/api/scanner/search?event_id=${encodeURIComponent(eventId)}&q=test`, {
+        headers: { 'X-Scanner-Token': token, 'X-Scanner-Event': eventId }
+      });
+      if (resp.ok) {
+        const sel = document.getElementById('event-select');
+        sessionStorage.setItem('scannerToken', token);
+        sessionStorage.setItem('scannerEventId', eventId);
+        sessionStorage.setItem('scannerEventName', sel.options[sel.selectedIndex].dataset.name || '');
+        showApp();
+      } else {
+        errEl.textContent = 'Wrong password';
+        const card = document.getElementById('auth-card');
+        card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+      }
+    } catch { errEl.textContent = 'Connection error'; }
+    finally { btn.disabled = false; btn.textContent = 'Sign in'; }
+  }
+
+  function signOut() {
+    sessionStorage.removeItem('scannerToken');
+    sessionStorage.removeItem('scannerEventId');
+    sessionStorage.removeItem('scannerEventName');
+    stopCamera(); location.reload();
+  }
+
+  function showApp() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-screen').classList.add('active');
+    document.getElementById('header-event-name').textContent = getEventName();
+    startCamera();
+  }
+
+  function switchTab(tab) {
+    document.getElementById('tab-scan-btn').classList.toggle('active', tab === 'scan');
+    document.getElementById('tab-search-btn').classList.toggle('active', tab === 'search');
+    document.getElementById('tab-scan').classList.toggle('active', tab === 'scan');
+    document.getElementById('tab-search').classList.toggle('active', tab === 'search');
+    if (tab === 'scan' && !scannerRunning) startCamera();
+    if (tab === 'search') stopCamera();
+  }
+
+  async function startCamera() {
+    if (scannerRunning) return;
+    try {
+      if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
+      await html5QrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 260 } }, onScanSuccess, () => {});
+      scannerRunning = true; scannerPaused = false;
+      document.getElementById('pause-btn').textContent = 'Pause';
+    } catch (e) { console.error('Camera error:', e); }
+  }
+
+  function stopCamera() {
+    if (html5QrCode && scannerRunning) { html5QrCode.stop().catch(() => {}); scannerRunning = false; }
+  }
+
+  function togglePause() {
+    if (!html5QrCode || !scannerRunning) return;
+    if (scannerPaused) { html5QrCode.resume(); scannerPaused = false; document.getElementById('pause-btn').textContent = 'Pause'; }
+    else               { html5QrCode.pause();  scannerPaused = true;  document.getElementById('pause-btn').textContent = 'Resume'; }
+  }
+
+  async function onScanSuccess(code) {
+    if (!html5QrCode) return;
+    html5QrCode.pause(); scannerPaused = true;
+    try {
+      const resp = await fetch(`${API_BASE}/api/orders/verify/${encodeURIComponent(code)}`, { method: 'POST', headers: scanHeaders() });
+      const data = await resp.json();
+      showScanResult(data, resp.ok);
+    } catch { showScanResult(null, false); }
+    setTimeout(() => {
+      hideScanResult();
+      if (html5QrCode && scannerRunning) { html5QrCode.resume(); scannerPaused = false; }
+    }, 2500);
+  }
+
+  function showScanResult(data, httpOk) {
+    const overlay = document.getElementById('scan-overlay');
+    const card    = document.getElementById('scan-result-card');
+    const icon    = document.getElementById('result-icon');
+    const title   = document.getElementById('result-title');
+    const sub     = document.getElementById('result-sub');
+    card.className = 'scan-result-card';
+    overlay.classList.remove('success-bg');
+    if (httpOk && data?.valid) {
+      overlay.classList.add('success-bg');
+      icon.textContent = '✅'; title.textContent = data.ticket?.customer_name || 'Valid ticket';
+      const parts = [data.ticket?.ticket_type]; if (data.ticket?.seat_id) parts.push(`Seat: ${data.ticket.seat_id}`);
+      sub.textContent = parts.filter(Boolean).join(' · ');
+      playBeep(880, 100);
+    } else if (data?.reason === 'already_scanned') {
+      card.classList.add('result-warning'); icon.textContent = '⚠️';
+      title.textContent = 'Already scanned'; sub.textContent = data.scanned_at ? `at ${fmtTime(data.scanned_at)}` : ''; playBeep(220, 80, 2);
+    } else if (data?.reason === 'wrong_event') {
+      card.classList.add('result-error'); icon.textContent = '❌';
+      title.textContent = 'Wrong event'; sub.textContent = 'This ticket is for a different event'; playBeep(220, 80, 2);
+    } else {
+      card.classList.add('result-error'); icon.textContent = '❌';
+      title.textContent = 'Invalid ticket'; sub.textContent = (data?.error) || 'Not found or payment incomplete'; playBeep(220, 80, 2);
+    }
+    overlay.classList.remove('hidden');
+  }
+
+  function hideScanResult() { document.getElementById('scan-overlay').classList.add('hidden'); }
+
+  function playBeep(hz, durationMs, pulses = 1) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < pulses; i++) {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = hz; gain.gain.value = 0.3;
+        const t = ctx.currentTime + i * (durationMs + 100) / 1000;
+        osc.start(t); osc.stop(t + durationMs / 1000);
+      }
+    } catch {}
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchTimer);
+    if (document.getElementById('search-input').value.length >= 2) searchTimer = setTimeout(doSearch, 400);
+  }
+
+  async function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    const eventId = getEventId();
+    const container = document.getElementById('search-results');
+    if (!eventId || q.length < 2) return;
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-mid);">Searching…</div>';
+    try {
+      const resp = await fetch(`${API_BASE}/api/scanner/search?event_id=${encodeURIComponent(eventId)}&q=${encodeURIComponent(q)}`, { headers: scanHeaders() });
+      const data = await resp.json();
+      renderSearch(data.results || []);
+    } catch { container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-mid);">Connection error</div>'; }
+  }
+
+  function renderSearch(results) {
+    const container = document.getElementById('search-results');
+    if (!results.length) { container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-mid);">No results</div>'; return; }
+    container.innerHTML = results.map(order => {
+      const tickets = order.tickets || [];
+      const allChecked = tickets.length > 0 && tickets.every(t => t.scanned || t.cancelled);
+      return `<div class="guest-card" id="order-${escAttr(order.order_id)}">
+        <div class="guest-name">${esc(order.customer?.name || '—')}</div>
+        <div class="guest-phone">${esc(order.customer?.phone || '')}</div>
+        ${tickets.map(t => renderTicketRow(order.order_id, t)).join('')}
+        ${allChecked ? '<div class="all-checked-banner">All checked in ✓</div>' : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function renderTicketRow(orderId, t) {
+    const seatText = t.seat_id ? `<div class="ticket-seat">Seat: ${esc(t.seat_id)}</div>` : '';
+    let badge, btn = '';
+    if (t.cancelled)       { badge = '<span class="badge badge-inactive">Cancelled</span>'; }
+    else if (t.scanned)    { badge = `<span class="badge badge-active">✓ Scanned${t.scanned_at ? ' ' + fmtTime(t.scanned_at) : ''}</span>`; }
+    else                   { badge = '<span class="badge">Not scanned</span>'; btn = `<button class="btn btn-primary btn-sm" id="btn-${escAttr(t.code)}" onclick="checkIn('${escAttr(orderId)}','${escAttr(t.code)}',this)">✓ Check in</button>`; }
+    return `<div class="ticket-row" id="row-${escAttr(t.code)}">
+      <div class="ticket-info"><div class="ticket-type">${esc(t.ticket_type || '—')}</div>${seatText}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${badge}${btn}</div>
+    </div>`;
+  }
+
+  async function checkIn(orderId, code, btn) {
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      const resp = await fetch(`${API_BASE}/api/orders/verify/${encodeURIComponent(code)}`, { method: 'POST', headers: scanHeaders() });
+      const data = await resp.json();
+      if ((resp.ok && data.valid) || data.reason === 'already_scanned') {
+        const scannedAt = data.ticket?.scanned_at || data.scanned_at || new Date().toISOString();
+        const row = document.getElementById(`row-${code}`);
+        if (row) row.querySelector('div:last-child').innerHTML = `<span class="badge badge-active">✓ Scanned ${fmtTime(scannedAt)}</span>`;
+        const card = document.getElementById(`order-${orderId}`);
+        if (card && !card.querySelector('.btn-primary') && !card.querySelector('.all-checked-banner')) {
+          const banner = document.createElement('div'); banner.className = 'all-checked-banner'; banner.textContent = 'All checked in ✓'; card.appendChild(banner);
+        }
+      } else { btn.disabled = false; btn.textContent = '✓ Check in'; alert(data.error || 'Check-in failed'); }
+    } catch { btn.disabled = false; btn.textContent = '✓ Check in'; }
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '';
+    try {
+      const s = (iso.endsWith('Z') || iso.includes('+')) ? iso : iso + 'Z';
+      return new Date(s).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jerusalem' });
+    } catch { return iso; }
+  }
+</script>
+</body>
+</html>

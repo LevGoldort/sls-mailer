@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Поиск — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Глобальный поиск</h1>
+        <p class="page-subtitle">По заказам, событиям, покупателям</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <div class="card-body">
+        <div class="search-input-wrap" style="max-width:600px;">
+          <span class="search-input-icon">🔍</span>
+          <input class="search-input" id="q" placeholder="Имя, email, телефон, ID заказа, название события..."
+                 autofocus style="font-size:16px;padding:12px 12px 12px 40px;">
+        </div>
+        <p id="status-hint" style="font-size:12px;color:var(--gray);margin-top:8px;">Загрузка данных...</p>
+      </div>
+    </div>
+
+    <div id="results" style="display:none;">
+      <div id="orders-section" style="display:none;">
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header">
+            <span class="card-title">Заказы</span>
+            <span class="tab-count" id="orders-count">0</span>
+          </div>
+          <div class="card-body" style="padding-top:0;">
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>ID</th><th>Имя</th><th>Email</th><th>Событие</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr></thead>
+                <tbody id="orders-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="events-section" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">События</span>
+            <span class="tab-count" id="events-count">0</span>
+          </div>
+          <div class="card-body" style="padding-top:0;">
+            <div id="events-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="empty-result" style="display:none;">
+        <div class="empty">
+          <span class="empty-icon">🔍</span>
+          <span class="empty-text">Ничего не найдено</span>
+          <span class="empty-hint">Попробуйте другой запрос</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script src="order-modal.js"></script>
+<script>
+  let allOrders = [], allEvents = [], dataLoaded = false;
+  let searchTimer = null;
+
+  async function loadData() {
+    try {
+      const [ordersData, eventsData] = await Promise.all([API.getOrders(), API.getEvents()]);
+      allOrders = ordersData.orders || [];
+      allEvents = eventsData.events || [];
+      dataLoaded = true;
+      document.getElementById('status-hint').textContent = 'Введите запрос для поиска';
+      const q = document.getElementById('q').value.trim();
+      if (q.length >= 2) doSearch(q);
+    } catch (err) {
+      document.getElementById('status-hint').textContent = 'Ошибка загрузки данных';
+      handleError(err, 'Ошибка загрузки');
+    }
+  }
+
+  function getEventTitle(eventId) {
+    const e = allEvents.find(ev => ev.event_id === eventId);
+    return e ? e.title : eventId;
+  }
+
+  document.getElementById('q').addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    const q = e.target.value.trim();
+    if (!q) { hideResults(); return; }
+    searchTimer = setTimeout(() => { if (dataLoaded) doSearch(q); }, 300);
+  });
+
+  function hideResults() {
+    document.getElementById('results').style.display = 'none';
+  }
+
+  function doSearch(q) {
+    const lq = q.toLowerCase();
+
+    const orders = allOrders.filter(o =>
+      o.order_id.toLowerCase().includes(lq) ||
+      (o.customer?.email  || '').toLowerCase().includes(lq) ||
+      (o.customer?.phone  || '').toLowerCase().includes(lq) ||
+      (o.customer?.name   || '').toLowerCase().includes(lq)
+    ).slice(0, 50);
+
+    const events = allEvents.filter(e =>
+      e.title.toLowerCase().includes(lq) ||
+      (e.description || '').toLowerCase().includes(lq)
+    ).slice(0, 20);
+
+    renderResults({ orders, events });
+  }
+
+  function renderResults(data) {
+    const orders = data.orders || [];
+    const events = data.events || [];
+    const hasAny  = orders.length || events.length;
+
+    document.getElementById('results').style.display = '';
+    document.getElementById('empty-result').style.display  = hasAny ? 'none' : '';
+    document.getElementById('orders-section').style.display = orders.length ? '' : 'none';
+    document.getElementById('events-section').style.display = events.length ? '' : 'none';
+
+    document.getElementById('orders-count').textContent = orders.length;
+    document.getElementById('events-count').textContent = events.length;
+
+    if (orders.length) {
+      document.getElementById('orders-tbody').innerHTML = orders.map(o => {
+        const status = o.payment?.status || 'pending';
+        return `<tr style="cursor:pointer;" onclick="openOrderModal('${o.order_id}')">
+          <td class="mono">${o.order_id.slice(0,12)}...</td>
+          <td style="font-weight:500;">${escapeHtml(o.customer?.name || '-')}</td>
+          <td style="font-size:13px;">${escapeHtml(o.customer?.email || '')}</td>
+          <td style="font-size:13px;color:var(--gray-mid);">${escapeHtml(getEventTitle(o.event_id))}</td>
+          <td>${formatCurrency(o.total_amount)}</td>
+          <td><span class="status-badge status-${status}">${status}</span></td>
+          <td style="font-size:13px;">${formatDate(o.created_at)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    if (events.length) {
+      document.getElementById('events-list').innerHTML = events.map(event => {
+        const isExternal = event.event_type === 'external';
+        const stats = calculateEventStats(event);
+        return `<div class="event-row" style="cursor:pointer;" onclick="navigateTo('event-edit.html?id=${event.event_id}')">
+          <div class="event-row-info">
+            <div class="event-row-title">
+              ${escapeHtml(event.title)}
+              ${isExternal ? '<span class="badge" style="background:var(--orange-bg);color:var(--orange);font-size:10px;margin-left:6px;">external</span>' : ''}
+            </div>
+            <div class="event-row-meta">
+              <span>${formatDate(event.date)}</span>
+              ${!isExternal ? `<span>Продано: ${stats.soldTickets}/${stats.totalTickets}</span>` : ''}
+            </div>
+          </div>
+          <span class="badge badge-${event.status}">${event.status}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  loadData();
+</script>
+</body>
+</html>

@@ -130,12 +130,12 @@ def test_get_seat_availability_with_reservations(db_client, sample_event, api_ga
     assert body['reserved_seats_details'][0]['session_id'] == 'session-123'
 
 
-def test_save_seat_allocation_success(db_client, sample_event, admin_api_key, api_gateway_event, api_handler):
+def test_save_seat_allocation_success(db_client, sample_event, jwt_admin_token, api_gateway_event, api_handler):
     """Test POST /api/events/{event_id}/seat-allocation with valid data"""
     # Setup
     db_client.put_event(sample_event)
 
-    
+
 
     # New seat allocation
     new_allocation = {
@@ -151,7 +151,7 @@ def test_save_seat_allocation_success(db_client, sample_event, admin_api_key, ap
         'POST',
         '/api/events/test-event-1/seat-allocation',
         body={'seat_allocation': new_allocation},
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response = api_handler.lambda_handler(event, None)
 
@@ -182,14 +182,14 @@ def test_save_seat_allocation_unauthorized(db_client, sample_event, api_gateway_
 
     assert response['statusCode'] == 401
     body = json.loads(response['body'])
-    assert 'Unauthorized' in body['error']
+    assert 'Authentication required' in body['error']
 
 
-def test_save_seat_allocation_exceeds_total(db_client, sample_event, admin_api_key, api_gateway_event, api_handler):
+def test_save_seat_allocation_exceeds_total(db_client, sample_event, jwt_admin_token, api_gateway_event, api_handler):
     """Test seat allocation that exceeds ticket type total"""
     db_client.put_event(sample_event)
 
-    
+
 
     # Try to allocate more seats than available for regular (total: 50)
     oversized_allocation = {f'0-{i}': 'tt-regular' for i in range(60)}
@@ -198,7 +198,7 @@ def test_save_seat_allocation_exceeds_total(db_client, sample_event, admin_api_k
         'POST',
         '/api/events/test-event-1/seat-allocation',
         body={'seat_allocation': oversized_allocation},
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response = api_handler.lambda_handler(event, None)
 
@@ -207,7 +207,7 @@ def test_save_seat_allocation_exceeds_total(db_client, sample_event, admin_api_k
     assert 'exceeds total' in body['error']
 
 
-def test_save_seat_allocation_cannot_modify_sold_seat(db_client, sample_event, admin_api_key, api_gateway_event, api_handler):
+def test_save_seat_allocation_cannot_modify_sold_seat(db_client, sample_event, jwt_admin_token, api_gateway_event, api_handler):
     """Test that sold seats cannot be reallocated to different ticket type"""
     # Setup event
     db_client.put_event(sample_event)
@@ -251,7 +251,7 @@ def test_save_seat_allocation_cannot_modify_sold_seat(db_client, sample_event, a
         'POST',
         '/api/events/test-event-1/seat-allocation',
         body={'seat_allocation': new_allocation},
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response = api_handler.lambda_handler(event, None)
 
@@ -261,17 +261,17 @@ def test_save_seat_allocation_cannot_modify_sold_seat(db_client, sample_event, a
     assert '0-0' in body['error']
 
 
-def test_save_seat_allocation_missing_data(db_client, sample_event, admin_api_key, api_gateway_event, api_handler):
+def test_save_seat_allocation_missing_data(db_client, sample_event, jwt_admin_token, api_gateway_event, api_handler):
     """Test POST /api/events/{event_id}/seat-allocation with missing data"""
     db_client.put_event(sample_event)
 
-    
+
 
     event = api_gateway_event(
         'POST',
         '/api/events/test-event-1/seat-allocation',
         body={},  # Empty body
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response = api_handler.lambda_handler(event, None)
 

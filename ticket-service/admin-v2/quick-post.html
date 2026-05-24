@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Быстрый пост — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Быстрый пост</h1>
+        <p class="page-subtitle">Добавить внешнее событие на сайт</p>
+      </div>
+    </div>
+
+    <form id="quick-post-form" style="max-width:640px;" onsubmit="handleSubmit(event)">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основное</span></div>
+        <div class="card-body">
+          <div id="alert-error" class="alert alert-error" style="display:none;"></div>
+          <div id="alert-success" class="alert alert-success" style="display:none;"></div>
+
+          <div class="form-group">
+            <label class="form-label">Название *</label>
+            <input class="form-input" type="text" id="title" placeholder="Название события" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Дата и время *</label>
+            <input class="form-input" type="datetime-local" id="date" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ссылка на событие *</label>
+            <input class="form-input" type="url" id="external-url" placeholder="https://..." required>
+            <div id="og-status" class="form-hint" style="display:none;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Описание</label>
+            <textarea class="form-textarea" id="description" placeholder="Краткое описание (необязательно)"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Обложка</span></div>
+        <div class="card-body">
+          <div class="upload-area" id="upload-area" onclick="document.getElementById('image-file').click()">
+            Нажмите для загрузки фото или вставьте из буфера обмена
+          </div>
+          <input type="file" id="image-file" accept="image/*" style="display:none;">
+          <div id="image-preview" style="display:none;margin-top:12px;">
+            <img id="image-preview-img" src="" alt="" style="max-width:100%;max-height:200px;border-radius:8px;">
+          </div>
+          <input type="hidden" id="image-url">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Место и участники</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Место проведения</label>
+            <div style="display:flex;gap:8px;">
+              <select class="form-select" id="location" style="flex:1;"></select>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openLocationPopup()">+ Локация</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Участники / перформеры</label>
+            <input class="form-input" type="text" id="performer-search" placeholder="Поиск..." style="margin-bottom:8px;">
+            <div class="performers-grid" id="performer-list" style="border:1px solid var(--border);border-radius:8px;max-height:160px;overflow-y:auto;padding:8px;">
+              <div style="color:var(--gray);font-size:13px;padding:4px;">Загрузка...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary" id="submit-btn" style="width:100%;">Опубликовать событие</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+
+<!-- Location popup -->
+<div class="modal-overlay" id="location-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="modal-title">Новая локация</span>
+      <button class="modal-close" onclick="closeLocationPopup()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Название *</label>
+        <input class="form-input" type="text" id="loc-name" placeholder="Название площадки">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Город *</label>
+        <input class="form-input" type="text" id="loc-city" placeholder="Тель-Авив">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Адрес *</label>
+        <input class="form-input" type="text" id="loc-address" placeholder="ул. Дизенгоф, 50">
+      </div>
+      <div id="loc-error" style="color:#ef4444;font-size:13px;display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeLocationPopup()">Отмена</button>
+      <button class="btn btn-primary" id="loc-save-btn" onclick="saveLocation()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  const SECRET_KEY = 'yallafriend';
+
+  async function loadLocations(selectId) {
+    try {
+      const data = await API.getLocations();
+      const sel = document.getElementById('location');
+      sel.innerHTML = '<option value="">— не выбрано —</option>';
+      (data.locations || []).forEach(loc => {
+        const opt = document.createElement('option');
+        opt.value = loc.location_id;
+        opt.textContent = loc.name;
+        sel.appendChild(opt);
+      });
+      if (selectId) sel.value = selectId;
+    } catch {}
+  }
+
+  async function loadPerformers() {
+    const container = document.getElementById('performer-list');
+    try {
+      const data = await API.getPerformers();
+      const performers = data.performers || [];
+      if (!performers.length) { container.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:4px;">Нет перформеров</div>'; return; }
+      container.innerHTML = '';
+      performers.forEach(p => {
+        const div = document.createElement('div');
+        div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 4px;border-radius:6px;cursor:pointer;';
+        div.innerHTML = `
+          <input type="checkbox" id="perf-${p.performer_id}" value="${p.performer_id}" style="width:16px;height:16px;cursor:pointer;accent-color:var(--purple);">
+          ${p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">` : ''}
+          <span style="font-size:13px;">${escapeHtml(p.name)}</span>`;
+        div.addEventListener('click', e => {
+          if (e.target.tagName !== 'INPUT') { const cb = div.querySelector('input'); cb.checked = !cb.checked; }
+        });
+        container.appendChild(div);
+      });
+    } catch { container.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:4px;">Ошибка загрузки</div>'; }
+  }
+
+  document.getElementById('image-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (file) await uploadImage(file);
+  });
+
+  document.addEventListener('paste', async e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) { const file = item.getAsFile(); if (file) { await uploadImage(file); break; } }
+    }
+  });
+
+  const uploadArea = document.getElementById('upload-area');
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--purple)'; });
+  uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+  uploadArea.addEventListener('drop', async e => {
+    e.preventDefault(); uploadArea.style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (file?.type.startsWith('image/')) await uploadImage(file);
+  });
+
+  async function uploadImage(file) {
+    uploadArea.textContent = 'Загрузка...';
+    try {
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+      const result = await fetch(`${API_BASE_URL}/api/upload-image/quick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: SECRET_KEY, filename: file.name || 'upload.jpg', contentType: file.type || 'image/jpeg', data: b64 }),
+      });
+      if (!result.ok) throw new Error();
+      const data = await result.json();
+      document.getElementById('image-url').value = data.url;
+      document.getElementById('image-preview-img').src = data.url;
+      document.getElementById('image-preview').style.display = 'block';
+      uploadArea.textContent = 'Фото загружено. Нажмите для замены.';
+    } catch { uploadArea.textContent = 'Ошибка загрузки. Попробуйте снова.'; }
+  }
+
+  document.getElementById('external-url').addEventListener('blur', async function() {
+    const url = this.value.trim();
+    if (!url) return;
+    const status = document.getElementById('og-status');
+    status.textContent = 'Загрузка данных из ссылки...';
+    status.style.display = 'block';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/url-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (!document.getElementById('title').value && data.title) document.getElementById('title').value = data.title;
+      if (!document.getElementById('description').value && data.description) document.getElementById('description').value = data.description;
+      if (!document.getElementById('image-url').value && data.image) {
+        document.getElementById('image-url').value = data.image;
+        document.getElementById('image-preview-img').src = data.image;
+        document.getElementById('image-preview').style.display = 'block';
+        uploadArea.textContent = 'Фото загружено. Нажмите для замены.';
+      }
+      status.textContent = data.title ? 'Данные подтянуты ✓' : '';
+      if (!data.title) status.style.display = 'none';
+    } catch { status.style.display = 'none'; }
+  });
+
+  document.getElementById('performer-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#performer-list > div').forEach(item => {
+      const name = item.querySelector('span')?.textContent.toLowerCase() || '';
+      item.style.display = name.includes(q) ? 'flex' : 'none';
+    });
+  });
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const errorBox   = document.getElementById('alert-error');
+    const successBox = document.getElementById('alert-success');
+    const btn        = document.getElementById('submit-btn');
+    errorBox.style.display = 'none'; successBox.style.display = 'none';
+
+    const title       = document.getElementById('title').value.trim();
+    const dateRaw     = document.getElementById('date').value;
+    const externalUrl = document.getElementById('external-url').value.trim();
+    if (!title || !dateRaw || !externalUrl) {
+      errorBox.textContent = 'Заполните все обязательные поля.';
+      errorBox.style.display = 'block'; return;
+    }
+
+    const performerIds = Array.from(document.querySelectorAll('#performer-list input[type=checkbox]:checked')).map(cb => cb.value);
+    const payload = {
+      secret:       SECRET_KEY,
+      title,
+      date:         new Date(dateRaw).toISOString(),
+      external_url: externalUrl,
+      description:  document.getElementById('description').value.trim(),
+      images:       document.getElementById('image-url').value ? [document.getElementById('image-url').value] : [],
+      location_id:  document.getElementById('location').value || null,
+      performer_ids: performerIds,
+    };
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span> Публикация...';
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/events/quick`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`);
+      successBox.textContent = `Событие "${title}" опубликовано!`;
+      successBox.style.display = 'block';
+      document.getElementById('quick-post-form').reset();
+      document.getElementById('image-preview').style.display = 'none';
+      document.getElementById('image-url').value = '';
+      uploadArea.textContent = 'Нажмите для загрузки фото или вставьте из буфера обмена';
+    } catch (err) {
+      errorBox.textContent = err.message || 'Произошла ошибка';
+      errorBox.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Опубликовать событие';
+    }
+  }
+
+  function openLocationPopup() {
+    document.getElementById('location-modal').classList.add('active');
+    document.getElementById('loc-name').value = '';
+    document.getElementById('loc-city').value = '';
+    document.getElementById('loc-address').value = '';
+    document.getElementById('loc-error').style.display = 'none';
+  }
+  function closeLocationPopup() { document.getElementById('location-modal').classList.remove('active'); }
+
+  async function saveLocation() {
+    const name = document.getElementById('loc-name').value.trim();
+    const city = document.getElementById('loc-city').value.trim();
+    const addr = document.getElementById('loc-address').value.trim();
+    const errDiv = document.getElementById('loc-error');
+    const btn = document.getElementById('loc-save-btn');
+    if (!name || !city || !addr) { errDiv.textContent = 'Заполните все поля'; errDiv.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Сохранение...'; errDiv.style.display = 'none';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/locations/quick`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: SECRET_KEY, name, city, address: addr }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`);
+      closeLocationPopup();
+      await loadLocations(data.location.location_id);
+    } catch (err) { errDiv.textContent = err.message || 'Ошибка'; errDiv.style.display = 'block'; }
+    finally { btn.disabled = false; btn.textContent = 'Сохранить'; }
+  }
+
+  document.getElementById('location-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeLocationPopup(); });
+
+  loadLocations();
+  loadPerformers();
+</script>
+</body>
+</html>

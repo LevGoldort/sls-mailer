@@ -13,7 +13,8 @@ parameter_overrides = [
     "Environment=prod",
     "SenderEmail=tickets@yallabalagan.org",
     "GA4Id=G-RP1612BFV9",
-    "FBPixelId=738718761834602"
+    "FBPixelId=738718761834602",
+    "FrontendDistributionId=E395U4QHM2AOIF"
     # AllPay credentials loaded from .env.prod via deploy script
 ]
 confirm_changeset = true

@@ -567,6 +567,36 @@ class DynamoDBClient:
             ExpressionAttributeValues=expr_values,
         )
 
+    def list_merchandise_orders(self, limit: int = 100, last_key: Dict = None) -> Dict:
+        kwargs = {'Limit': limit}
+        if last_key:
+            kwargs['ExclusiveStartKey'] = last_key
+        response = self.merchandise_orders_table.scan(**kwargs)
+        return {'items': response.get('Items', []), 'last_key': response.get('LastEvaluatedKey')}
+
+    def list_merchandise_orders_by_product(self, product_id: str) -> List[Dict]:
+        from boto3.dynamodb.conditions import Key
+        response = self.merchandise_orders_table.query(
+            IndexName='ProductIndex',
+            KeyConditionExpression=Key('GSI2PK').eq(f'PRODUCT#{product_id}'),
+            ScanIndexForward=False,
+        )
+        return response.get('Items', [])
+
+    def update_merchandise_order(self, order_id: str, updates: Dict):
+        expr_parts, names, values = [], {}, {}
+        for key, val in updates.items():
+            placeholder = f'#{key}'
+            names[placeholder] = key
+            values[f':{key}'] = val
+            expr_parts.append(f'{placeholder} = :{key}')
+        return self.merchandise_orders_table.update_item(
+            Key={'PK': f'MERCH_ORDER#{order_id}', 'SK': 'METADATA'},
+            UpdateExpression='SET ' + ', '.join(expr_parts),
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
+
     # ===== Seat Reservations =====
     def get_seat_reservations(self, event_id: str) -> List[Dict]:
         """Получает все активные резервации для события"""

@@ -42,6 +42,8 @@ class MerchandiseOrder:
     payment_method: str = "allpay"  # "allpay" | "mock"
     payment_id: Optional[str] = None
     status: str = "pending"  # "pending" | "completed" | "failed"
+    fulfillment_status: str = "new"  # "new" | "fulfilled"
+    fulfillment_note: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     @staticmethod
@@ -70,6 +72,9 @@ class MerchandiseOrder:
         }
         if self.payment_id:
             item['payment_id'] = self.payment_id
+        item['fulfillment_status'] = self.fulfillment_status
+        if self.fulfillment_note:
+            item['fulfillment_note'] = self.fulfillment_note
         return item
 
     @classmethod
@@ -84,5 +89,7 @@ class MerchandiseOrder:
             payment_method=item.get('payment_method', 'allpay'),
             payment_id=item.get('payment_id'),
             status=item.get('status', 'pending'),
+            fulfillment_status=item.get('fulfillment_status', 'new'),
+            fulfillment_note=item.get('fulfillment_note'),
             created_at=item.get('created_at'),
         )

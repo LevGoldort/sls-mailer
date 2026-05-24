@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дашборд — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Дашборд</h1>
+        <p class="page-subtitle">Обзор продаж и событий</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="regenerate-site-btn" onclick="regenerateSite()">
+          Обновить сайт
+        </button>
+      </div>
+    </div>
+
+    <p id="regenerate-status" style="font-size:13px;margin-bottom:16px;min-height:18px;"></p>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Событий</div>
+        <div class="stat-value" id="stat-events">—</div>
+        <div class="stat-desc">всего в системе</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Заказов</div>
+        <div class="stat-value" id="stat-orders">—</div>
+        <div class="stat-desc">оплаченных</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Билетов</div>
+        <div class="stat-value" id="stat-tickets">—</div>
+        <div class="stat-desc">продано</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Выручка</div>
+        <div class="stat-value" id="stat-revenue">—</div>
+        <div class="stat-desc">общая</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Локации</div>
+        <div class="stat-value" id="stat-locations">—</div>
+        <div class="stat-desc">площадок</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Купоны</div>
+        <div class="stat-value" id="stat-coupons">—</div>
+        <div class="stat-desc">активных</div>
+      </div>
+    </div>
+
+    <!-- Events -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">События</span>
+        <a href="events.html" class="btn btn-ghost btn-sm">Все события →</a>
+      </div>
+      <div class="card-body" style="padding-top:0;">
+        <div class="tabs">
+          <button class="tab active" id="tab-upcoming" onclick="switchTab('upcoming')">
+            Предстоящие <span class="tab-count" id="count-upcoming">0</span>
+          </button>
+          <button class="tab" id="tab-past" onclick="switchTab('past')">
+            Прошедшие <span class="tab-count" id="count-past">0</span>
+          </button>
+        </div>
+
+        <div id="upcoming-tab" class="tab-content active">
+          <div id="upcoming-events"><div class="loading">Загрузка...</div></div>
+        </div>
+        <div id="past-tab" class="tab-content">
+          <div id="past-events"><div class="loading">Загрузка...</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let allEvents = [];
+
+  async function loadDashboard() {
+    try {
+      const isAdmin = Auth.isAdmin();
+      const requests = [API.getEvents(), API.getLocations()];
+      if (isAdmin) requests.push(API.getOrders(), API.getCoupons('active'));
+
+      const results = await Promise.all(requests);
+      const [eventsData, locationsData] = results;
+      const ordersData  = isAdmin ? results[2] : null;
+      const couponsData = isAdmin ? results[3] : null;
+
+      allEvents = eventsData.events || [];
+      const orders    = ordersData?.orders    || [];
+      const locations = locationsData.locations || [];
+      const coupons   = couponsData?.coupons   || [];
+
+      const stats = calculateOrdersStats(orders);
+
+      document.getElementById('stat-events').textContent    = allEvents.length;
+      document.getElementById('stat-orders').textContent    = isAdmin ? stats.totalOrders  : '—';
+      document.getElementById('stat-tickets').textContent   = isAdmin ? stats.totalTickets : '—';
+      document.getElementById('stat-revenue').textContent   = isAdmin ? formatCurrency(stats.totalRevenue) : '—';
+      document.getElementById('stat-locations').textContent = locations.length;
+      document.getElementById('stat-coupons').textContent   = isAdmin ? coupons.length : '—';
+
+      renderEventLists();
+    } catch (err) {
+      handleError(err, 'Ошибка загрузки данных');
+    }
+  }
+
+  function isEventPast(event) {
+    const eventDate = new Date(event.date);
+    return new Date(eventDate.getTime() + 60 * 60 * 1000) <= new Date();
+  }
+
+  function renderEventLists() {
+    const upcoming = allEvents.filter(e => !isEventPast(e)).sort((a,b) => new Date(a.date) - new Date(b.date));
+    const past     = allEvents.filter(e =>  isEventPast(e)).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    document.getElementById('count-upcoming').textContent = upcoming.length;
+    document.getElementById('count-past').textContent     = past.length;
+
+    document.getElementById('upcoming-events').innerHTML = renderEventRows(upcoming, 'Нет предстоящих событий');
+    document.getElementById('past-events').innerHTML     = renderEventRows(past,     'Нет прошедших событий');
+  }
+
+  function renderEventRows(events, emptyMessage) {
+    if (!events.length) {
+      return `<div class="empty"><span class="empty-text">${emptyMessage}</span></div>`;
+    }
+    return events.map(event => {
+      const stats = calculateEventStats(event);
+      const statusClass = `badge-${event.status}`;
+      const isExternal = event.event_type === 'external';
+      const externalTag = isExternal ? '<span class="badge" style="background:var(--orange-bg);color:var(--orange);font-size:10px;margin-left:6px;">external</span>' : '';
+      const salesMeta = isExternal ? '' : `<span>Продано: ${stats.soldTickets}/${stats.totalTickets}</span><span>${formatCurrency(stats.revenue)}</span>`;
+      return `
+        <div class="event-row" style="cursor:pointer;" onclick="navigateTo('event-edit.html?id=${event.event_id}')">
+          <div class="event-row-info">
+            <div class="event-row-title">${escapeHtml(event.title)}${externalTag}</div>
+            <div class="event-row-meta">
+              <span>${formatDate(event.date)}</span>
+              ${salesMeta}
+            </div>
+          </div>
+          <span class="badge ${statusClass}">${event.status}</span>
+        </div>`;
+    }).join('');
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    document.getElementById(`${tab}-tab`).classList.add('active');
+  }
+
+  loadDashboard();
+  setInterval(loadDashboard, 30000);
+</script>
+</body>
+</html>

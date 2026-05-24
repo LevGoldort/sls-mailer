@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Локации — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div><h1 class="page-title">Локации</h1></div>
+      <div class="page-actions">
+        <a href="location-edit.html" class="btn btn-primary">+ Добавить локацию</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="search-bar" style="margin-bottom:0;">
+          <div class="search-input-wrap">
+            <span class="search-input-icon">🔍</span>
+            <input class="search-input" id="search" type="text" placeholder="Поиск по названию, городу...">
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table" id="locations-table">
+          <thead><tr>
+            <th>Название</th><th class="hide-mobile">Город</th><th class="hide-mobile">Вместимость</th><th>Тип</th><th class="hide-mobile">Адрес</th><th></th>
+          </tr></thead>
+          <tbody id="locations-tbody"><tr><td colspan="6"><div class="loading">Загрузка...</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let allLocations = [];
+
+  async function load() {
+    try {
+      const data = await API.getLocations();
+      allLocations = data.locations || [];
+      render();
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  function render() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const tbody = document.getElementById('locations-tbody');
+    const filtered = allLocations.filter(loc =>
+      !q ||
+      (loc.name || '').toLowerCase().includes(q) ||
+      (loc.city || '').toLowerCase().includes(q)
+    );
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="empty-text">Нет локаций</span></div></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(loc => {
+      const venueType = loc.venue_config?.venue_type;
+      const isSeated = venueType === 'seated';
+      const typeLabel = isSeated
+        ? '<span class="badge badge-active" style="font-size:11px;">С местами</span>'
+        : '<span class="badge" style="background:var(--blue-bg);color:var(--blue);font-size:11px;">без мест</span>';
+      const addrObj = loc.address;
+      const addrStr = addrObj && typeof addrObj === 'object'
+        ? [addrObj.street, addrObj.city].filter(Boolean).join(', ')
+        : (addrObj || '—');
+      return `<tr>
+        <td style="font-weight:500;">${escapeHtml(loc.name)}</td>
+        <td class="hide-mobile">${escapeHtml(loc.city || '—')}</td>
+        <td class="hide-mobile">${loc.capacity ? loc.capacity + ' мест' : '—'}</td>
+        <td>${typeLabel}</td>
+        <td class="hide-mobile" style="font-size:13px;color:var(--gray-mid);">${escapeHtml(addrStr)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="navigateTo('location-edit.html?id=${loc.location_id}')">Редактировать</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLocation('${loc.location_id}','${escapeHtml(loc.name).replace(/'/g,"\\'")}')">Удалить</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deleteLocation(id, name) {
+    if (!confirm(`Удалить локацию "${name}"?`)) return;
+    try {
+      await API.deleteLocation(id);
+      showToast('Локация удалена');
+      load();
+    } catch (err) { handleError(err, 'Ошибка удаления'); }
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  load();
+</script>
+</body>
+</html>

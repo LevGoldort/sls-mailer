@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Заказы — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Заказы</h1>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Экспорт CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-input-icon">🔍</span>
+            <input class="search-input" id="search" placeholder="ID заказа, email, телефон...">
+          </div>
+          <select class="form-select" id="status-filter" style="width:180px;">
+            <option value="">Все статусы</option>
+            <option value="completed">Оплаченные</option>
+            <option value="pending">Ожидают оплаты</option>
+            <option value="cancelled">Отменённые</option>
+          </select>
+          <select class="form-select" id="event-filter" style="width:220px;">
+            <option value="">Все события</option>
+          </select>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" id="tab-active" onclick="switchTab('active')">
+            Активные события <span class="tab-count" id="count-active">0</span>
+          </button>
+          <button class="tab" id="tab-all" onclick="switchTab('all')">
+            Все заказы <span class="tab-count" id="count-all">0</span>
+          </button>
+        </div>
+
+        <div class="tab-content active" id="active-content">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr>
+                <th class="hide-mobile">Заказ</th><th>Событие</th><th>Имя</th><th class="hide-mobile">Email</th><th class="hide-mobile">Билеты</th><th>Сумма</th><th>Статус</th><th class="hide-mobile">Дата и время</th>
+              </tr></thead>
+              <tbody id="tbody-active"><tr><td colspan="8"><div class="loading">Загрузка...</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-content" id="all-content">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr>
+                <th class="hide-mobile">Заказ</th><th>Событие</th><th>Имя</th><th class="hide-mobile">Email</th><th class="hide-mobile">Билеты</th><th>Сумма</th><th>Статус</th><th class="hide-mobile">Дата и время</th>
+              </tr></thead>
+              <tbody id="tbody-all"><tr><td colspan="8"><div class="loading">Загрузка...</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script src="order-modal.js"></script>
+<script>
+  let allOrders = [], allEvents = [], currentTab = 'active';
+
+  async function load() {
+    if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
+    try {
+      const [ordersData, eventsData] = await Promise.all([API.getOrders(), API.getEvents()]);
+      allOrders = ordersData.orders || [];
+      allEvents = eventsData.events || [];
+
+      // Populate event filter
+      const sel = document.getElementById('event-filter');
+      allEvents.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.event_id;
+        opt.textContent = e.title;
+        sel.appendChild(opt);
+      });
+
+      document.getElementById('count-all').textContent    = allOrders.length;
+      document.getElementById('count-active').textContent = allOrders.length;
+
+      render();
+    } catch (err) { handleError(err, 'Ошибка загрузки заказов'); }
+  }
+
+  function getEventTitle(eventId) {
+    const e = allEvents.find(ev => ev.event_id === eventId);
+    return e ? e.title : eventId;
+  }
+
+  function filter(orders) {
+    const q      = document.getElementById('search').value.toLowerCase();
+    const status = document.getElementById('status-filter').value;
+    const evId   = document.getElementById('event-filter').value;
+
+    return orders.filter(o => {
+      const matchQ = !q ||
+        o.order_id.toLowerCase().includes(q) ||
+        (o.customer?.email || '').toLowerCase().includes(q) ||
+        (o.customer?.phone || '').toLowerCase().includes(q) ||
+        (o.customer?.name  || '').toLowerCase().includes(q);
+      const matchStatus = !status || (o.payment?.status || '') === status;
+      const matchEvent  = !evId   || o.event_id === evId;
+      return matchQ && matchStatus && matchEvent;
+    });
+  }
+
+  function renderRows(orders, tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!orders.length) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><span class="empty-text">Нет заказов</span></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = orders.map(o => {
+      const ticketCount = (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0);
+      const status = o.payment?.status || 'pending';
+      const eventTitle = getEventTitle(o.event_id);
+      return `
+        <tr style="cursor:pointer;" onclick="openOrderModal('${o.order_id}')">
+          <td class="mono hide-mobile">${o.order_id.slice(0,10)}...</td>
+          <td>${escapeHtml(eventTitle)}</td>
+          <td style="font-weight:500;">${escapeHtml(o.customer?.name || '-')}</td>
+          <td class="hide-mobile" style="font-size:13px;">${escapeHtml(o.customer?.email || '-')}</td>
+          <td class="hide-mobile">${ticketCount}</td>
+          <td>${formatCurrency(o.total_amount)}</td>
+          <td><span class="status-badge status-${status}">${status}</span></td>
+          <td class="hide-mobile" style="font-size:13px;">${formatDate(o.created_at)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function render() {
+    const filtered = filter(allOrders);
+    document.getElementById('count-all').textContent    = filtered.length;
+    document.getElementById('count-active').textContent = filtered.length;
+    renderRows(filtered, 'tbody-active');
+    renderRows(filtered, 'tbody-all');
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    document.getElementById(`${tab}-content`).classList.add('active');
+  }
+
+  function exportCSV() {
+    exportToCSV(allOrders.map(o => ({
+      order_id: o.order_id,
+      event: getEventTitle(o.event_id),
+      name: o.customer?.name || '',
+      email: o.customer?.email || '',
+      phone: o.customer?.phone || '',
+      total: o.total_amount,
+      status: o.payment?.status || '',
+      date: o.created_at,
+    })), 'orders.csv');
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('status-filter').addEventListener('change', render);
+  document.getElementById('event-filter').addEventListener('change', render);
+
+  load();
+</script>
+</body>
+</html>

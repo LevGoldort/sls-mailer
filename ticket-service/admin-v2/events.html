@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>События — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">События</h1>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportEvents()">Экспорт CSV</button>
+        <a href="event-edit.html" class="btn btn-primary">+ Создать событие</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-input-icon">🔍</span>
+            <input class="search-input" type="text" id="search" placeholder="Поиск по названию...">
+          </div>
+          <select class="form-select" id="status-filter" style="width:180px;">
+            <option value="">Все статусы</option>
+            <option value="active">Активные</option>
+            <option value="sold_out">Распроданные</option>
+            <option value="cancelled">Отменённые</option>
+          </select>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" id="tab-upcoming" onclick="switchTab('upcoming')">
+            Предстоящие <span class="tab-count" id="count-upcoming">0</span>
+          </button>
+          <button class="tab" id="tab-past" onclick="switchTab('past')">
+            Прошедшие <span class="tab-count" id="count-past">0</span>
+          </button>
+        </div>
+
+        <div id="upcoming-tab" class="tab-content active">
+          <div id="upcoming-container"><div class="loading">Загрузка...</div></div>
+        </div>
+        <div id="past-tab" class="tab-content">
+          <div id="past-container"><div class="loading">Загрузка...</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let allEvents = [], upcomingEvents = [], pastEvents = [];
+
+  async function loadEvents() {
+    try {
+      const data = await API.getEvents();
+      allEvents = data.events || [];
+
+      const now = new Date();
+      upcomingEvents = allEvents.filter(e => new Date(e.date) >= now).sort((a,b) => new Date(a.date)-new Date(b.date));
+      pastEvents     = allEvents.filter(e => new Date(e.date) <  now).sort((a,b) => new Date(b.date)-new Date(a.date));
+
+      document.getElementById('count-upcoming').textContent = upcomingEvents.length;
+      document.getElementById('count-past').textContent     = pastEvents.length;
+
+      displayEvents();
+    } catch (err) {
+      handleError(err, 'Ошибка загрузки событий');
+      document.getElementById('upcoming-container').innerHTML =
+        '<div class="empty"><span class="empty-text">Ошибка загрузки</span></div>';
+    }
+  }
+
+  function displayEvents() {
+    const search = document.getElementById('search').value.toLowerCase();
+    const status = document.getElementById('status-filter').value;
+
+    function filter(arr) {
+      return arr.filter(e => {
+        const matchSearch = !search || e.title.toLowerCase().includes(search) ||
+          (e.description && e.description.toLowerCase().includes(search));
+        const matchStatus = !status || e.status === status;
+        return matchSearch && matchStatus;
+      });
+    }
+
+    document.getElementById('upcoming-container').innerHTML = renderList(filter(upcomingEvents), 'Нет предстоящих событий');
+    document.getElementById('past-container').innerHTML     = renderList(filter(pastEvents),     'Нет прошедших событий');
+  }
+
+  function renderList(events, emptyMessage) {
+    if (!events.length) {
+      return `<div class="empty"><span class="empty-text">${emptyMessage}</span></div>`;
+    }
+    return events.map(event => {
+      const isExternal = event.event_type === 'external';
+      const stats = calculateEventStats(event);
+      const statusClass = `badge-${event.status}`;
+      const publicUrl = event.slug ? `/events/${event.slug}.html` : `/events/${event.event_id}.html`;
+      const salesMeta = isExternal
+        ? ''
+        : `<span>Продано: ${stats.soldTickets}/${stats.totalTickets} (${stats.capacity}%)</span><span>${formatCurrency(stats.revenue)}</span>`;
+      return `
+        <div class="event-row">
+          <div class="event-row-info">
+            <div class="event-row-title">
+              ${escapeHtml(event.title)}
+              ${isExternal ? '<span class="badge" style="background:var(--orange-bg);color:var(--orange);font-size:10px;margin-left:6px;">external</span>' : ''}
+            </div>
+            <div class="event-row-meta">
+              <span>${formatDate(event.date)}</span>
+              ${salesMeta}
+              <a href="${publicUrl}" target="_blank" style="color:var(--purple);">↗ публичная страница</a>
+            </div>
+          </div>
+          <div class="event-row-actions">
+            <span class="badge ${statusClass}">${event.status}</span>
+            <button class="btn btn-ghost btn-sm" onclick="navigateTo('event-edit.html?id=${event.event_id}')">Редактировать</button>
+            <button class="btn btn-ghost btn-sm" onclick="navigateTo('sms-blast.html?id=${event.event_id}')">SMS</button>
+            ${Auth.isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteEvent('${event.event_id}','${escapeHtml(event.title).replace(/'/g,'&#39;')}')">Удалить</button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    document.getElementById(`${tab}-tab`).classList.add('active');
+  }
+
+  async function deleteEvent(eventId, title) {
+    if (!confirm(`Удалить событие "${title}"?`)) return;
+    try {
+      await API.deleteEvent(eventId);
+      showToast('Событие удалено');
+      await loadEvents();
+    } catch (err) { handleError(err, 'Ошибка удаления'); }
+  }
+
+  function exportEvents() {
+    const all = [...upcomingEvents, ...pastEvents];
+    exportToCSV(all.map(e => {
+      const s = calculateEventStats(e);
+      return { title: e.title, date: e.date, status: e.status, sold: s.soldTickets, total: s.totalTickets, revenue: s.revenue };
+    }), 'events.csv');
+  }
+
+  document.getElementById('search').addEventListener('input', displayEvents);
+  document.getElementById('status-filter').addEventListener('change', displayEvents);
+
+  loadEvents();
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Перформеры — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .performers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .performer-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; transition: box-shadow .15s; }
+    .performer-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .performer-photo { width: 100%; height: 160px; object-fit: cover; background: var(--gray-light); }
+    .performer-photo-placeholder { width: 100%; height: 160px; background: var(--gray-light); display: flex; align-items: center; justify-content: center; font-size: 48px; color: var(--gray-mid); }
+    .performer-body { padding: 14px; }
+    .performer-name { font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 2px; }
+    .performer-role { font-size: 12px; color: var(--purple); font-weight: 500; margin-bottom: 6px; }
+    .performer-bio { font-size: 12px; color: var(--gray-mid); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .performer-actions { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+    .performer-actions .btn { flex: 1; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div><h1 class="page-title">Перформеры</h1></div>
+      <div class="page-actions">
+        <a href="performer-edit.html" class="btn btn-primary">+ Добавить</a>
+      </div>
+    </div>
+
+    <div id="performers-container">
+      <div class="loading">Загрузка...</div>
+    </div>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  async function load() {
+    try {
+      const data = await API.getPerformers();
+      render(data.performers || []);
+    } catch (err) {
+      handleError(err, 'Ошибка загрузки');
+      document.getElementById('performers-container').innerHTML =
+        '<div class="card"><div class="card-body"><div class="empty"><span class="empty-text">Ошибка загрузки</span></div></div></div>';
+    }
+  }
+
+  function render(performers) {
+    const container = document.getElementById('performers-container');
+    if (!performers.length) {
+      container.innerHTML = '<div class="card"><div class="card-body"><div class="empty"><span class="empty-text">Нет перформеров</span></div></div></div>';
+      return;
+    }
+    const cards = performers.map(p => {
+      const photo = p.photo_url
+        ? `<img class="performer-photo" src="${escapeHtml(p.photo_url)}" alt="">`
+        : `<div class="performer-photo-placeholder">🎤</div>`;
+      const statusBadge = p.status === 'active'
+        ? '<span class="badge badge-active" style="font-size:11px;">активен</span>'
+        : '<span class="badge badge-cancelled" style="font-size:11px;">неактивен</span>';
+      return `<div class="performer-card">
+        ${photo}
+        <div class="performer-body">
+          <div class="performer-name">${escapeHtml(p.name)} ${statusBadge}</div>
+          ${p.role ? `<div class="performer-role">${escapeHtml(p.role)}</div>` : ''}
+          ${p.bio ? `<div class="performer-bio">${escapeHtml(p.bio)}</div>` : ''}
+        </div>
+        <div class="performer-actions">
+          <button class="btn btn-ghost btn-sm" onclick="navigateTo('performer-edit.html?id=${p.performer_id}')">Редактировать</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePerformer('${p.performer_id}','${escapeHtml(p.name).replace(/'/g,"\\'")}')">Удалить</button>
+        </div>
+      </div>`;
+    }).join('');
+    container.innerHTML = `<div class="performers-grid">${cards}</div>`;
+  }
+
+  async function deletePerformer(id, name) {
+    if (!confirm(`Деактивировать перформера "${name}"?`)) return;
+    try {
+      await API.deletePerformer(id);
+      showToast('Перформер деактивирован');
+      load();
+    } catch (err) { handleError(err, 'Ошибка удаления'); }
+  }
+
+  load();
+</script>
+</body>
+</html>

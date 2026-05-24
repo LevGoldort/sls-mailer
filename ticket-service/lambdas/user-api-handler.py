@@ -196,7 +196,7 @@ def handle_change_password(event: dict) -> dict:
 # User management helpers
 # ---------------------------------------------------------------------------
 
-VALID_ROLES = {"admin", "organizer"}
+VALID_ROLES = {"admin", "organizer", "content_manager"}
 
 
 def _require_admin(event: dict):

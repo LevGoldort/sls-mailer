@@ -55,7 +55,7 @@ echo ""
 # Fast admin-only mode: just sync admin panel to S3 and exit
 if [[ "$MODE" == "admin" ]]; then
   echo "--- Admin-only mode: syncing admin panel to S3 ---"
-  aws s3 sync "$SCRIPT_DIR/admin/" "s3://$ADMIN_BUCKET/" \
+  aws s3 sync "$SCRIPT_DIR/admin-v2/" "s3://$ADMIN_BUCKET/" \
     --profile "$PROFILE" --region "$REGION" \
     --exclude "*.md" --exclude ".DS_Store" \
     --delete --no-cli-pager
@@ -63,11 +63,11 @@ if [[ "$MODE" == "admin" ]]; then
   exit 0
 fi
 
-if [[ "$ENV" == "prod" ]]; then
-  echo "WARNING: This will update Lambda functions in PRODUCTION!"
-  echo "Press Ctrl+C to cancel, or Enter to continue..."
-  read
-fi
+# if [[ "$ENV" == "prod" ]]; then
+#   echo "WARNING: This will update Lambda functions in PRODUCTION!"
+#   echo "Press Ctrl+C to cancel, or Enter to continue..."
+#   read
+# fi
 
 # Build
 echo "Building SAM application..."
@@ -303,6 +303,8 @@ cat > /tmp/site-regen-env.json <<EOF
     "S3_BUCKET": "${S3_BUCKET}",
     "GA4_ID": "${GA4_ID}",
     "FB_PIXEL_ID": "${FB_PIXEL_ID}",
+    "YOUTUBE_API_KEY": "${YOUTUBE_API_KEY}",
+    "YOUTUBE_PLAYLIST_ID": "${YOUTUBE_PLAYLIST_ID}",
     "ENVIRONMENT": "${ENV}",
     "PAYMENT_MODE": "${PAYMENT_MODE}",
     "EMAIL_SENDER_LAMBDA": "yallabalagan-email-sender",
@@ -496,7 +498,7 @@ ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-episodes"
 # Sync S3
 echo ""
 echo "Syncing admin files to S3..."
-aws s3 sync "$SCRIPT_DIR/admin/" "s3://$ADMIN_BUCKET/" \
+aws s3 sync "$SCRIPT_DIR/admin-v2/" "s3://$ADMIN_BUCKET/" \
   --profile "$PROFILE" \
   --exclude "*.md" --exclude ".DS_Store" \
   --delete
@@ -505,6 +507,15 @@ echo "Syncing frontend static files to S3..."
 aws s3 sync "$SCRIPT_DIR/frontend/static/" "s3://$FRONTEND_BUCKET/static/" \
   --profile "$PROFILE" \
   --exclude "*.md" --exclude ".DS_Store"
+
+# Ensure S3 website ErrorDocument points to 404.html
+echo ""
+echo "Updating S3 website configuration..."
+aws s3api put-bucket-website \
+  --bucket "$FRONTEND_BUCKET" \
+  --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"404.html"}}' \
+  --profile "$PROFILE" --region "$REGION" --no-cli-pager
+echo "  ErrorDocument set to 404.html"
 
 # Regenerate site
 echo ""
@@ -535,6 +546,10 @@ if [[ "$ENV" == "prod" ]]; then
     --distribution-id E1QVQ0JRE575WR \
     --paths "/*" \
     --profile "$PROFILE" --no-cli-pager > /dev/null
+  aws cloudfront create-invalidation \
+    --distribution-id E395U4QHM2AOIF \
+    --paths "/*" \
+    --profile "$PROFILE" --no-cli-pager > /dev/null
   echo "  Invalidation created"
 fi
 
@@ -543,7 +558,7 @@ echo "=== Deployment complete: $ENV ==="
 echo ""
 if [[ "$ENV" == "prod" ]]; then
   echo "  Admin:    https://admin.yallabalagan.org"
-  echo "  Frontend: https://events.yallabalagan.org"
+  echo "  Frontend: https://yallabalagan.org"
   echo "  API:      https://ovajavet67.execute-api.eu-north-1.amazonaws.com"
 else
   echo "  Admin:    http://$ADMIN_BUCKET.s3-website.eu-north-1.amazonaws.com"

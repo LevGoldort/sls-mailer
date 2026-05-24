@@ -112,19 +112,6 @@
 </section>
 {% endif %}
 
-{# ── YouTube embed ── #}
-{% if performer.get('youtube_embed') %}
-<section class="yb-pad" style="padding-bottom:24px">
-  <div style="position:relative;border:var(--yb-border);box-shadow:8px 8px 0 var(--yb-magenta);background:var(--yb-ink);aspect-ratio:16/9;overflow:hidden">
-    <iframe src="{{ performer.youtube_embed }}"
-            title="{{ performer.name }} — запись"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            style="width:100%;height:100%;border:none;display:block"></iframe>
-    <div style="position:absolute;top:16px;right:16px;padding:5px 11px;background:var(--yb-red);color:var(--yb-paper);border:2.5px solid var(--yb-ink);font-family:var(--yb-font-mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transform:rotate(2deg);pointer-events:none">★ REC ★</div>
-  </div>
-</section>
-{% endif %}
 
 {# ── Episodes ── #}
 {% if performer_episodes %}

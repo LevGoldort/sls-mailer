@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Шоу — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <a href="shows.html" style="font-size:13px;color:var(--gray-mid);">← Назад к шоу</a>
+        <h1 class="page-title" style="margin-top:6px;" id="page-title">Новое шоу</h1>
+      </div>
+    </div>
+
+    <form id="show-form" style="max-width:720px;" onsubmit="return false;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Обложка</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+            <div id="photo-placeholder" style="width:120px;height:120px;border-radius:10px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0;">📺</div>
+            <img id="photo-preview" style="display:none;width:120px;height:120px;border-radius:10px;object-fit:cover;flex-shrink:0;" src="" alt="">
+            <div class="upload-area" id="photo-upload-area" onclick="document.getElementById('photo-file').click()" style="flex:1;min-width:200px;">
+              Нажмите, перетащите или вставьте (Ctrl+V)<br><small style="color:var(--gray);">JPG, PNG до 5MB</small>
+            </div>
+            <input type="file" id="photo-file" accept="image/*" style="display:none;">
+            <input type="hidden" id="photo-url">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основная информация</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Название *</label>
+              <input class="form-input" type="text" id="name" placeholder="Название шоу">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug *</label>
+              <input class="form-input" type="text" id="slug" placeholder="show-name">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Краткое описание</label>
+            <input class="form-input" type="text" id="short-description" placeholder="Одна строка для карточки">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Полное описание</label>
+            <textarea class="form-textarea" id="description" placeholder="Полное описание шоу..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:80px;">
+        <div class="card-header"><span class="card-title">Ссылки</span></div>
+        <div class="card-body">
+          <div id="links-container"></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addLink()" style="margin-top:8px;">+ Добавить ссылку</button>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span></span>
+        <div class="save-bar-actions">
+          <a href="shows.html" class="btn btn-ghost">Отмена</a>
+          <button class="btn btn-primary" type="button" id="save-btn" onclick="save()">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  const showId = new URLSearchParams(window.location.search).get('id');
+
+  document.getElementById('name').addEventListener('input', function() {
+    if (showId) return;
+    document.getElementById('slug').value = this.value.toLowerCase()
+      .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  });
+
+  initCoverUpload({
+    uploadAreaId: 'photo-upload-area',
+    fileInputId: 'photo-file',
+    previewId: 'photo-preview',
+    placeholderId: 'photo-placeholder',
+    urlInputId: 'photo-url',
+    folder: 'shows',
+  });
+
+  function addLink(label = '', url = '') {
+    const container = document.getElementById('links-container');
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:10px;';
+    row.innerHTML = `
+      <input class="form-input" type="text" placeholder="Метка (напр. YouTube)" value="${escapeHtml(label)}" style="flex:1;">
+      <input class="form-input" type="url" placeholder="https://..." value="${escapeHtml(url)}" style="flex:2;">
+      <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">✕</button>`;
+    container.appendChild(row);
+  }
+
+  function getLinks() {
+    return Array.from(document.querySelectorAll('#links-container > div')).map(row => {
+      const inputs = row.querySelectorAll('input');
+      return { label: inputs[0].value.trim(), url: inputs[1].value.trim() };
+    }).filter(l => l.label && l.url);
+  }
+
+  async function load() {
+    if (!showId) return;
+    document.getElementById('page-title').textContent = 'Редактировать шоу';
+    try {
+      const data = await API.getShow(showId);
+      const s = data.show;
+      document.getElementById('name').value             = s.name || '';
+      document.getElementById('slug').value             = s.slug || '';
+      document.getElementById('short-description').value = s.short_description || '';
+      document.getElementById('description').value      = s.description || '';
+      if (s.photo_url) {
+        document.getElementById('photo-url').value = s.photo_url;
+        document.getElementById('photo-preview').src = s.photo_url;
+        document.getElementById('photo-preview').style.display = 'block';
+        document.getElementById('photo-placeholder').style.display = 'none';
+      }
+      (s.links || []).forEach(l => addLink(l.label, l.url));
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  async function save() {
+    const btn  = document.getElementById('save-btn');
+    const name = document.getElementById('name').value.trim();
+    const slug = document.getElementById('slug').value.trim();
+    if (!name || !slug) { showToast('Заполните название и slug', 'error'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span>';
+
+    const payload = {
+      name, slug,
+      short_description: document.getElementById('short-description').value.trim(),
+      description: document.getElementById('description').value.trim(),
+      photo_url: document.getElementById('photo-url').value.trim() || null,
+      links: getLinks(),
+    };
+
+    try {
+      if (showId) { await API.updateShow(showId, payload); }
+      else        { await API.createShow(payload); }
+      showToast('Сохранено');
+      setTimeout(() => navigateTo('shows.html'), 800);
+    } catch (err) {
+      handleError(err, 'Ошибка сохранения');
+      btn.disabled = false;
+      btn.textContent = 'Сохранить';
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

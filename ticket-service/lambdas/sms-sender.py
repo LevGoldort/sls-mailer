@@ -45,7 +45,7 @@ def build_sms_message(order: Order, event: Event, custom_message: str = None, in
         parts.append(f"Дата: {format_event_date(event.date)}")
         if location:
             parts.append(f"Место: {location.name}, {location.address.street}, {location.address.city}")
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://yallabalagan.org')
         parts.append(f"Билеты онлайн: {frontend_url}/ticket.html?order_id={order.order_id}")
 
     return "\n".join(parts)

@@ -354,7 +354,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         qr_dict['seat_display'] = get_seat_display(qr_dict['seat_id'], seating_map)
                     cancelled_qr_codes.append(qr_dict)
 
-            frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://yallabalagan.org')
             cancel_template = Template(load_cancellation_template())
             email_html = cancel_template.render(
                 order=order,
@@ -429,7 +429,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             enriched_qr_codes = []
 
         # Get frontend URL from environment
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://events.yallabalagan.org')
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://yallabalagan.org')
 
         # Render email HTML
         try:

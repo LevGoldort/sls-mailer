@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Мерч — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .product-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; transition: box-shadow .15s; }
+    .product-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .product-photo { width: 100%; height: 160px; object-fit: cover; background: var(--gray-light); }
+    .product-photo-placeholder { width: 100%; height: 160px; background: var(--gray-light); display: flex; align-items: center; justify-content: center; font-size: 48px; color: var(--gray-mid); }
+    .product-body { padding: 14px; }
+    .product-name { font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 4px; }
+    .product-performer { font-size: 12px; color: var(--purple); font-weight: 500; margin-bottom: 6px; }
+    .product-desc { font-size: 12px; color: var(--gray-mid); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
+    .product-meta { display: flex; justify-content: space-between; align-items: center; }
+    .product-price { font-size: 17px; font-weight: 700; color: var(--dark); }
+    .product-slots { font-size: 12px; color: var(--gray-mid); }
+    .product-actions { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+    .product-actions .btn { flex: 1; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div><h1 class="page-title">Мерч</h1></div>
+      <div class="page-actions">
+        <select class="form-select" id="performer-filter" style="width:auto;min-width:180px;">
+          <option value="">Все перформеры</option>
+        </select>
+        <a href="product-edit.html" class="btn btn-primary">+ Добавить товар</a>
+      </div>
+    </div>
+
+    <div id="products-container">
+      <div class="loading">Загрузка...</div>
+    </div>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let performerMap = {};
+
+  async function loadPerformers() {
+    try {
+      const data = await API.getPerformers();
+      const performers = data.performers || [];
+      performers.forEach(p => { performerMap[p.performer_id] = p.name; });
+      const sel = document.getElementById('performer-filter');
+      performers.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.performer_id;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', loadProducts);
+    } catch (e) { console.warn('Could not load performers', e); }
+  }
+
+  async function loadProducts() {
+    const performerId = document.getElementById('performer-filter').value || null;
+    document.getElementById('products-container').innerHTML = '<div class="loading">Загрузка...</div>';
+    try {
+      const data = await API.getProducts(performerId);
+      render(data.products || []);
+    } catch (err) {
+      handleError(err, 'Ошибка загрузки');
+      document.getElementById('products-container').innerHTML =
+        '<div class="card"><div class="card-body"><div class="empty"><span class="empty-text">Ошибка загрузки</span></div></div></div>';
+    }
+  }
+
+  function render(products) {
+    const container = document.getElementById('products-container');
+    if (!products.length) {
+      container.innerHTML = '<div class="card"><div class="card-body"><div class="empty"><span class="empty-text">Нет товаров</span></div></div></div>';
+      return;
+    }
+    const statusLabel = { active: 'доступен', inactive: 'неактивен', sold_out: 'распродан' };
+    const statusClass = { active: 'badge-active', inactive: 'badge-cancelled', sold_out: 'badge-past' };
+    const cards = products.map(p => {
+      const photo = p.photo_url
+        ? `<img class="product-photo" src="${escapeHtml(p.photo_url)}" alt="">`
+        : `<div class="product-photo-placeholder">🛍️</div>`;
+      const slotsText = p.total_slots != null
+        ? `${p.sold_slots || 0} / ${p.total_slots} продано`
+        : `${p.sold_slots || 0} продано`;
+      const perfName = performerMap[p.performer_id] || '';
+      return `<div class="product-card">
+        ${photo}
+        <div class="product-body">
+          <div class="product-name">${escapeHtml(p.name)} <span class="badge ${statusClass[p.status] || 'badge-cancelled'}" style="font-size:11px;">${statusLabel[p.status] || p.status}</span></div>
+          ${perfName ? `<div class="product-performer">${escapeHtml(perfName)}</div>` : ''}
+          ${p.short_description ? `<div class="product-desc">${escapeHtml(p.short_description)}</div>` : ''}
+          <div class="product-meta">
+            <span class="product-price">${p.price_ils}₪</span>
+            <span class="product-slots">${slotsText}</span>
+          </div>
+        </div>
+        <div class="product-actions">
+          <button class="btn btn-ghost btn-sm" onclick="navigateTo('product-edit.html?id=${p.product_id}')">Редактировать</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.product_id}','${escapeHtml(p.name).replace(/'/g,"\\'")}')">Удалить</button>
+        </div>
+      </div>`;
+    }).join('');
+    container.innerHTML = `<div class="products-grid">${cards}</div>`;
+  }
+
+  async function deleteProduct(id, name) {
+    if (!confirm(`Удалить товар "${name}"?`)) return;
+    try {
+      await API.deleteProduct(id);
+      showToast('Товар удалён');
+      loadProducts();
+    } catch (err) { handleError(err, 'Ошибка удаления'); }
+  }
+
+  loadPerformers().then(loadProducts);
+</script>
+</body>
+</html>

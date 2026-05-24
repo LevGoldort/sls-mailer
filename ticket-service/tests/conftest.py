@@ -36,8 +36,9 @@ def aws_credentials():
     os.environ['AWS_SECURITY_TOKEN'] = 'testing'
     os.environ['AWS_SESSION_TOKEN'] = 'testing'
     os.environ['AWS_REGION'] = 'eu-north-1'
-    # Set admin key for auth tests
+    os.environ['AWS_DEFAULT_REGION'] = 'eu-north-1'
     os.environ['ADMIN_API_KEYS'] = 'test-admin-key'
+    os.environ['JWT_SECRET'] = 'test-jwt-secret-32chars!!!!!!!!'
 
 
 @pytest.fixture
@@ -199,7 +200,7 @@ def sample_event():
         'event_id': 'test-event-1',
         'title': 'Test Event',
         'description': 'Test Description',
-        'date': '2025-12-31T20:00:00Z',
+        'date': '2030-12-31T20:00:00Z',
         'location_id': 'test-location-1',
         'ticket_types': [
             {
@@ -226,7 +227,7 @@ def sample_event():
             '0-3': 'tt-vip'
         },
         'GSI1PK': 'EVENT',
-        'GSI1SK': '2025-12-31T20:00:00Z'
+        'GSI1SK': '2030-12-31T20:00:00Z'
     }
 
 
@@ -268,6 +269,18 @@ def sample_location():
 def admin_api_key():
     """Mock admin API key - ENV already set in aws_credentials"""
     return 'test-admin-key'
+
+
+@pytest.fixture
+def jwt_admin_token(aws_credentials):
+    """Valid JWT access token with admin role for use in Authorization: Bearer headers."""
+    from utils.auth_jwt import generate_access_token
+    return generate_access_token(
+        user_id='test-admin-user',
+        tenant_id='yallabalagan',
+        email='admin@test.com',
+        role='admin',
+    )
 
 
 @pytest.fixture

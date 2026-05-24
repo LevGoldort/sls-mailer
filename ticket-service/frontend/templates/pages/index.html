@@ -96,12 +96,18 @@
     <div class="yb-podcast__right">
       <div class="yb-podcast__latest">
         <div class="yb-podcast__latest-label">{{ strings.podcast.latest_label }}</div>
-        <div class="yb-podcast__latest-title">«Что происходит в Израиле — снова обо всём»</div>
+        <div class="yb-podcast__latest-title">{{ latest_podcast.title if latest_podcast else '«Что происходит в Израиле — снова обо всём»' }}</div>
       </div>
       <div class="yb-podcast__ctas">
+        {% if latest_podcast %}
+        <a href="https://www.youtube.com/watch?v={{ latest_podcast.video_id }}" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener">
+          {{ strings.podcast.watch_youtube }}
+        </a>
+        {% else %}
         <a href="https://youtube.com/@yallabalagan" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener">
           {{ strings.podcast.watch_youtube }}
         </a>
+        {% endif %}
         <a href="https://open.spotify.com" class="yb-btn yb-btn--paper yb-btn--full" target="_blank" rel="noopener">
           {{ strings.podcast.listen_spotify }}
         </a>

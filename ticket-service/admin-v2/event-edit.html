@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Событие — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .ticket-type-block {
+      background: var(--bg);
+      border: 1px solid rgba(28,26,36,0.09);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 12px;
+    }
+    .ticket-type-block .form-row { margin-bottom: 0; }
+    .ticket-type-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .performer-check-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border: 1.5px solid rgba(28,26,36,0.10); border-radius: var(--radius-sm);
+      cursor: pointer; user-select: none; transition: border-color var(--transition), background var(--transition);
+    }
+    .performer-check-item:hover  { border-color: var(--purple); background: var(--purple-light); }
+    .performer-check-item.selected { border-color: var(--purple); background: var(--purple-light); }
+    .performer-check-item img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .performer-check-placeholder { width: 32px; height: 32px; border-radius: 50%; background: rgba(28,26,36,0.08); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .performers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-height: 240px; overflow-y: auto; }
+    .event-type-toggle { display: flex; border: 1px solid rgba(28,26,36,0.15); border-radius: var(--radius-sm); overflow: hidden; }
+    .event-type-btn { flex: 1; padding: 8px 16px; border: none; background: var(--bg); cursor: pointer; font-size: 14px; font-weight: 500; font-family: var(--font); transition: background var(--transition), color var(--transition); }
+    .event-type-btn.active { background: var(--purple); color: white; }
+    .save-bar-dirty  { color: var(--amber); }
+    .save-bar-saved  { color: var(--green); }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <!-- Create mode header -->
+    <div id="create-header">
+      <div class="page-header">
+        <div>
+          <a href="events.html" style="font-size:13px;color:var(--gray-mid);">← Назад к событиям</a>
+          <h1 class="page-title" style="margin-top:6px;">Новое событие</h1>
+        </div>
+      </div>
+    </div>
+
+    <!-- Management mode header -->
+    <div id="management-header" style="display:none;">
+      <div class="page-header">
+        <div>
+          <a href="events.html" style="font-size:13px;color:var(--gray-mid);">← Назад к событиям</a>
+          <h1 class="page-title" style="margin-top:6px;" id="mgmt-title">Событие</h1>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:6px;font-size:13px;color:var(--gray-mid);">
+            <span id="mgmt-date"></span>
+            <span id="mgmt-status"></span>
+          </div>
+        </div>
+        <div class="page-actions">
+          <a id="mgmt-sms-link" href="#" class="btn btn-ghost">SMS рассылка</a>
+        </div>
+      </div>
+
+      <div class="tabs" style="margin-bottom:28px;">
+        <button class="tab active" id="mtab-form"    onclick="switchMgmtTab('form')">Редактировать</button>
+        <button class="tab"        id="mtab-stats"   onclick="switchMgmtTab('stats')">Статистика</button>
+        <button class="tab" id="mtab-orders" onclick="switchMgmtTab('orders')" style="${Auth.isAdmin() ? '' : 'display:none;'}">Заказы <span class="tab-count" id="orders-count">0</span></button>
+        <button class="tab"        id="mtab-seating" onclick="switchMgmtTab('seating')" style="display:none;">Места</button>
+      </div>
+    </div>
+
+    <!-- Stats tab -->
+    <div id="tab-stats" class="tab-content">
+      <div class="stats-grid" id="event-stats-grid"></div>
+    </div>
+
+    <!-- Orders tab -->
+    <div id="tab-orders" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Заказы</span>
+          <button class="btn btn-ghost btn-sm" onclick="exportOrdersCSV()">Экспорт CSV</button>
+        </div>
+        <div class="card-body">
+          <div class="search-bar">
+            <div class="search-input-wrap">
+              <span class="search-input-icon">🔍</span>
+              <input class="search-input" id="orders-search" placeholder="ID, email, телефон...">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="orders-table">
+              <thead><tr>
+                <th>Заказ</th><th>Имя</th><th>Email</th><th>Билеты</th><th>Сумма</th><th>Статус</th><th>Дата и время</th>
+              </tr></thead>
+              <tbody id="orders-tbody"><tr><td colspan="7" class="loading">Загрузка...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seating tab -->
+    <div id="tab-seating" class="tab-content">
+      <div class="card">
+        <div class="card-body">
+          <div id="seat-allocation-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit form (always rendered, shown/hidden by tab or as main in create mode) -->
+    <div id="tab-form" class="tab-content active">
+      <form id="event-form">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Основное</span></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Тип события</label>
+              <div class="event-type-toggle">
+                <button type="button" class="event-type-btn active" id="btn-internal" onclick="setEventType('internal', true)">Собственное</button>
+                <button type="button" class="event-type-btn" id="btn-external" onclick="setEventType('external', true)">Внешнее</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="title">Название *</label>
+              <input class="form-input" type="text" id="title" name="title" required placeholder="Название события" oninput="onTitleInput(this.value)">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="date">Дата *</label>
+                <input class="form-input" type="date" id="date" name="date" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="time">Время *</label>
+                <input class="form-input" type="time" id="time" name="time" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="location_id">Локация *</label>
+                <select class="form-select" id="location_id" name="location_id" required>
+                  <option value="">Выберите локацию...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="status">Статус</label>
+                <select class="form-select" id="status" name="status">
+                  <option value="active">Активное</option>
+                  <option value="sold_out">Распродано</option>
+                  <option value="cancelled">Отменено</option>
+                  <option value="draft">Черновик</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="description">Описание</label>
+              <textarea class="form-textarea" id="description" name="description" rows="4" placeholder="Описание события..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="slug">URL-адрес (slug)</label>
+              <input class="form-input" type="text" id="slug" name="slug" placeholder="my-event" oninput="onSlugInput(this.value)">
+              <span class="form-hint" id="slug-preview"></span>
+            </div>
+
+            <div class="form-group" id="external-url-group" style="display:none;">
+              <label class="form-label" for="external_url">Внешняя ссылка</label>
+              <input class="form-input" type="url" id="external_url" placeholder="https://...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Performers -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Артисты</span></div>
+          <div class="card-body">
+            <div class="performers-grid" id="performers-checklist">
+              <div class="loading">Загрузка...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Images -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Изображения</span></div>
+          <div class="card-body">
+            <div id="event-images-upload"></div>
+          </div>
+        </div>
+
+        <!-- Ticket types (internal only, hidden for external events) -->
+        <div class="card" id="ticket-types-section" style="display:none;">
+          <div class="card-header">
+            <span class="card-title">Типы билетов</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addTicketType()">+ Добавить тип</button>
+          </div>
+          <div class="card-body">
+            <div id="ticket-types-container"></div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<!-- Sticky save bar -->
+<div class="save-bar" id="save-bar">
+  <span class="save-bar-status" id="save-status"></span>
+  <div class="save-bar-actions">
+    <a href="events.html" class="btn btn-ghost">Отмена</a>
+    <button class="btn btn-primary" id="save-btn" onclick="saveEvent()">Сохранить</button>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script src="shared-image-upload.js"></script>
+<script src="seating-map-editor.js"></script>
+<script src="seating-allocation-editor.js"></script>
+<script src="order-modal.js"></script>
+<script>
+  let eventId = null;
+  let ticketTypeCounter = 0;
+  let imageUrls = [];
+  let slugManuallyEdited = false;
+  let allEventOrders = [];
+  let currentEventData = null;
+  let currentVenueMap = null;
+  let seatAllocationData = null;
+  let seatAllocationColors = null;
+  let seatAllocator = null;
+  let performers = [];
+  let currentEventType = 'internal';
+  let isDirty = false;
+  let locations = [];
+
+  function markDirty() {
+    if (!isDirty) {
+      isDirty = true;
+      document.getElementById('save-status').textContent = 'Есть несохранённые изменения';
+      document.getElementById('save-status').className = 'save-bar-status save-bar-dirty';
+    }
+  }
+
+  function markSaved() {
+    isDirty = false;
+    document.getElementById('save-status').textContent = 'Сохранено ✓';
+    document.getElementById('save-status').className = 'save-bar-status save-bar-saved';
+  }
+
+  function setEventType(type, dirty = true) {
+    currentEventType = type;
+    document.getElementById('btn-internal').classList.toggle('active', type === 'internal');
+    document.getElementById('btn-external').classList.toggle('active', type === 'external');
+    document.getElementById('external-url-group').style.display  = type === 'external' ? '' : 'none';
+    document.getElementById('ticket-types-section').style.display = type === 'internal' ? '' : 'none';
+    if (dirty) markDirty();
+  }
+
+  function slugify(v) {
+    return (v || '').toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-+|-+$/g,'');
+  }
+
+  function updateSlugPreview() {
+    const slug = document.getElementById('slug').value.trim();
+    const el   = document.getElementById('slug-preview');
+    if (slug) el.textContent = `URL: /events/${slug}.html`;
+    else if (eventId) el.textContent = `URL по умолчанию: /events/${eventId}.html`;
+    else el.textContent = 'Без slug страница доступна по /events/<id>.html';
+  }
+
+  function onTitleInput(val) {
+    if (!eventId && !slugManuallyEdited) {
+      document.getElementById('slug').value = slugify(val);
+      updateSlugPreview();
+    }
+    markDirty();
+  }
+
+  function onSlugInput(val) {
+    slugManuallyEdited = true;
+    document.getElementById('slug').value = slugify(val);
+    updateSlugPreview();
+    markDirty();
+  }
+
+  async function loadLocations() {
+    try {
+      const data = await API.getLocations();
+      locations = data.locations || [];
+      const select = document.getElementById('location_id');
+      locations.forEach(loc => {
+        const opt = document.createElement('option');
+        opt.value = loc.location_id;
+        opt.textContent = `${loc.name} (${loc.capacity} мест)`;
+        select.appendChild(opt);
+      });
+    } catch (err) { handleError(err, 'Ошибка загрузки локаций'); }
+  }
+
+  async function loadPerformers() {
+    try {
+      const data = await API.getPerformers();
+      performers = data.performers || [];
+      renderPerformersChecklist([]);
+    } catch { document.getElementById('performers-checklist').innerHTML = '<span style="color:var(--gray);font-size:13px;">Нет артистов</span>'; }
+  }
+
+  function renderPerformersChecklist(selectedIds) {
+    const container = document.getElementById('performers-checklist');
+    if (!performers.length) { container.innerHTML = '<span style="color:var(--gray);font-size:13px;">Нет артистов</span>'; return; }
+    container.innerHTML = performers.map(p => {
+      const selected = selectedIds.includes(p.performer_id) ? 'selected' : '';
+      const photo = p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="">` : `<div class="performer-check-placeholder">🎤</div>`;
+      return `<div class="performer-check-item ${selected}" data-id="${p.performer_id}" onclick="togglePerformer(this)">
+        ${photo}
+        <span style="font-size:13px;font-weight:500;">${escapeHtml(p.name)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function togglePerformer(el) { el.classList.toggle('selected'); markDirty(); }
+
+  function getSelectedPerformerIds() {
+    return Array.from(document.querySelectorAll('.performer-check-item.selected')).map(el => el.dataset.id);
+  }
+
+  function addTicketType(data = {}) {
+    ticketTypeCounter++;
+    const id  = data.type_id || `tt-${Date.now()}-${ticketTypeCounter}`;
+    const div = document.createElement('div');
+    div.className = 'ticket-type-block';
+    div.dataset.typeId = id;
+    div.innerHTML = `
+      <div class="ticket-type-header">
+        <span style="font-size:13px;font-weight:600;color:var(--gray-mid);">Тип ${ticketTypeCounter}</span>
+        <button type="button" class="btn btn-danger btn-sm" onclick="removeTicketType(this)">Удалить</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Название</label>
+          <input class="form-input tt-name" type="text" value="${escapeHtml(data.name || '')}" placeholder="VIP, Стандарт..." oninput="markDirty()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Цена (₪)</label>
+          <input class="form-input tt-price" type="number" value="${data.price || ''}" placeholder="0" min="0" oninput="markDirty()">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Кол-во билетов</label>
+          <input class="form-input tt-total" type="number" value="${data.total || ''}" placeholder="100" min="1" oninput="markDirty()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Цвет</label>
+          <input type="color" class="tt-color" value="${data.color || '#6b5acf'}" style="width:48px;height:38px;border:1px solid rgba(28,26,36,0.15);border-radius:var(--radius-sm);cursor:pointer;background:none;" oninput="markDirty()">
+        </div>
+      </div>
+    `;
+    document.getElementById('ticket-types-container').appendChild(div);
+  }
+
+  function removeTicketType(btn) {
+    btn.closest('.ticket-type-block').remove();
+    markDirty();
+  }
+
+  function collectTicketTypes() {
+    return Array.from(document.querySelectorAll('.ticket-type-block')).map(block => ({
+      type_id:   block.dataset.typeId,
+      name:      block.querySelector('.tt-name').value.trim(),
+      price:     parseFloat(block.querySelector('.tt-price').value) || 0,
+      total:     parseInt(block.querySelector('.tt-total').value) || 0,
+      available: parseInt(block.querySelector('.tt-total').value) || 0,
+      color:     block.querySelector('.tt-color').value,
+    }));
+  }
+
+  function collectFormData() {
+    const date = document.getElementById('date').value;
+    const time = document.getElementById('time').value;
+    const data = {
+      title:       document.getElementById('title').value.trim(),
+      description: document.getElementById('description').value.trim(),
+      date:        date && time ? `${date}T${time}:00Z` : '',
+      location_id: document.getElementById('location_id').value,
+      status:      document.getElementById('status').value,
+      slug:        document.getElementById('slug').value.trim() || null,
+      event_type:  currentEventType,
+      performer_ids: getSelectedPerformerIds(),
+      images:      imageUrls,
+    };
+    if (currentEventType === 'external') {
+      data.external_url = document.getElementById('external_url').value.trim();
+    } else {
+      data.ticket_types = collectTicketTypes();
+      if (seatAllocationData) {
+        data.seat_allocation = seatAllocationData;
+        data.seat_allocation_colors = seatAllocationColors;
+      }
+    }
+    return data;
+  }
+
+  async function saveEvent() {
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span>';
+
+    try {
+      const data = collectFormData();
+      if (!data.title) { showToast('Введите название', 'error'); return; }
+      if (!data.date)  { showToast('Укажите дату и время', 'error'); return; }
+      if (!data.location_id) { showToast('Выберите локацию', 'error'); return; }
+
+      if (eventId) {
+        await API.updateEvent(eventId, data);
+        showToast('Событие обновлено');
+      } else {
+        const res = await API.createEvent(data);
+        const newId = res.event?.event_id || res.event_id;
+        showToast('Событие создано');
+        window.location.href = `event-edit.html?id=${newId}`;
+        return;
+      }
+      markSaved();
+    } catch (err) {
+      handleError(err, 'Ошибка сохранения');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Сохранить';
+    }
+  }
+
+  async function loadEvent(id) {
+    try {
+      const res   = await API.getEvent(id);
+      const event = res.event;
+      currentEventData = event;
+
+      // Populate management header
+      document.getElementById('mgmt-title').textContent = event.title;
+      document.getElementById('mgmt-date').textContent  = formatDate(event.date);
+      document.getElementById('mgmt-status').innerHTML  = `<span class="badge badge-${event.status}">${event.status}</span>`;
+      document.getElementById('mgmt-sms-link').href     = `sms-blast.html?id=${id}`;
+
+      // Fill form fields
+      document.getElementById('title').value       = event.title;
+      document.getElementById('description').value = event.description || '';
+      document.getElementById('status').value      = event.status;
+      document.getElementById('slug').value        = event.slug || '';
+      slugManuallyEdited = !!event.slug;
+      updateSlugPreview();
+
+      const [datePart, timePart] = (event.date.replace('Z','')).split('T');
+      document.getElementById('date').value = datePart;
+      document.getElementById('time').value = timePart.slice(0,5);
+
+      document.getElementById('location_id').value = event.location_id;
+
+      setEventType(event.event_type === 'external' ? 'external' : 'internal', false);
+      if (event.event_type === 'external') {
+        document.getElementById('external_url').value = event.external_url || '';
+      }
+
+      renderPerformersChecklist(event.performer_ids || []);
+
+      if (event.images?.length) { imageUrls = event.images; }
+      initImageUploadComponent(imageUrls);
+
+      // Ticket types
+      const container = document.getElementById('ticket-types-container');
+      container.innerHTML = '';
+      ticketTypeCounter = 0;
+      if (event.ticket_types?.length) {
+        event.ticket_types.forEach(tt => addTicketType(tt));
+      } else if (currentEventType === 'internal') {
+        addTicketType();
+      }
+
+      // Load venue seating
+      if (event.location_id) {
+        try {
+          const locData = await API.getLocation(event.location_id);
+          const loc = locData.location;
+          if (loc.venue_config?.venue_type === 'seated' && loc.venue_config?.seating_map) {
+            currentVenueMap = loc.venue_config.seating_map;
+            document.getElementById('mtab-seating').style.display = '';
+          }
+        } catch { /* ok */ }
+      }
+
+      if (event.seat_allocation) {
+        seatAllocationData   = event.seat_allocation;
+        seatAllocationColors = event.seat_allocation_colors || {};
+      }
+
+      // Load orders
+      await loadEventOrders(id);
+      document.getElementById('save-status').textContent = 'Загружено';
+      document.getElementById('save-status').className   = 'save-bar-status save-bar-saved';
+
+    } catch (err) { handleError(err, 'Ошибка загрузки события'); }
+  }
+
+  async function loadEventOrders(id) {
+    try {
+      const data = await API.getOrdersByEvent(id);
+      allEventOrders = data.orders || [];
+      document.getElementById('orders-count').textContent = allEventOrders.length;
+      renderOrdersTable(allEventOrders);
+      renderEventStats();
+    } catch { /* non-critical */ }
+  }
+
+  function renderEventStats() {
+    const grid = document.getElementById('event-stats-grid');
+    if (!grid || !currentEventData) return;
+
+    const eventStats = calculateEventStats(currentEventData);
+    const completed  = allEventOrders.filter(o => o.payment?.status === 'completed');
+    const pending    = allEventOrders.filter(o => o.payment?.status === 'pending');
+    const revenue    = completed.reduce((s, o) => s + (o.total_amount || 0), 0);
+    const avgOrder   = completed.length ? revenue / completed.length : 0;
+
+    grid.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Продано билетов</div>
+        <div class="stat-value">${eventStats.soldTickets} / ${eventStats.totalTickets}</div>
+        <div class="stat-desc">${eventStats.capacity}% заполнено</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Выручка</div>
+        <div class="stat-value">${formatCurrency(revenue)}</div>
+        <div class="stat-desc">${completed.length} оплаченных заказов</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Средний чек</div>
+        <div class="stat-value">${formatCurrency(avgOrder)}</div>
+        <div class="stat-desc">на заказ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Ожидают оплаты</div>
+        <div class="stat-value">${pending.length}</div>
+        <div class="stat-desc">незавершённых заказов</div>
+      </div>
+    `;
+
+    // Per ticket type breakdown
+    if (currentEventData.ticket_types?.length > 0) {
+      const breakdownHtml = currentEventData.ticket_types.map(tt => {
+        const sold = (tt.total || 0) - (tt.available || 0);
+        const pct  = tt.total ? Math.round((sold / tt.total) * 100) : 0;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(28,26,36,0.06);">
+          <div>
+            <div style="font-weight:500;font-size:14px;">${escapeHtml(tt.name || tt.type_id || '')}</div>
+            <div style="font-size:12px;color:var(--gray-mid);">${formatCurrency(tt.price)} · ${sold}/${tt.total} продано</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:14px;font-weight:600;color:var(--purple);">${formatCurrency(sold * (tt.price || 0))}</div>
+            <div style="font-size:12px;color:var(--gray-mid);">${pct}%</div>
+          </div>
+        </div>`;
+      }).join('');
+      grid.insertAdjacentHTML('afterend', `
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header"><span class="card-title">По типам билетов</span></div>
+          <div class="card-body" style="padding-top:0;">${breakdownHtml}</div>
+        </div>`);
+    }
+  }
+
+  function renderOrdersTable(orders) {
+    const tbody = document.getElementById('orders-tbody');
+    if (!orders.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><span class="empty-text">Нет заказов</span></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = orders.map(o => {
+      const ticketCount = (o.tickets || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
+      const status = o.payment?.status || 'pending';
+      return `
+        <tr style="cursor:pointer;" onclick="openOrderModal('${o.order_id}')">
+          <td class="mono">${o.order_id.slice(0,10)}...</td>
+          <td style="font-weight:500;">${escapeHtml(o.customer?.name || '-')}</td>
+          <td style="font-size:13px;">${escapeHtml(o.customer?.email || '-')}</td>
+          <td>${ticketCount}</td>
+          <td>${formatCurrency(o.total_amount)}</td>
+          <td><span class="status-badge status-${status}">${status}</span></td>
+          <td style="font-size:13px;">${formatDate(o.created_at)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function filterOrders() {
+    const q = document.getElementById('orders-search').value.toLowerCase();
+    if (!q) { renderOrdersTable(allEventOrders); return; }
+    renderOrdersTable(allEventOrders.filter(o =>
+      o.order_id.toLowerCase().includes(q) ||
+      (o.customer?.email  || '').toLowerCase().includes(q) ||
+      (o.customer?.phone  || '').toLowerCase().includes(q) ||
+      (o.customer?.name   || '').toLowerCase().includes(q)
+    ));
+  }
+
+  function exportOrdersCSV() {
+    exportToCSV(allEventOrders.map(o => ({
+      order_id: o.order_id,
+      name: o.customer?.name || '',
+      email: o.customer?.email || '',
+      phone: o.customer?.phone || '',
+      total: o.total_amount,
+      status: o.payment?.status || '',
+      date: o.created_at,
+    })), `orders-${eventId}.csv`);
+  }
+
+  function switchMgmtTab(tab) {
+    ['form','stats','orders','seating'].forEach(t => {
+      const btn = document.getElementById(`mtab-${t}`);
+      const panel = document.getElementById(`tab-${t}`);
+      if (btn) btn.classList.toggle('active', t === tab);
+      if (panel) { panel.classList.toggle('active', t === tab); }
+    });
+  }
+
+  function initImageUploadComponent(existing = []) {
+    if (typeof initImageUpload !== 'function') return;
+    initImageUpload('event-images-upload', 'events',
+      (url) => { imageUrls.push(url); markDirty(); },
+      (err) => { showToast('Ошибка загрузки фото', 'error'); },
+      { existingImages: existing, onRemove: (url) => { imageUrls = imageUrls.filter(u => u !== url); markDirty(); } }
+    );
+  }
+
+  async function init() {
+    updateSlugPreview();
+    await Promise.all([loadLocations(), loadPerformers()]);
+
+    const params = new URLSearchParams(window.location.search);
+    eventId = params.get('id');
+
+    // Wire up form change tracking
+    document.getElementById('event-form').addEventListener('change', markDirty);
+    document.getElementById('orders-search').addEventListener('input', filterOrders);
+
+    if (eventId) {
+      document.getElementById('create-header').style.display   = 'none';
+      document.getElementById('management-header').style.display = '';
+      await loadEvent(eventId);
+    } else {
+      setEventType('internal', false);
+      initImageUploadComponent();
+      addTicketType();
+      document.getElementById('save-status').textContent = 'Новое событие';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

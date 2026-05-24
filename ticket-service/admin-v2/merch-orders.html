@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Мерч-заказы — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .progress-bar-wrap { background: var(--border-color, #e5e7eb); border-radius: 6px; height: 8px; margin: 6px 0 2px; }
+    .progress-bar { background: var(--primary, #6366f1); border-radius: 6px; height: 8px; transition: width .3s; }
+    .progress-label { font-size: 13px; color: var(--text-secondary, #6b7280); }
+    .group-card { border: 1px solid var(--border-color, #e5e7eb); border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; }
+    .group-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .toggle-link { font-size: 13px; color: var(--primary, #6366f1); cursor: pointer; white-space: nowrap; text-decoration: none; }
+    .toggle-link:hover { text-decoration: underline; }
+    .group-buyers { overflow: hidden; }
+    .group-buyers.collapsed { display: none; }
+    .group-card-title { font-weight: 600; font-size: 15px; flex: 1; }
+    .group-actions { display: flex; gap: 8px; align-items: center; }
+    .note-input { font-size: 13px; padding: 4px 8px; border: 1px solid var(--border-color, #e5e7eb); border-radius: 6px; width: 220px; }
+    .fulfillment-badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+    .fulfillment-new       { background: #fef3c7; color: #92400e; }
+    .fulfillment-fulfilled { background: #d1fae5; color: #065f46; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Мерч-заказы</h1>
+      </div>
+      <div class="page-actions">
+        <select class="form-select" id="product-filter" style="width:220px;">
+          <option value="">Все товары</option>
+        </select>
+        <select class="form-select" id="payment-filter" style="width:160px;">
+          <option value="">Любой статус оплаты</option>
+          <option value="completed">Оплачен</option>
+          <option value="pending">Ожидает оплаты</option>
+          <option value="failed">Отклонён</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="sections-wrap">
+      <div class="loading" style="padding:32px;text-align:center;">Загрузка...</div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let allOrders = [], allProducts = [], productMap = {};
+
+  async function load() {
+    if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
+    try {
+      const [ordersData, productsData] = await Promise.all([
+        API.getMerchOrders(),
+        API.getProducts(),
+      ]);
+      allOrders = ordersData.orders || [];
+      allProducts = productsData.products || [];
+
+      productMap = {};
+      allProducts.forEach(p => { productMap[p.product_id] = p; });
+
+      const sel = document.getElementById('product-filter');
+      allProducts.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.product_id;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+
+      render();
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  function filterOrders() {
+    const productId    = document.getElementById('product-filter').value;
+    const paymentStatus = document.getElementById('payment-filter').value;
+    return allOrders.filter(o => {
+      const matchProduct = !productId || o.product_id === productId;
+      const matchPayment = !paymentStatus || o.status === paymentStatus;
+      return matchProduct && matchPayment;
+    });
+  }
+
+  function render() {
+    const orders = filterOrders();
+    const wrap = document.getElementById('sections-wrap');
+
+    const personal = orders.filter(o => {
+      const p = productMap[o.product_id];
+      return !p || p.product_type !== 'group';
+    });
+    const groupOrders = orders.filter(o => {
+      const p = productMap[o.product_id];
+      return p && p.product_type === 'group';
+    });
+
+    let html = '';
+
+    // ── Personal section ──
+    html += `<div class="card" style="margin-bottom:24px;">
+      <div class="card-header"><h2 class="card-title">Индивидуальные покупки</h2></div>
+      <div class="card-body">`;
+    if (!personal.length) {
+      html += '<div class="empty"><span class="empty-text">Нет заказов</span></div>';
+    } else {
+      html += `<div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th>Покупатель</th><th class="hide-mobile">Telegram</th><th class="hide-mobile">Продукт</th><th>Сумма</th>
+          <th class="hide-mobile">Дата</th><th>Оплата</th><th>Выполнение</th><th></th>
+        </tr></thead>
+        <tbody>`;
+      personal.forEach(o => { html += renderPersonalRow(o); });
+      html += '</tbody></table></div>';
+    }
+    html += '</div></div>';
+
+    // ── Group section ──
+    if (groupOrders.length) {
+      html += '<h2 style="margin:0 0 16px;font-size:18px;font-weight:600;">Групповые товары</h2>';
+
+      const byProduct = {};
+      groupOrders.forEach(o => {
+        if (!byProduct[o.product_id]) byProduct[o.product_id] = [];
+        byProduct[o.product_id].push(o);
+      });
+
+      Object.entries(byProduct).forEach(([productId, productOrders]) => {
+        html += renderGroupCard(productId, productOrders);
+      });
+    }
+
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.fulfill-btn').forEach(btn => {
+      btn.addEventListener('click', () => fulfillOrder(btn.dataset.id));
+    });
+    wrap.querySelectorAll('.fulfill-all-btn').forEach(btn => {
+      btn.addEventListener('click', () => fulfillGroup(btn.dataset.product));
+    });
+  }
+
+  function renderPersonalRow(o) {
+    const product = productMap[o.product_id];
+    const productName = product ? escapeHtml(product.name) : escapeHtml(o.product_slug || o.product_id);
+    const buyer = o.buyer || {};
+    const fStatus = o.fulfillment_status || 'new';
+    const badge = `<span class="fulfillment-badge fulfillment-${fStatus}">${fStatus === 'fulfilled' ? 'Выполнен' : 'Новый'}</span>`;
+    return `<tr>
+      <td><div style="font-weight:500;">${escapeHtml(buyer.name || '-')}</div>
+          <div style="font-size:12px;color:var(--text-secondary,#6b7280);">${escapeHtml(buyer.email || '-')}</div></td>
+      <td class="hide-mobile" style="font-size:13px;">${escapeHtml(buyer.telegram || '-')}</td>
+      <td class="hide-mobile">${productName}</td>
+      <td>${typeof o.amount_ils === 'number' ? formatCurrency(o.amount_ils) : (o.amount_ils ? o.amount_ils + '₪' : '-')}</td>
+      <td class="hide-mobile" style="font-size:13px;">${formatDateShort(o.created_at)}</td>
+      <td><span class="status-badge status-${o.status || 'pending'}">${o.status || 'pending'}</span></td>
+      <td>${badge}</td>
+      <td>${fStatus !== 'fulfilled' ? `<button class="btn btn-sm btn-ghost fulfill-btn" data-id="${o.order_id}">Выполнено</button>` : ''}</td>
+    </tr>`;
+  }
+
+  function renderGroupCard(productId, productOrders) {
+    const product = productMap[productId];
+    const name = product ? escapeHtml(product.name) : escapeHtml(productId);
+    const groupSize = product ? (product.group_size || '?') : '?';
+    const completedOrders = productOrders.filter(o => o.status === 'completed');
+    const count = completedOrders.length;
+    const pct = groupSize !== '?' ? Math.min(100, Math.round(count / groupSize * 100)) : 0;
+    const allFulfilled = completedOrders.length > 0 && completedOrders.every(o => o.fulfillment_status === 'fulfilled');
+
+    const cardId = `group-${productId}`;
+
+    let html = `<div class="group-card">
+      <div class="group-card-header">
+        <div class="group-card-title">${name}</div>
+        <div class="progress-label">${count} / ${groupSize} оплачено</div>
+        <a class="toggle-link" onclick="toggleGroup('${cardId}')" id="toggle-${cardId}">▶ Показать покупателей</a>
+        <div class="group-actions">
+          ${!allFulfilled && completedOrders.length > 0
+            ? `<input class="note-input" id="note-${productId}" placeholder="Заметка (дата, ссылка...)">`
+              + `<button class="btn btn-sm btn-primary fulfill-all-btn" data-product="${productId}">Отметить всех выполненными</button>`
+            : ''}
+        </div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" style="width:${pct}%"></div>
+      </div>`;
+
+    if (!productOrders.length) {
+      html += '<div class="empty" style="padding:12px 0;"><span class="empty-text">Нет заказов</span></div>';
+    } else {
+      html += `<div class="group-buyers collapsed" id="${cardId}"><div class="table-wrap" style="margin-top:12px;"><table class="table">
+        <thead><tr>
+          <th>Покупатель</th><th>Telegram</th><th>Телефон</th><th>Дата</th><th>Оплата</th><th>Выполнение</th>
+        </tr></thead><tbody>`;
+      productOrders.forEach(o => {
+        const buyer = o.buyer || {};
+        const fStatus = o.fulfillment_status || 'new';
+        const badge = `<span class="fulfillment-badge fulfillment-${fStatus}">${fStatus === 'fulfilled' ? 'Выполнен' : 'Новый'}</span>`;
+        const note = o.fulfillment_note ? `<div style="font-size:11px;color:var(--text-secondary,#6b7280);">${escapeHtml(o.fulfillment_note)}</div>` : '';
+        html += `<tr>
+          <td><div style="font-weight:500;">${escapeHtml(buyer.name || '-')}</div>
+              <div style="font-size:12px;color:var(--text-secondary,#6b7280);">${escapeHtml(buyer.email || '-')}</div></td>
+          <td style="font-size:13px;">${escapeHtml(buyer.telegram || '-')}</td>
+          <td style="font-size:13px;">${escapeHtml(buyer.phone || '-')}</td>
+          <td style="font-size:13px;">${formatDateShort(o.created_at)}</td>
+          <td><span class="status-badge status-${o.status || 'pending'}">${o.status || 'pending'}</span></td>
+          <td>${badge}${note}</td>
+        </tr>`;
+      });
+      html += '</tbody></table></div></div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function toggleGroup(cardId) {
+    const el = document.getElementById(cardId);
+    const link = document.getElementById(`toggle-${cardId}`);
+    if (!el) return;
+    const collapsed = el.classList.toggle('collapsed');
+    link.textContent = collapsed ? '▶ Показать покупателей' : '▼ Скрыть';
+  }
+
+  async function fulfillOrder(orderId) {
+    try {
+      await API.patchMerchOrder(orderId, { fulfillment_status: 'fulfilled' });
+      const idx = allOrders.findIndex(o => o.order_id === orderId);
+      if (idx !== -1) allOrders[idx].fulfillment_status = 'fulfilled';
+      render();
+      showToast('Заказ отмечен как выполненный');
+    } catch (err) { handleError(err, 'Ошибка обновления'); }
+  }
+
+  async function fulfillGroup(productId) {
+    const note = (document.getElementById(`note-${productId}`) || {}).value || '';
+    const toFulfill = allOrders.filter(
+      o => o.product_id === productId && o.status === 'completed' && o.fulfillment_status !== 'fulfilled'
+    );
+    if (!toFulfill.length) { showToast('Нет заказов для выполнения', 'error'); return; }
+
+    try {
+      await Promise.all(toFulfill.map(o =>
+        API.patchMerchOrder(o.order_id, {
+          fulfillment_status: 'fulfilled',
+          ...(note ? { fulfillment_note: note } : {}),
+        })
+      ));
+      toFulfill.forEach(o => {
+        const idx = allOrders.findIndex(x => x.order_id === o.order_id);
+        if (idx !== -1) {
+          allOrders[idx].fulfillment_status = 'fulfilled';
+          if (note) allOrders[idx].fulfillment_note = note;
+        }
+      });
+      render();
+      showToast(`Отмечено выполненными: ${toFulfill.length} заказов`);
+    } catch (err) { handleError(err, 'Ошибка обновления группы'); }
+  }
+
+  document.getElementById('product-filter').addEventListener('change', render);
+  document.getElementById('payment-filter').addEventListener('change', render);
+
+  load();
+</script>
+</body>
+</html>

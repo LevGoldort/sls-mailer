@@ -157,7 +157,7 @@ def test_create_order_seat_already_sold(db_client, sample_event, sample_location
     assert 'already reserved' in body['error']
 
 
-def test_save_seat_allocation_updates_availability(db_client, sample_event, admin_api_key, api_gateway_event, api_handler):
+def test_save_seat_allocation_updates_availability(db_client, sample_event, jwt_admin_token, api_gateway_event, api_handler):
     """Test that saving seat allocation updates ticket availability"""
     # Setup event with initial allocation
     db_client.put_event(sample_event)
@@ -175,7 +175,7 @@ def test_save_seat_allocation_updates_availability(db_client, sample_event, admi
         'POST',
         '/api/events/test-event-1/seat-allocation',
         body=new_allocation,
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response = api_handler.lambda_handler(event, None)
 
@@ -193,7 +193,7 @@ def test_save_seat_allocation_updates_availability(db_client, sample_event, admi
     assert ticket_types['tt-vip']['available'] == 2
 
 
-def test_create_event_with_seat_allocation_sets_availability(db_client, sample_location, admin_api_key, api_gateway_event, api_handler):
+def test_create_event_with_seat_allocation_sets_availability(db_client, sample_location, jwt_admin_token, api_gateway_event, api_handler):
     """Test that creating event with seat_allocation sets correct availability"""
     # Setup location
     db_client.put_location(sample_location)
@@ -202,7 +202,7 @@ def test_create_event_with_seat_allocation_sets_availability(db_client, sample_l
     event_data = {
         'title': 'New Seated Event',
         'description': 'Test event',
-        'date': '2025-12-31T20:00:00Z',
+        'date': '2030-12-31T20:00:00Z',
         'location_id': 'test-location-1',
         'ticket_types': [
             {
@@ -230,7 +230,7 @@ def test_create_event_with_seat_allocation_sets_availability(db_client, sample_l
         'POST',
         '/api/events',
         body=event_data,
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response = api_handler.lambda_handler(event, None)
 
@@ -244,7 +244,7 @@ def test_create_event_with_seat_allocation_sets_availability(db_client, sample_l
     assert ticket_types['tt-vip']['available'] == 1  # Not 20!
 
 
-def test_refund_releases_seats(db_client, sample_event, sample_location, admin_api_key, api_gateway_event, api_handler):
+def test_refund_releases_seats(db_client, sample_event, sample_location, jwt_admin_token, api_gateway_event, api_handler):
     """Test that refunding an order releases the seats"""
     # Setup
     db_client.put_event(sample_event)
@@ -290,7 +290,7 @@ def test_refund_releases_seats(db_client, sample_event, sample_location, admin_a
     event2 = api_gateway_event(
         'POST',
         f'/api/orders/{order_id}/refund',
-        headers={'Authorization': f'Bearer {admin_api_key}'}
+        headers={'Authorization': f'Bearer {jwt_admin_token}'}
     )
     response2 = api_handler.lambda_handler(event2, None)
     assert response2['statusCode'] == 200

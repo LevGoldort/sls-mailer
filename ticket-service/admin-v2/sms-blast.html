@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMS Blast — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">SMS Blast</h1>
+        <p class="page-subtitle">Рассылка SMS по покупателям события</p>
+      </div>
+    </div>
+
+    <div style="max-width:640px;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Событие</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Выберите событие</label>
+            <select class="form-select" id="event-select" onchange="onEventChange()">
+              <option value="">— Загрузка... —</option>
+            </select>
+          </div>
+          <div id="recipients-info" style="font-size:14px;color:var(--gray-mid);display:none;">
+            <span class="badge badge-active" style="font-size:13px;" id="recipients-count">0</span> покупателей получат SMS
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Сообщение</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Текст сообщения (необязательно)</label>
+            <textarea class="form-textarea" id="custom-message" placeholder="Дополнительный текст. Оставьте пустым для отправки только информации о билетах." oninput="updatePreview()"></textarea>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="include-ticket-info" checked onchange="updatePreview()" style="width:16px;height:16px;accent-color:var(--purple);">
+              <span class="form-label" style="margin-bottom:0;">Приложить информацию о билетах</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Превью</label>
+            <div id="preview-box" style="background:var(--purple-light);border:1px solid var(--purple);border-radius:8px;padding:14px;font-size:14px;color:var(--dark);min-height:48px;">
+              Выберите событие для просмотра превью.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-body">
+          <button class="btn btn-primary" id="btn-send" onclick="sendBlast()" disabled style="width:100%;">
+            Отправить SMS Blast
+          </button>
+          <div id="result-box" style="display:none;margin-top:16px;padding:14px;border-radius:8px;font-size:14px;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let events = [], selectedEvent = null, orderCount = 0;
+
+  async function load() {
+    try {
+      const data = await API.getEvents();
+      events = (data.events || []).filter(ev => ev.status === 'active');
+      const sel = document.getElementById('event-select');
+      sel.innerHTML = '<option value="">— Выберите событие —</option>';
+      events.forEach(ev => {
+        const opt = document.createElement('option');
+        opt.value = ev.event_id;
+        opt.textContent = escapeHtml(ev.title);
+        sel.appendChild(opt);
+      });
+      const preselect = new URLSearchParams(window.location.search).get('id');
+      if (preselect) { sel.value = preselect; if (sel.value === preselect) await onEventChange(); }
+    } catch (err) { handleError(err, 'Ошибка загрузки событий'); }
+  }
+
+  async function onEventChange() {
+    const eventId = document.getElementById('event-select').value;
+    selectedEvent = events.find(e => e.event_id === eventId) || null;
+    orderCount = 0;
+    document.getElementById('btn-send').disabled = true;
+    document.getElementById('recipients-info').style.display = 'none';
+    if (!eventId) { updatePreview(); return; }
+
+    try {
+      const orders = await API.getOrdersByEvent(eventId);
+      const list = (orders.orders || []);
+      orderCount = list.filter(o => {
+        if (o.payment?.status !== 'completed') return false;
+        if (!o.customer?.phone) return false;
+        const qrs = o.qr_codes || [];
+        if (qrs.length > 0 && qrs.every(q => q.cancelled)) return false;
+        return true;
+      }).length;
+      document.getElementById('recipients-count').textContent = orderCount;
+      document.getElementById('recipients-info').style.display = 'block';
+      document.getElementById('btn-send').disabled = orderCount === 0;
+    } catch (err) { handleError(err, 'Ошибка загрузки заказов'); }
+    updatePreview();
+  }
+
+  function updatePreview() {
+    const custom = document.getElementById('custom-message').value.trim();
+    const includeTickets = document.getElementById('include-ticket-info').checked;
+    const box = document.getElementById('preview-box');
+    const eventTitle = selectedEvent?.title || '[Название события]';
+    const eventDate  = selectedEvent?.date  || '';
+    const parts = [];
+    if (custom) parts.push(custom);
+    if (includeTickets) {
+      if (eventDate) parts.push(`Дата: ${eventDate}`);
+      parts.push('Место: [название и адрес площадки]');
+      parts.push('Билеты онлайн: https://events.yallabalagan.org/ticket.html?order_id=...');
+    }
+    box.innerHTML = parts.length ? parts.map(p => escapeHtml(p)).join('<br>') : '<em style="color:var(--gray-mid);">Сообщение пустое</em>';
+  }
+
+  async function sendBlast() {
+    const eventId = document.getElementById('event-select').value;
+    if (!eventId || orderCount === 0) return;
+    if (!confirm(`Отправить SMS ${orderCount} покупателям?\n\nЭто действие нельзя отменить.`)) return;
+
+    const customMessage  = document.getElementById('custom-message').value.trim();
+    const includeTickets = document.getElementById('include-ticket-info').checked;
+    const btn = document.getElementById('btn-send');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span> Отправка...';
+
+    const resultBox = document.getElementById('result-box');
+    resultBox.style.display = 'none';
+
+    try {
+      const result = await API.sendSmsBlast(eventId, { custom_message: customMessage, include_ticket_info: includeTickets });
+      resultBox.style.cssText = 'display:block;background:#f0fff4;border:1px solid #86efac;color:#16a34a;margin-top:16px;padding:14px;border-radius:8px;font-size:14px;';
+      resultBox.textContent = `SMS Blast запущен для ${result.triggered || orderCount} заказов.`;
+      btn.innerHTML = 'Отправлено!';
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Отправить SMS Blast'; }, 3000);
+    } catch (err) {
+      resultBox.style.cssText = 'display:block;background:#fff0f0;border:1px solid #fca5a5;color:#dc2626;margin-top:16px;padding:14px;border-radius:8px;font-size:14px;';
+      resultBox.textContent = 'Ошибка: ' + (err.message || 'Неизвестная ошибка');
+      btn.disabled = false;
+      btn.textContent = 'Отправить SMS Blast';
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

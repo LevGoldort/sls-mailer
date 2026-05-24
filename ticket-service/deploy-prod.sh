@@ -360,9 +360,9 @@ fi
 
 # Sync S3 files
 echo ""
-if [ -d "$SCRIPT_DIR/admin" ]; then
+if [ -d "$SCRIPT_DIR/admin-v2" ]; then
     echo "📤 Syncing admin files to S3..."
-    aws s3 sync "$SCRIPT_DIR/admin/" s3://yallabalagan-ticket-admin/ \
+    aws s3 sync "$SCRIPT_DIR/admin-v2/" s3://yallabalagan-ticket-admin/ \
       --profile prod \
       --exclude "*.md" \
       --exclude ".DS_Store" \

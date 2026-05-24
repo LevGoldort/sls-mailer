@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Товар — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <a href="products.html" style="font-size:13px;color:var(--gray-mid);">← Назад к мерчу</a>
+        <h1 class="page-title" style="margin-top:6px;" id="page-title">Новый товар</h1>
+      </div>
+    </div>
+
+    <form id="prod-form" style="max-width:720px;" onsubmit="return false;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основное фото</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+            <div id="photo-placeholder" style="width:120px;height:120px;border-radius:10px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0;">🛍️</div>
+            <img id="photo-preview" style="display:none;width:120px;height:120px;border-radius:10px;object-fit:cover;flex-shrink:0;" src="" alt="">
+            <div class="upload-area" id="photo-upload-area" onclick="document.getElementById('photo-file').click()" style="flex:1;min-width:200px;">
+              Нажмите, перетащите или вставьте (Ctrl+V)<br><small style="color:var(--gray);">JPG, PNG до 5MB</small>
+            </div>
+            <input type="file" id="photo-file" accept="image/*" style="display:none;">
+            <input type="hidden" id="photo-url">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основная информация</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Перформер *</label>
+            <select class="form-select" id="performer-id">
+              <option value="">Выберите перформера...</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Название *</label>
+              <input class="form-input" type="text" id="name" placeholder="Название товара">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug *</label>
+              <input class="form-input" type="text" id="slug" placeholder="product-slug">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Краткое описание *</label>
+            <input class="form-input" type="text" id="short-description" placeholder="Одна строка">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Полное описание</label>
+            <textarea class="form-textarea" id="full-description" placeholder="Подробное описание товара..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Что получает покупатель</label>
+            <textarea class="form-textarea" id="what-you-get" placeholder="Что именно входит в покупку..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Цена и слоты</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Цена (₪) *</label>
+              <input class="form-input" type="number" id="price" min="0" step="0.01" placeholder="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Всего слотов (пусто = ∞)</label>
+              <input class="form-input" type="number" id="total-slots" min="1" placeholder="оставьте пустым для ∞">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Статус</label>
+            <select class="form-select" id="status">
+              <option value="active">Доступен</option>
+              <option value="inactive">Неактивен</option>
+              <option value="sold_out">Распродан</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:80px;">
+        <div class="card-header"><span class="card-title">Галерея</span></div>
+        <div class="card-body">
+          <div id="gallery-grid" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('gallery-file').click()" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:8px;">+</button>
+          </div>
+          <input type="file" id="gallery-file" accept="image/*" multiple style="display:none;">
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span></span>
+        <div class="save-bar-actions">
+          <a href="products.html" class="btn btn-ghost">Отмена</a>
+          <button class="btn btn-primary" type="button" id="save-btn" onclick="save()">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  const productId = new URLSearchParams(window.location.search).get('id');
+  let galleryUrls = [];
+
+  document.getElementById('name').addEventListener('input', function() {
+    if (productId) return;
+    document.getElementById('slug').value = this.value.toLowerCase()
+      .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  });
+
+  initCoverUpload({
+    uploadAreaId: 'photo-upload-area',
+    fileInputId: 'photo-file',
+    previewId: 'photo-preview',
+    placeholderId: 'photo-placeholder',
+    urlInputId: 'photo-url',
+    folder: 'products',
+  });
+
+  document.getElementById('gallery-file').addEventListener('change', async function() {
+    for (const file of Array.from(this.files)) {
+      try {
+        const url = await uploadFile(file, 'products');
+        if (url) addGalleryPhoto(url);
+      } catch { showToast('Ошибка загрузки фото галереи', 'error'); }
+    }
+    this.value = '';
+  });
+
+  function addGalleryPhoto(url) {
+    if (galleryUrls.includes(url)) return;
+    galleryUrls.push(url);
+    renderGallery();
+  }
+  function removeGalleryPhoto(url) { galleryUrls = galleryUrls.filter(u => u !== url); renderGallery(); }
+  function renderGallery() {
+    document.getElementById('gallery-grid').innerHTML = galleryUrls.map(url =>
+      `<div style="position:relative;width:80px;height:80px;">
+        <img src="${escapeHtml(url)}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:8px;">
+        <button onclick="removeGalleryPhoto('${escapeHtml(url)}')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:white;border:none;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;">&times;</button>
+      </div>`
+    ).join('') + `<button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('gallery-file').click()" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:8px;">+</button>`;
+  }
+
+  async function loadPerformers() {
+    try {
+      const data = await API.getPerformers();
+      const sel = document.getElementById('performer-id');
+      (data.performers || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.performer_id;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+    } catch {}
+  }
+
+  async function load() {
+    if (!productId) return;
+    document.getElementById('page-title').textContent = 'Редактировать товар';
+    try {
+      const data = await API.getProduct(productId);
+      const p = data.product;
+      document.getElementById('performer-id').value       = p.performer_id || '';
+      document.getElementById('name').value               = p.name || '';
+      document.getElementById('slug').value               = p.slug || '';
+      document.getElementById('short-description').value  = p.short_description || '';
+      document.getElementById('full-description').value   = p.full_description || '';
+      document.getElementById('what-you-get').value       = p.what_you_get || '';
+      document.getElementById('price').value              = p.price_ils || '';
+      document.getElementById('total-slots').value        = p.total_slots != null ? p.total_slots : '';
+      document.getElementById('status').value             = p.status || 'active';
+      if (p.photo_url) {
+        document.getElementById('photo-url').value = p.photo_url;
+        document.getElementById('photo-preview').src = p.photo_url;
+        document.getElementById('photo-preview').style.display = 'block';
+        document.getElementById('photo-placeholder').style.display = 'none';
+      }
+      galleryUrls = p.gallery_urls || [];
+      renderGallery();
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  async function save() {
+    const btn = document.getElementById('save-btn');
+    const performerId = document.getElementById('performer-id').value;
+    const name        = document.getElementById('name').value.trim();
+    const slug        = document.getElementById('slug').value.trim();
+    const shortDesc   = document.getElementById('short-description').value.trim();
+    const price       = parseFloat(document.getElementById('price').value);
+    if (!performerId || !name || !slug || !shortDesc || isNaN(price)) {
+      showToast('Заполните все обязательные поля', 'error'); return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span>';
+
+    const totalSlotsRaw = document.getElementById('total-slots').value.trim();
+    const payload = {
+      performer_id: performerId, name, slug,
+      short_description: shortDesc,
+      full_description: document.getElementById('full-description').value.trim(),
+      what_you_get: document.getElementById('what-you-get').value.trim(),
+      price_ils: price,
+      photo_url: document.getElementById('photo-url').value || null,
+      gallery_urls: galleryUrls,
+      total_slots: totalSlotsRaw ? parseInt(totalSlotsRaw) : null,
+      status: document.getElementById('status').value,
+    };
+
+    try {
+      if (productId) { await API.updateProduct(productId, payload); }
+      else           { await API.createProduct(payload); }
+      showToast('Сохранено');
+      setTimeout(() => navigateTo('products.html'), 800);
+    } catch (err) {
+      handleError(err, 'Ошибка сохранения');
+      btn.disabled = false;
+      btn.textContent = 'Сохранить';
+    }
+  }
+
+  loadPerformers().then(load);
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Перформер — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <a href="performers.html" style="font-size:13px;color:var(--gray-mid);">← Назад к перформерам</a>
+        <h1 class="page-title" style="margin-top:6px;" id="page-title">Новый перформер</h1>
+      </div>
+    </div>
+
+    <form id="perf-form" style="max-width:720px;" onsubmit="return false;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основное фото</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+            <div id="photo-placeholder" style="width:120px;height:120px;border-radius:10px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0;">🎤</div>
+            <img id="photo-preview" style="display:none;width:120px;height:120px;border-radius:10px;object-fit:cover;flex-shrink:0;" src="" alt="">
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('photo-file').click()" style="flex:1;min-width:200px;">
+              Нажмите, перетащите или вставьте (Ctrl+V)<br><small style="color:var(--gray);">JPG, PNG до 5MB</small>
+            </div>
+            <input type="file" id="photo-file" accept="image/*" style="display:none;">
+            <input type="hidden" id="photo-url">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основная информация</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Имя *</label>
+              <input class="form-input" type="text" id="name" placeholder="Имя перформера">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug *</label>
+              <input class="form-input" type="text" id="slug" placeholder="performer-name">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Роль *</label>
+              <input class="form-input" type="text" id="role" placeholder="DJ, Музыкант, Художник...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Статус</label>
+              <select class="form-select" id="status">
+                <option value="active">Активен</option>
+                <option value="inactive">Неактивен</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Биография *</label>
+            <textarea class="form-textarea" id="bio" placeholder="Расскажите о перформере..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">YouTube (embed URL)</label>
+            <input class="form-input" type="url" id="youtube-embed" placeholder="https://www.youtube.com/embed/VIDEO_ID">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Социальные сети</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Instagram</label>
+              <input class="form-input" type="url" id="social-instagram" placeholder="https://instagram.com/...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Telegram</label>
+              <input class="form-input" type="url" id="social-telegram" placeholder="https://t.me/...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">YouTube</label>
+              <input class="form-input" type="url" id="social-youtube" placeholder="https://youtube.com/...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Facebook</label>
+              <input class="form-input" type="url" id="social-facebook" placeholder="https://facebook.com/...">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Контакт</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input class="form-input" type="email" id="contact-email" placeholder="contact@example.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Телефон</label>
+              <input class="form-input" type="tel" id="contact-phone" placeholder="+972...">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:80px;">
+        <div class="card-header"><span class="card-title">Галерея</span></div>
+        <div class="card-body">
+          <div id="gallery-grid" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-ghost btn-sm" id="add-gallery-btn" onclick="document.getElementById('gallery-file').click()" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:8px;">+</button>
+          </div>
+          <input type="file" id="gallery-file" accept="image/*" multiple style="display:none;">
+        </div>
+      </div>
+
+      <div class="save-bar" id="save-bar">
+        <span id="save-status"></span>
+        <div class="save-bar-actions">
+          <a href="performers.html" class="btn btn-ghost">Отмена</a>
+          <button class="btn btn-primary" type="button" id="save-btn" onclick="save()">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  const performerId = new URLSearchParams(window.location.search).get('id');
+  let galleryUrls = [];
+
+  document.getElementById('name').addEventListener('input', function() {
+    if (performerId) return;
+    document.getElementById('slug').value = this.value.toLowerCase()
+      .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  });
+
+  initCoverUpload({
+    uploadAreaId: 'upload-area',
+    fileInputId: 'photo-file',
+    previewId: 'photo-preview',
+    placeholderId: 'photo-placeholder',
+    urlInputId: 'photo-url',
+    folder: 'performers',
+  });
+
+  document.getElementById('gallery-file').addEventListener('change', async function() {
+    for (const file of Array.from(this.files)) {
+      try {
+        const url = await uploadFile(file, 'performers');
+        if (url) addGalleryPhoto(url);
+      } catch { showToast('Ошибка загрузки фото галереи', 'error'); }
+    }
+    this.value = '';
+  });
+
+  function addGalleryPhoto(url) {
+    if (galleryUrls.includes(url)) return;
+    galleryUrls.push(url);
+    renderGallery();
+  }
+
+  function removeGalleryPhoto(url) {
+    galleryUrls = galleryUrls.filter(u => u !== url);
+    renderGallery();
+  }
+
+  function renderGallery() {
+    const grid = document.getElementById('gallery-grid');
+    grid.innerHTML = galleryUrls.map(url => `
+      <div style="position:relative;width:80px;height:80px;">
+        <img src="${escapeHtml(url)}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:8px;">
+        <button onclick="removeGalleryPhoto('${escapeHtml(url)}')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:white;border:none;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;">&times;</button>
+      </div>
+    `).join('') + `<button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('gallery-file').click()" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:8px;">+</button>`;
+  }
+
+  async function load() {
+    if (!performerId) return;
+    document.getElementById('page-title').textContent = 'Редактировать перформера';
+    try {
+      const data = await API.getPerformer(performerId);
+      const p = data.performer;
+      document.getElementById('name').value        = p.name || '';
+      document.getElementById('slug').value        = p.slug || '';
+      document.getElementById('bio').value         = p.bio || '';
+      document.getElementById('role').value        = p.role || '';
+      document.getElementById('status').value      = p.status || 'active';
+      document.getElementById('youtube-embed').value = p.youtube_embed || '';
+      document.getElementById('contact-email').value = p.contact_email || '';
+      document.getElementById('contact-phone').value = p.contact_phone || '';
+      const social = p.social || {};
+      document.getElementById('social-instagram').value = social.instagram || '';
+      document.getElementById('social-telegram').value  = social.telegram || '';
+      document.getElementById('social-youtube').value   = social.youtube || '';
+      document.getElementById('social-facebook').value  = social.facebook || '';
+      if (p.photo_url) {
+        document.getElementById('photo-url').value = p.photo_url;
+        document.getElementById('photo-preview').src = p.photo_url;
+        document.getElementById('photo-preview').style.display = 'block';
+        document.getElementById('photo-placeholder').style.display = 'none';
+      }
+      galleryUrls = p.photos || [];
+      renderGallery();
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  async function save() {
+    const btn = document.getElementById('save-btn');
+    const name = document.getElementById('name').value.trim();
+    const slug = document.getElementById('slug').value.trim();
+    const bio  = document.getElementById('bio').value.trim();
+    const role = document.getElementById('role').value.trim();
+    if (!name || !slug || !bio || !role) { showToast('Заполните все обязательные поля', 'error'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span>';
+
+    const payload = {
+      name, slug, bio, role,
+      status:        document.getElementById('status').value,
+      photo_url:     document.getElementById('photo-url').value || null,
+      photos:        galleryUrls,
+      youtube_embed: document.getElementById('youtube-embed').value.trim() || null,
+      social: {
+        instagram: document.getElementById('social-instagram').value.trim() || null,
+        telegram:  document.getElementById('social-telegram').value.trim() || null,
+        youtube:   document.getElementById('social-youtube').value.trim() || null,
+        facebook:  document.getElementById('social-facebook').value.trim() || null,
+      },
+      contact_email: document.getElementById('contact-email').value.trim() || null,
+      contact_phone: document.getElementById('contact-phone').value.trim() || null,
+    };
+
+    try {
+      if (performerId) { await API.updatePerformer(performerId, payload); }
+      else             { await API.createPerformer(payload); }
+      showToast('Сохранено');
+      setTimeout(() => navigateTo('performers.html'), 800);
+    } catch (err) {
+      handleError(err, 'Ошибка сохранения');
+      btn.disabled = false;
+      btn.textContent = 'Сохранить';
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

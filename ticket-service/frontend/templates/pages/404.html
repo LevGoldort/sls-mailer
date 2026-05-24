@@ -1,0 +1,77 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}404 — Страница не найдена | YallaBalagan{% endblock %}
+{% block description %}Страница не найдена{% endblock %}
+
+{% block content %}
+<div class="not-found-container">
+    <div class="error-code">404</div>
+    <h1 class="error-title">Страница не найдена</h1>
+
+    <div class="customer-frame">
+        <img
+            src="https://donate-yallabalagan.s3.eu-north-1.amazonaws.com/images/404/customer.jpg"
+            alt="Счастливый покупатель"
+            class="customer-photo"
+        >
+        <p class="customer-text">
+            Запрос данных страницы этого сайта был украден евреем — пожалуйста, повторите попытку позже.
+        </p>
+    </div>
+
+    <a href="/" class="yb-btn yb-btn--magenta">Вернуться на главную</a>
+</div>
+
+<style>
+.not-found-container {
+    max-width: 600px;
+    margin: 4rem auto;
+    padding: 0 1.5rem;
+    text-align: center;
+}
+
+.error-code {
+    font-family: var(--yb-font-display);
+    font-size: clamp(80px, 20vw, 140px);
+    line-height: 1;
+    color: var(--yb-magenta);
+    text-shadow: 6px 6px 0 var(--yb-ink);
+    margin-bottom: 1rem;
+}
+
+.error-title {
+    font-family: var(--yb-font-display);
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    color: var(--yb-ink);
+    margin-bottom: 2rem;
+}
+
+.customer-frame {
+    background: white;
+    border: var(--yb-border);
+    box-shadow: var(--yb-shadow-magenta);
+    padding: 2rem;
+    margin: 0 auto 2.5rem;
+    max-width: 440px;
+}
+
+.customer-photo {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 1.25rem;
+    border: var(--yb-border);
+    box-shadow: var(--yb-shadow-sm);
+}
+
+.customer-text {
+    font-family: var(--yb-font-body);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--yb-ink);
+    line-height: 1.5;
+}
+</style>
+{% endblock %}

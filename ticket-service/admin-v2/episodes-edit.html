@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Эпизод — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .yt-url-card { background: linear-gradient(135deg, #1a1429 0%, #2d1f4a 100%); border: 2px solid #7c3aed; }
+    .yt-url-card .card-header { border-bottom-color: rgba(124,58,237,0.3); }
+    .yt-url-card .card-title { color: #c4b5fd; }
+    .yt-url-input {
+      width: 100%; padding: 16px 18px; font-size: 17px; border-radius: 10px;
+      border: 2px solid rgba(124,58,237,0.5); background: rgba(255,255,255,0.06);
+      color: #f5f3ff; outline: none; transition: border-color .2s;
+      box-sizing: border-box;
+    }
+    .yt-url-input::placeholder { color: rgba(196,181,253,0.45); }
+    .yt-url-input:focus { border-color: #7c3aed; background: rgba(255,255,255,0.1); }
+    .yt-fetch-hint { font-size: 12px; color: #a78bfa; margin-top: 6px; min-height: 18px; }
+    .yt-label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #c4b5fd; margin-bottom: 10px; }
+    .yt-icon { font-size: 22px; }
+
+    .performers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    .performer-check-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border: 1.5px solid rgba(28,26,36,0.10); border-radius: var(--radius-sm);
+      cursor: pointer; user-select: none; transition: border-color .15s, background .15s;
+    }
+    .performer-check-item:hover   { border-color: var(--purple); background: var(--purple-light); }
+    .performer-check-item.selected { border-color: var(--purple); background: var(--purple-light); }
+    .performer-check-item.suggested { border-color: #f59e0b; background: #fef3c7; }
+    .performer-check-item.suggested.selected { border-color: var(--purple); background: var(--purple-light); }
+    .performer-check-item img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .performer-check-placeholder { width: 32px; height: 32px; border-radius: 50%; background: rgba(28,26,36,0.08); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .suggest-hint { font-size: 12px; color: #92400e; margin-top: 4px; display: none; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <a href="episodes.html" id="back-link" style="font-size:13px;color:var(--gray-mid);">← Назад к эпизодам</a>
+        <h1 class="page-title" style="margin-top:6px;" id="page-title">Новый эпизод</h1>
+      </div>
+    </div>
+
+    <form id="ep-form" style="max-width:720px;" onsubmit="return false;">
+
+      <div class="card yt-url-card">
+        <div class="card-header"><span class="card-title">Ссылка на YouTube</span></div>
+        <div class="card-body">
+          <div class="yt-label"><span class="yt-icon">▶</span> Вставьте ссылку — название, превью и участники подтянутся автоматически</div>
+          <input class="yt-url-input" type="url" id="url" placeholder="https://youtu.be/... или https://www.youtube.com/watch?v=...">
+          <div class="yt-fetch-hint" id="yt-hint"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основная информация</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Шоу *</label>
+              <select class="form-select" id="show-id" onchange="autoSlug()">
+                <option value="">— выберите шоу —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Номер эпизода <span style="font-weight:400;color:var(--gray-mid)">(авто)</span></label>
+              <input class="form-input" type="number" id="number" placeholder="авто" min="1" oninput="autoSlug()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Название *</label>
+              <input class="form-input" type="text" id="title" placeholder="Название эпизода" oninput="autoSlug()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Slug</label>
+              <input class="form-input" type="text" id="slug" placeholder="генерируется автоматически">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Описание</label>
+            <textarea class="form-textarea" id="description" placeholder="Описание эпизода..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Превью (thumbnail)</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+            <div id="thumb-placeholder" style="width:160px;height:90px;border-radius:8px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--purple);flex-shrink:0;">▶</div>
+            <img id="thumb-preview" style="display:none;width:160px;height:90px;border-radius:8px;object-fit:cover;flex-shrink:0;" src="" alt="">
+            <div class="upload-area" id="thumb-upload-area" onclick="document.getElementById('thumb-file').click()" style="flex:1;min-width:200px;">
+              Нажмите, перетащите или вставьте (Ctrl+V)<br><small style="color:var(--gray);">JPG, PNG · 16:9 рекомендуется</small>
+            </div>
+            <input type="file" id="thumb-file" accept="image/*" style="display:none;">
+            <input type="hidden" id="thumbnail-url">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:80px;">
+        <div class="card-header"><span class="card-title">Участники</span></div>
+        <div class="card-body">
+          <div class="suggest-hint" id="suggest-hint">⚡ Подобраны автоматически по названию — проверьте и скорректируйте</div>
+          <div class="performers-grid" id="performers-checklist">
+            <div class="loading">Загрузка...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span></span>
+        <div class="save-bar-actions">
+          <button type="button" class="btn btn-ghost" id="cancel-btn">Отмена</button>
+          <button class="btn btn-primary" type="button" id="save-btn" onclick="save()">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  const episodeId = new URLSearchParams(window.location.search).get('id');
+  const preShowId = new URLSearchParams(window.location.search).get('show_id');
+  let selectedPerformerIds = [], allPerformers = [], showSlugMap = {};
+
+  document.getElementById('cancel-btn').onclick = () => navigateTo(preShowId ? `episodes.html?show_id=${preShowId}` : 'episodes.html');
+
+  initCoverUpload({
+    uploadAreaId: 'thumb-upload-area',
+    fileInputId: 'thumb-file',
+    previewId: 'thumb-preview',
+    placeholderId: 'thumb-placeholder',
+    urlInputId: 'thumbnail-url',
+    folder: 'episodes',
+  });
+
+  function autoSlug() {
+    if (episodeId) return;
+    const showSel = document.getElementById('show-id');
+    const showSlug = showSlugMap[showSel.value] || '';
+    const num = document.getElementById('number').value || '';
+    const title = document.getElementById('title').value.toLowerCase()
+      .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const parts = [showSlug, num ? `ep${num}` : '', title].filter(Boolean);
+    document.getElementById('slug').value = parts.join('-');
+  }
+
+  function extractYoutubeId(url) {
+    const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+
+  function setThumbPreview(url) {
+    document.getElementById('thumbnail-url').value = url;
+    const img = document.getElementById('thumb-preview');
+    img.src = url;
+    img.style.display = 'block';
+    document.getElementById('thumb-placeholder').style.display = 'none';
+  }
+
+  async function suggestPerformers(title, description) {
+    if (!allPerformers.length) return;
+    try {
+      const data = await apiCall('/api/episodes/suggest-performers', 'POST', { title, description });
+      const suggestions = data.suggestions || [];
+      if (!suggestions.length) return;
+      const suggestedIds = suggestions.map(s => s.performer_id);
+      suggestedIds.forEach(pid => {
+        if (!selectedPerformerIds.includes(pid)) selectedPerformerIds.push(pid);
+      });
+      renderPerformersChecklist(selectedPerformerIds, suggestedIds);
+      document.getElementById('suggest-hint').style.display = 'block';
+    } catch { /* non-critical */ }
+  }
+
+  async function fetchYoutubeData() {
+    const url = document.getElementById('url').value.trim();
+    const hint = document.getElementById('yt-hint');
+    if (!url) return;
+
+    const videoId = extractYoutubeId(url);
+    if (!videoId) { hint.textContent = ''; return; }
+
+    hint.textContent = 'Загружаем данные с YouTube...';
+    const filled = [];
+
+    if (!document.getElementById('thumbnail-url').value) {
+      setThumbPreview(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
+      filled.push('превью');
+    }
+
+    let resolvedTitle = '', resolvedDescription = '';
+    try {
+      const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) {
+          resolvedTitle = data.title;
+          if (!document.getElementById('title').value.trim()) {
+            document.getElementById('title').value = data.title;
+            autoSlug();
+            filled.push('название');
+          }
+          if (!document.getElementById('description').value.trim()) {
+            document.getElementById('description').value = data.title;
+            resolvedDescription = data.title;
+            filled.push('описание');
+          }
+          if (data.thumbnail_url) {
+            setThumbPreview(data.thumbnail_url);
+            if (!filled.includes('превью')) filled.push('превью');
+          }
+        }
+      }
+    } catch { /* non-critical */ }
+
+    if (resolvedTitle) {
+      await suggestPerformers(resolvedTitle, resolvedDescription);
+    }
+
+    hint.textContent = filled.length ? `Автозаполнено: ${filled.join(', ')}` : 'Ссылка распознана';
+  }
+
+  const urlInput = document.getElementById('url');
+  urlInput.addEventListener('blur', fetchYoutubeData);
+  urlInput.addEventListener('paste', () => setTimeout(fetchYoutubeData, 100));
+
+  function renderPerformersChecklist(selectedIds, suggestedIds = []) {
+    const container = document.getElementById('performers-checklist');
+    if (!allPerformers.length) {
+      container.innerHTML = '<span style="color:var(--gray);font-size:13px;">Нет комиков</span>';
+      return;
+    }
+    container.innerHTML = allPerformers.map(p => {
+      const isSel = selectedIds.includes(p.performer_id);
+      const isSug = suggestedIds.includes(p.performer_id);
+      const cls = [isSel ? 'selected' : '', isSug && !isSel ? 'suggested' : ''].filter(Boolean).join(' ');
+      const photo = p.photo_url
+        ? `<img src="${escapeHtml(p.photo_url)}" alt="">`
+        : `<div class="performer-check-placeholder">🎤</div>`;
+      return `<div class="performer-check-item ${cls}" data-id="${p.performer_id}" onclick="togglePerformer(this)">
+        ${photo}
+        <span style="font-size:13px;font-weight:500;">${escapeHtml(p.name)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function togglePerformer(el) {
+    const pid = el.dataset.id;
+    const idx = selectedPerformerIds.indexOf(pid);
+    if (idx > -1) {
+      selectedPerformerIds.splice(idx, 1);
+      el.classList.remove('selected');
+    } else {
+      selectedPerformerIds.push(pid);
+      el.classList.add('selected');
+    }
+  }
+
+  async function load() {
+    const [showsData, performersData] = await Promise.all([API.getShows(), API.getPerformers()]);
+    const shows = showsData.shows || [];
+    allPerformers = performersData.performers || [];
+
+    const showSel = document.getElementById('show-id');
+    shows.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.show_id;
+      opt.textContent = s.name;
+      showSel.appendChild(opt);
+      showSlugMap[s.show_id] = s.slug || '';
+    });
+
+    if (preShowId && !episodeId) {
+      showSel.value = preShowId;
+      document.getElementById('back-link').href = `episodes.html?show_id=${preShowId}`;
+    }
+
+    if (episodeId) {
+      document.getElementById('page-title').textContent = 'Редактировать эпизод';
+      const data = await API.getEpisode(episodeId);
+      const ep = data.episode;
+      showSel.value = ep.show_id;
+      document.getElementById('number').value      = ep.number;
+      document.getElementById('title').value       = ep.title || '';
+      document.getElementById('slug').value        = ep.slug || '';
+      document.getElementById('description').value = ep.description || '';
+      document.getElementById('url').value         = ep.url || '';
+      if (ep.thumbnail_url) {
+        document.getElementById('thumbnail-url').value = ep.thumbnail_url;
+        document.getElementById('thumb-preview').src = ep.thumbnail_url;
+        document.getElementById('thumb-preview').style.display = 'block';
+        document.getElementById('thumb-placeholder').style.display = 'none';
+      }
+      selectedPerformerIds = ep.performer_ids || [];
+      document.getElementById('back-link').href = `episodes.html?show_id=${ep.show_id}`;
+      document.getElementById('cancel-btn').onclick = () => navigateTo(`episodes.html?show_id=${ep.show_id}`);
+    }
+
+    renderPerformersChecklist(selectedPerformerIds);
+  }
+
+  async function save() {
+    const btn    = document.getElementById('save-btn');
+    const showId = document.getElementById('show-id').value;
+    const title  = document.getElementById('title').value.trim();
+    const slug   = document.getElementById('slug').value.trim();
+    const numRaw = document.getElementById('number').value;
+
+    if (!showId) { showToast('Выберите шоу', 'error'); return; }
+    if (!title)  { showToast('Заполните название', 'error'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span>';
+
+    const payload = {
+      show_id: showId,
+      title,
+      slug: slug || undefined,
+      description: document.getElementById('description').value.trim(),
+      url: document.getElementById('url').value.trim() || null,
+      thumbnail_url: document.getElementById('thumbnail-url').value.trim() || null,
+      performer_ids: selectedPerformerIds,
+    };
+    if (numRaw) payload.number = parseInt(numRaw, 10);
+
+    try {
+      if (episodeId) { await API.updateEpisode(episodeId, payload); }
+      else           { await API.createEpisode(payload); }
+      showToast('Сохранено');
+      setTimeout(() => navigateTo(`episodes.html?show_id=${showId}`), 800);
+    } catch (err) {
+      handleError(err, 'Ошибка сохранения');
+      btn.disabled = false;
+      btn.textContent = 'Сохранить';
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

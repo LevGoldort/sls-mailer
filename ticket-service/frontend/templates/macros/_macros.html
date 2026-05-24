@@ -58,7 +58,8 @@
       <div class="yb-event-card__date-num">{{ event['date'] | date_num }}</div>
       <div class="yb-event-card__date-month">{{ event['date'] | month_abbr }}</div>
     </div>
-    <div class="yb-event-card__date-day">{{ event['date'] | day_of_week | upper }} · {{ event['date'] | year }}</div>
+    {% set _time = event.get('time_formatted') or (event['date'] | format_time) %}
+    <div class="yb-event-card__date-day">{{ event['date'] | day_of_week | upper }} · {{ event['date'] | year }}{% if _time and _time != '00:00' %} · {{ _time }}{% endif %}</div>
   </div>
 
   {# Photo column #}

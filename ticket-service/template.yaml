@@ -94,6 +94,17 @@ Parameters:
     Default: "Yalla"
     Description: Active Trail SMS sender ID (pre-registered name)
 
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Secret key for signing JWT tokens (min 32 chars recommended)
+
+  FrontendDistributionId:
+    Type: String
+    Default: ""
+    Description: CloudFront distribution ID for events frontend (events.yallabalagan.org)
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
 
@@ -107,12 +118,18 @@ Globals:
         ENVIRONMENT: !Ref Environment
         PAYMENT_MODE: !Ref PaymentMode
         EMAIL_SENDER_LAMBDA: yallabalagan-email-sender
-        SMS_SENDER_LAMBDA: yallabalagan-sms-sender
         EVENTS_TABLE: !Ref EventsTable
         LOCATIONS_TABLE: !Ref LocationsTable
         ORDERS_TABLE: !Ref OrdersTable
         COUPONS_TABLE: !Ref CouponsTable
         SEAT_RESERVATIONS_TABLE: !Ref SeatReservationsTable
+        USERS_TABLE: !Ref UsersTable
+        REFRESH_TOKENS_TABLE: !Ref RefreshTokensTable
+        PERFORMERS_TABLE: !Ref PerformersTable
+        PRODUCTS_TABLE: !Ref ProductsTable
+        MERCHANDISE_ORDERS_TABLE: !Ref MerchandiseOrdersTable
+        SHOWS_TABLE: !Ref ShowsTable
+        EPISODES_TABLE: !Ref EpisodesTable
         MEDIA_BUCKET: !Ref MediaBucket
         FRONTEND_BUCKET: !Ref FrontendBucket
 
@@ -138,6 +155,10 @@ Resources:
         - AttributeName: date
           AttributeType: S
         - AttributeName: slug
+          AttributeType: S
+        - AttributeName: owner_id
+          AttributeType: S
+        - AttributeName: event_type
           AttributeType: S
       KeySchema:
         - AttributeName: PK
@@ -165,6 +186,20 @@ Resources:
           KeySchema:
             - AttributeName: slug
               KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: OwnerIndex
+          KeySchema:
+            - AttributeName: owner_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: EventTypeIndex
+          KeySchema:
+            - AttributeName: event_type
+              KeyType: HASH
+            - AttributeName: date
+              KeyType: RANGE
           Projection:
             ProjectionType: ALL
       Tags:
@@ -316,6 +351,277 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  RefreshTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-refresh-tokens
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token_hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token_hash
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  PerformersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-performers
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-products
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: PerformerIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  MerchandiseOrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-merchandise-orders
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ProductIndex
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  ShowsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-shows
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  EpisodesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-episodes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+        - AttributeName: show_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ShowIndex
+          KeySchema:
+            - AttributeName: show_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   ##############################################################################
   # S3 Buckets
   ##############################################################################
@@ -324,9 +630,12 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !If
+
         - IsProd
+
         - yallabalagan-ticket-media
-        - yallabalagan-ticket-media-dev
+
+        - !Sub yallabalagan-ticket-media-${Environment}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -365,9 +674,12 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !If
+
         - IsProd
+
         - yallabalagan-tickets-frontend
-        - yallabalagan-tickets-frontend-dev
+
+        - !Sub yallabalagan-tickets-frontend-${Environment}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -375,7 +687,7 @@ Resources:
         RestrictPublicBuckets: false
       WebsiteConfiguration:
         IndexDocument: index.html
-        ErrorDocument: error.html
+        ErrorDocument: 404.html
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -398,9 +710,12 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !If
+
         - IsProd
+
         - yallabalagan-ticket-admin
-        - yallabalagan-ticket-admin-dev
+
+        - !Sub yallabalagan-ticket-admin-${Environment}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -464,6 +779,12 @@ Resources:
             TableName: !Ref CouponsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref SeatReservationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PerformersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MerchandiseOrdersTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
         - Version: '2012-10-17'
@@ -472,9 +793,28 @@ Resources:
               Action:
                 - lambda:InvokeFunction
               Resource:
-                - !GetAtt SiteRegeneratorFunction.Arn
-                - !GetAtt EmailSenderFunction.Arn
-                - !GetAtt SmsSenderFunction.Arn
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-site-regenerator*"
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-email-sender*"
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-sms-sender*"
+
+  UserApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: yallabalagan-user-api
+      CodeUri: .
+      Handler: lambdas/user-api-handler.lambda_handler
+      Description: Auth and user management endpoints
+      Environment:
+        Variables:
+          ADMIN_API_KEYS: !Ref AdminApiKeys
+          JWT_SECRET: !Ref JwtSecret
+      # Routes wired manually in deploy.sh to avoid CloudFormation circular
+      # dependency through TicketApi → ApiErrorAlarm → TicketApiFunctionRole.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RefreshTokensTable
 
   # Site Regenerator
   SiteRegeneratorFunction:
@@ -487,9 +827,11 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
+          API_URL: !Sub https://${TicketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
           S3_BUCKET: !Ref FrontendBucket
           GA4_ID: !Ref GA4Id
           FB_PIXEL_ID: !Ref FBPixelId
+          CLOUDFRONT_DISTRIBUTION_ID: !Ref FrontendDistributionId
       Layers:
         - !Ref SiteTemplatesLayer
       Policies:
@@ -499,6 +841,10 @@ Resources:
             TableName: !Ref LocationsTable
         - S3CrudPolicy:
             BucketName: !Ref FrontendBucket
+        - Statement:
+            - Effect: Allow
+              Action: cloudfront:CreateInvalidation
+              Resource: "*"
       Events:
         # Можно добавить EventBridge schedule для автоматической регенерации
         ScheduleEvent:
@@ -526,13 +872,8 @@ Resources:
             TableName: !Ref LocationsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref OrdersTable
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - ses:SendEmail
-                - ses:SendRawEmail
-              Resource: '*'
+        - SESCrudPolicy:
+            IdentityName: !Ref SenderEmail
 
   # SMS Sender
   SmsSenderFunction:
@@ -596,7 +937,13 @@ Resources:
   SiteTemplatesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: yallabalagan-site-templates
+      LayerName: !If
+
+        - IsProd
+
+        - yallabalagan-site-templates
+
+        - !Sub yallabalagan-site-templates-${Environment}
       Description: Jinja2 templates for site generation
       ContentUri: frontend/
       CompatibleRuntimes:
@@ -612,11 +959,7 @@ Resources:
       StageName: !Ref Environment
       CorsConfiguration:
         AllowOrigins:
-          - https://admin.yallabalagan.org
-          - https://events.yallabalagan.org
-          - https://yallabalagan.org
-          - http://yallabalagan-ticket-admin-dev.s3-website.eu-north-1.amazonaws.com
-          - http://yallabalagan-tickets-frontend-dev.s3-website.eu-north-1.amazonaws.com
+          - '*'
         AllowMethods:
           - GET
           - POST
@@ -624,18 +967,30 @@ Resources:
           - DELETE
           - OPTIONS
         AllowHeaders:
-          - Content-Type
-          - X-API-Key
-          - Authorization
-          - X-Scanner-Token
-          - X-Scanner-Event
-          - X-Webhook-Signature
+          - '*'
       Tags:
         Project: YallaBalagan-TicketService
         Environment: !Ref Environment
 
   ##############################################################################
-  # CloudWatch Alarms — temporarily removed due to EarlyValidation issue
+  # CloudWatch Alarms (опционально)
+  ##############################################################################
+
+  ApiErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Environment}-ticket-api-errors
+      AlarmDescription: Alert when API has high error rate
+      MetricName: 5XXError
+      Namespace: AWS/ApiGateway
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref TicketApi
 
 ##############################################################################
 # Outputs
@@ -646,46 +1001,94 @@ Outputs:
     Description: API Gateway endpoint URL
     Value: !Sub https://${TicketApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
-      Name: TicketApiUrl
+      Name: !If
+
+        - IsProd
+
+        - TicketApiUrl
+
+        - !Sub ${Environment}-TicketApiUrl
 
   FrontendUrl:
     Description: Frontend S3 website URL
     Value: !GetAtt FrontendBucket.WebsiteURL
     Export:
-      Name: FrontendUrl
+      Name: !If
+
+        - IsProd
+
+        - FrontendUrl
+
+        - !Sub ${Environment}-FrontendUrl
 
   AdminUrl:
     Description: Admin S3 website URL
     Value: !GetAtt AdminBucket.WebsiteURL
     Export:
-      Name: AdminUrl
+      Name: !If
+
+        - IsProd
+
+        - AdminUrl
+
+        - !Sub ${Environment}-AdminUrl
 
   EventsTableName:
     Description: DynamoDB Events Table Name
     Value: !Ref EventsTable
     Export:
-      Name: EventsTable
+      Name: !If
+
+        - IsProd
+
+        - EventsTable
+
+        - !Sub ${Environment}-EventsTable
 
   LocationsTableName:
     Description: DynamoDB Locations Table Name
     Value: !Ref LocationsTable
     Export:
-      Name: LocationsTable
+      Name: !If
+
+        - IsProd
+
+        - LocationsTable
+
+        - !Sub ${Environment}-LocationsTable
 
   OrdersTableName:
     Description: DynamoDB Orders Table Name
     Value: !Ref OrdersTable
     Export:
-      Name: OrdersTable
+      Name: !If
+
+        - IsProd
+
+        - OrdersTable
+
+        - !Sub ${Environment}-OrdersTable
 
   MediaBucketName:
     Description: Media S3 Bucket Name
     Value: !Ref MediaBucket
     Export:
-      Name: MediaBucket
+      Name: !If
+
+        - IsProd
+
+        - MediaBucket
+
+        - !Sub ${Environment}-MediaBucket
 
   SeatReservationsTableName:
     Description: DynamoDB Seat Reservations Table Name
     Value: !Ref SeatReservationsTable
     Export:
-      Name: SeatReservationsTable
+      Name: !If
+
+        - IsProd
+
+        - SeatReservationsTable
+
+        - !Sub ${Environment}-SeatReservationsTable

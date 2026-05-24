@@ -405,8 +405,8 @@
         </span>
       </h3>
       <div class="yb-venue__addr">{% if location.address is mapping %}{{ location.address.street }}, {{ location.address.city }}{% else %}{{ location.address }}{% endif %}</div>
-      {% if location.get('parking_info') %}
-      <p class="yb-venue__hint">{{ location.parking_info }}</p>
+      {% if location.get('short_description') %}
+      <p class="yb-venue__hint">{{ location.short_description }}</p>
       {% endif %}
       <div class="yb-venue__actions">
         {% if _coords.get('lat') and _coords.get('lng') %}

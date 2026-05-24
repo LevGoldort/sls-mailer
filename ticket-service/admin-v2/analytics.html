@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аналитика — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 200px; padding-bottom: 4px; border-bottom: 1px solid rgba(28,26,36,0.08); }
+    .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0; height: 100%; }
+    .bar { width: 100%; max-width: 40px; border-radius: 4px 4px 0 0; background: var(--purple); min-height: 2px; }
+    .bar-val { font-size: 10px; color: var(--purple); font-weight: 600; margin-bottom: 3px; }
+    .bar-lbl { font-size: 10px; color: var(--gray); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40px; }
+    .breakdown-row { display: grid; grid-template-columns: 1fr 80px 80px 80px 100px; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(28,26,36,0.06); }
+    .breakdown-row:last-child { border-bottom: none; }
+    .progress-wrap { background: rgba(28,26,36,0.07); border-radius: 3px; height: 6px; overflow: hidden; margin-top: 4px; }
+    .progress-bar  { height: 100%; background: var(--purple); border-radius: 3px; }
+    .event-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 20px; font-size: 13px;
+      border: 1.5px solid rgba(28,26,36,0.12); background: var(--white);
+      cursor: pointer; user-select: none;
+      transition: border-color var(--transition), background var(--transition), color var(--transition);
+    }
+    .event-chip:hover { border-color: var(--purple); }
+    .event-chip.selected { border-color: var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 500; }
+    .event-chip .chip-date { font-size: 11px; opacity: 0.7; }
+    .chips-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Аналитика</h1>
+        <p class="page-subtitle">Продажи за последние 30 дней</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Заказов</div><div class="stat-value" id="s-orders">—</div></div>
+      <div class="stat-card"><div class="stat-label">Билетов</div><div class="stat-value" id="s-tickets">—</div></div>
+      <div class="stat-card"><div class="stat-label">Выручка</div><div class="stat-value" id="s-revenue">—</div></div>
+      <div class="stat-card"><div class="stat-label">Средний чек</div><div class="stat-value" id="s-avg">—</div></div>
+    </div>
+
+    <!-- Event multi-select chips -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <span class="card-title">Фильтр по событиям</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll()">Все</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectNone()">Сбросить</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="chips-wrap" id="event-chips">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><span class="card-title">Продажи по дням (30 дней)</span></div>
+      <div class="card-body">
+        <div class="bar-chart" id="chart"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">По событиям</span></div>
+      <div class="card-body" style="padding-top:0;">
+        <div class="breakdown-row" style="font-size:11px;font-weight:600;color:var(--gray-mid);text-transform:uppercase;letter-spacing:0.5px;padding-bottom:8px;">
+          <span>Событие</span><span>Заказов</span><span>Билетов</span><span>Занято</span><span>Выручка</span>
+        </div>
+        <div id="events-breakdown"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let allOrders = [], allEvents = [], eventsWithSales = [], selectedEventIds = new Set();
+
+  async function load() {
+    if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
+    try {
+      const [ordersData, eventsData] = await Promise.all([API.getOrders(), API.getEvents()]);
+      allOrders = ordersData.orders || [];
+      allEvents = eventsData.events || [];
+
+      // Find events with sales in last 30 days
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+
+      const eventIdsWithSales = new Set(
+        allOrders
+          .filter(o => o.payment?.status === 'completed' && new Date(o.created_at) >= cutoff)
+          .map(o => o.event_id)
+      );
+
+      eventsWithSales = allEvents.filter(e => eventIdsWithSales.has(e.event_id));
+      selectedEventIds = new Set(eventsWithSales.map(e => e.event_id));
+
+      renderChips();
+      render();
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  function renderChips() {
+    const wrap = document.getElementById('event-chips');
+    if (!eventsWithSales.length) {
+      wrap.innerHTML = '<span style="color:var(--gray-mid);font-size:13px;">Нет событий с продажами за 30 дней</span>';
+      return;
+    }
+    wrap.innerHTML = eventsWithSales.map(e => {
+      const selected = selectedEventIds.has(e.event_id) ? 'selected' : '';
+      return `<span class="event-chip ${selected}" data-id="${e.event_id}" onclick="toggleChip(this)">
+        ${escapeHtml(e.title)}
+        <span class="chip-date">${formatDateShort(e.date)}</span>
+      </span>`;
+    }).join('');
+  }
+
+  function toggleChip(el) {
+    const id = el.dataset.id;
+    if (selectedEventIds.has(id)) {
+      selectedEventIds.delete(id);
+      el.classList.remove('selected');
+    } else {
+      selectedEventIds.add(id);
+      el.classList.add('selected');
+    }
+    render();
+  }
+
+  function selectAll() {
+    selectedEventIds = new Set(eventsWithSales.map(e => e.event_id));
+    renderChips();
+    render();
+  }
+
+  function selectNone() {
+    selectedEventIds = new Set();
+    renderChips();
+    render();
+  }
+
+  function getFilteredOrders() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    return allOrders.filter(o =>
+      o.payment?.status === 'completed' &&
+      new Date(o.created_at) >= cutoff &&
+      selectedEventIds.has(o.event_id)
+    );
+  }
+
+  function render() {
+    const orders = getFilteredOrders();
+    const stats  = calculateOrdersStats(orders);
+
+    document.getElementById('s-orders').textContent  = stats.totalOrders;
+    document.getElementById('s-tickets').textContent = stats.totalTickets;
+    document.getElementById('s-revenue').textContent = formatCurrency(stats.totalRevenue);
+    document.getElementById('s-avg').textContent = stats.totalOrders
+      ? formatCurrency(stats.totalRevenue / stats.totalOrders) : '—';
+
+    renderChart(orders);
+    renderBreakdown();
+  }
+
+  function renderChart(orders) {
+    const days = {};
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0,10);
+      days[key] = 0;
+    }
+    orders.forEach(o => {
+      const key = o.created_at.slice(0,10);
+      if (key in days) days[key] += o.total_amount || 0;
+    });
+
+    const values = Object.values(days);
+    const keys   = Object.keys(days);
+    const max    = Math.max(...values, 1);
+    const chart  = document.getElementById('chart');
+
+    chart.innerHTML = keys.map((key, i) => {
+      const val     = values[i];
+      const pct     = (val / max) * 100;
+      const label   = key.slice(5);
+      const display = val > 0 ? formatCurrency(val) : '';
+      return `<div class="bar-wrap">
+        <div class="bar-val">${display}</div>
+        <div class="bar" style="height:${Math.max(pct, val > 0 ? 2 : 0)}%"></div>
+        <div class="bar-lbl">${i % 5 === 0 ? label : ''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderBreakdown() {
+    const container = document.getElementById('events-breakdown');
+    const eventsToShow = eventsWithSales.filter(e => selectedEventIds.has(e.event_id));
+
+    if (!eventsToShow.length) {
+      container.innerHTML = '<div class="empty"><span class="empty-text">Нет событий</span></div>';
+      return;
+    }
+
+    container.innerHTML = eventsToShow.map(event => {
+      const evOrders  = allOrders.filter(o => o.event_id === event.event_id && o.payment?.status === 'completed');
+      const stats     = calculateEventStats(event);
+      const ordStats  = calculateOrdersStats(evOrders);
+      const occupancy = stats.capacity;
+
+      return `<div class="breakdown-row">
+        <div>
+          <div style="font-size:14px;font-weight:500;">${escapeHtml(event.title)}</div>
+          <div style="font-size:12px;color:var(--gray-mid);">${formatDateShort(event.date)}</div>
+          <div class="progress-wrap"><div class="progress-bar" style="width:${occupancy}%"></div></div>
+        </div>
+        <span style="font-size:14px;">${ordStats.totalOrders}</span>
+        <span style="font-size:14px;">${stats.soldTickets}/${stats.totalTickets}</span>
+        <span style="font-size:14px;">${occupancy}%</span>
+        <span style="font-size:14px;font-weight:600;color:var(--purple);">${formatCurrency(ordStats.totalRevenue)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  load();
+</script>
+</body>
+</html>

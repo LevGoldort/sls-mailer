@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Пользователи — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- Create modal -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="modal-title">Новый пользователь</span>
+      <button class="modal-close" onclick="closeCreate()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="c-name">Имя *</label>
+        <input class="form-input" type="text" id="c-name" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="c-email">Email *</label>
+        <input class="form-input" type="email" id="c-email" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="c-password">Пароль *</label>
+        <input class="form-input" type="password" id="c-password" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="c-role">Роль</label>
+        <select class="form-select" id="c-role">
+          <option value="organizer">organizer</option>
+          <option value="content_manager">content_manager</option>
+          <option value="admin">admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCreate()">Отмена</button>
+      <button class="btn btn-primary" onclick="createUser()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset password modal -->
+<div class="modal-overlay" id="reset-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="modal-title">Сбросить пароль</span>
+      <button class="modal-close" onclick="closeReset()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="new-password">Новый пароль *</label>
+        <input class="form-input" type="password" id="new-password" required>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeReset()">Отмена</button>
+      <button class="btn btn-primary" onclick="doResetPassword()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div><h1 class="page-title">Пользователи</h1></div>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openCreate()">+ Создать</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Имя</th><th class="hide-mobile">Email</th><th>Роль</th><th>Статус</th><th class="hide-mobile">Последний вход</th><th>Действия</th></tr></thead>
+          <tbody id="users-tbody"><tr><td colspan="6"><div class="loading">Загрузка...</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  let allUsers = [], resetUserId = null;
+
+  async function load() {
+    if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
+    try {
+      const data = await API.getUsers();
+      allUsers = data.users || [];
+      render();
+    } catch (err) { handleError(err, 'Ошибка загрузки'); }
+  }
+
+  function render() {
+    const tbody = document.getElementById('users-tbody');
+    if (!allUsers.length) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="empty-text">Нет пользователей</span></div></td></tr>';
+      return;
+    }
+    const currentUser = Auth.getUser();
+    tbody.innerHTML = allUsers.map(u => {
+      const isSelf = u.user_id === currentUser?.user_id;
+      const statusClass = u.is_active !== false ? 'badge-active' : 'badge-inactive';
+      const statusLabel = u.is_active !== false ? 'активен' : 'деактивирован';
+      return `<tr>
+        <td style="font-weight:500;">${escapeHtml(u.name)} ${isSelf ? '<span class="badge" style="font-size:10px;">вы</span>' : ''}</td>
+        <td class="hide-mobile">${escapeHtml(u.email)}</td>
+        <td><span class="badge badge-${u.role}">${u.role}</span></td>
+        <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+        <td class="hide-mobile" style="font-size:13px;color:var(--gray-mid);">${u.last_login ? formatDateShort(u.last_login) : '—'}</td>
+        <td><div class="table-actions">
+          ${!isSelf ? `
+            <button class="btn btn-ghost btn-sm" onclick="openReset('${u.user_id}')">Сбросить пароль</button>
+            ${u.is_active !== false
+              ? `<button class="btn btn-danger btn-sm" onclick="deactivate('${u.user_id}','${escapeHtml(u.name)}')">Деактивировать</button>`
+              : ''}` : ''}
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function openCreate()  { document.getElementById('create-modal').classList.add('active'); }
+  function closeCreate() { document.getElementById('create-modal').classList.remove('active'); document.getElementById('c-name').value=''; document.getElementById('c-email').value=''; document.getElementById('c-password').value=''; }
+  function openReset(id) { resetUserId = id; document.getElementById('reset-modal').classList.add('active'); }
+  function closeReset()  { document.getElementById('reset-modal').classList.remove('active'); document.getElementById('new-password').value=''; resetUserId=null; }
+
+  async function createUser() {
+    const name     = document.getElementById('c-name').value.trim();
+    const email    = document.getElementById('c-email').value.trim();
+    const password = document.getElementById('c-password').value;
+    const role     = document.getElementById('c-role').value;
+    if (!name || !email || !password) { showToast('Заполните все поля', 'error'); return; }
+    try {
+      await API.createUser({ name, email, password, role });
+      showToast('Пользователь создан');
+      closeCreate();
+      await load();
+    } catch (err) { handleError(err, 'Ошибка создания'); }
+  }
+
+  async function doResetPassword() {
+    const newPass = document.getElementById('new-password').value;
+    if (!newPass) { showToast('Введите пароль', 'error'); return; }
+    try {
+      await API.resetUserPassword(resetUserId, newPass);
+      showToast('Пароль сброшен');
+      closeReset();
+    } catch (err) { handleError(err, 'Ошибка сброса пароля'); }
+  }
+
+  async function deactivate(id, name) {
+    if (!confirm(`Деактивировать пользователя "${name}"?`)) return;
+    try { await API.deactivateUser(id); showToast('Пользователь деактивирован'); await load(); }
+    catch (err) { handleError(err, 'Ошибка'); }
+  }
+
+  document.getElementById('create-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCreate(); });
+  document.getElementById('reset-modal').addEventListener('click',  e => { if (e.target === e.currentTarget) closeReset(); });
+
+  load();
+</script>
+</body>
+</html>

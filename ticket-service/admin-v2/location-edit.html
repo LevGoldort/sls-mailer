@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Локация — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .parking-item {
+      background: var(--gray-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .parking-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--gray-mid);
+    }
+
+    /* Seating map modal reuse old styles */
+    .seating-map-modal-content {
+      background: white;
+      border-radius: 12px;
+      max-width: 1200px;
+      width: 95%;
+      max-height: 95vh;
+      overflow-y: auto;
+    }
+    .seating-editor-container { padding: 24px; }
+    .editor-panel {
+      background: var(--gray-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .editor-panel h3 { margin: 0 0 14px; font-size: 14px; }
+    .editor-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .editor-toolbar button {
+      padding: 6px 10px;
+      font-size: 12px;
+      border: none;
+      background: var(--purple);
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .editor-toolbar button:hover { opacity: 0.85; }
+    .editor-toolbar button:disabled { background: var(--border); color: var(--gray-mid); cursor: not-allowed; }
+    .toolbar-divider { height: 20px; width: 1px; background: var(--border); margin: 0 4px; }
+    .canvas-viewport {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: auto;
+      max-height: 480px;
+      cursor: grab;
+    }
+    .canvas-viewport:active { cursor: grabbing; }
+    .seat { cursor: pointer; }
+    .seat-available  { fill: #4caf50; stroke: #2e7d32; stroke-width: 1; }
+    .seat-disabled   { fill: #e0e0e0; stroke: #bbb;    stroke-width: 1; }
+    .seat-selected   { fill: var(--purple); stroke: #5568d3; stroke-width: 2; }
+    .seat-disabled-selected { fill: #9575cd; stroke: #7e57c2; stroke-width: 2; }
+    .seat:hover:not(.seat-disabled) { filter: brightness(1.1); }
+    .seat-text { font-size: 10px; fill: white; text-anchor: middle; pointer-events: none; user-select: none; }
+    .import-divider { text-align: center; margin: 16px 0; position: relative; }
+    .import-divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--border); }
+    .import-divider span { background: var(--gray-bg); padding: 0 12px; position: relative; color: var(--gray-mid); font-size: 12px; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+
+    <div class="page-header">
+      <div>
+        <a href="locations.html" style="font-size:13px;color:var(--gray-mid);">← Назад к локациям</a>
+        <h1 class="page-title" style="margin-top:6px;" id="page-title">Новая локация</h1>
+      </div>
+    </div>
+
+    <form id="loc-form" style="max-width:720px;">
+
+      <!-- Основное -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Основное</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label" for="name">Название *</label>
+            <input class="form-input" type="text" id="name" required placeholder="Dizengoff Bar">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="slug">Slug (URL) *</label>
+              <input class="form-input" type="text" id="slug" required placeholder="dizengoff-bar">
+              <span class="form-hint">Только латиница, цифры, дефисы</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="capacity">Вместимость *</label>
+              <input class="form-input" type="number" id="capacity" min="1" required placeholder="150">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="venue_type">Тип площадки *</label>
+            <select class="form-select" id="venue_type" required>
+              <option value="">Выберите тип...</option>
+              <option value="standing">Без карты мест (свободная рассадка)</option>
+              <option value="seated">С картой мест (нумерованные места)</option>
+            </select>
+            <span class="form-hint">⚠️ Нельзя изменить после сохранения</span>
+          </div>
+          <div class="form-group" id="seating-map-section" style="display:none;">
+            <label class="form-label">Карта мест</label>
+            <button type="button" class="btn btn-ghost" onclick="openSeatingMapEditor()">
+              <span id="seating-map-btn-text">Создать карту мест</span>
+            </button>
+            <span class="form-hint" id="seating-map-summary" style="display:none;"></span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="short_description">Краткое описание *</label>
+            <textarea class="form-textarea" id="short_description" required placeholder="Уютный бар в центре Тель-Авива"></textarea>
+            <span class="form-hint">Отображается на странице события</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="description">Полное описание *</label>
+            <textarea class="form-textarea" id="description" required placeholder="Подробное описание локации..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Адрес -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Адрес и координаты</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label" for="street">Улица *</label>
+            <input class="form-input" type="text" id="street" required placeholder="Dizengoff 50">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="city">Город *</label>
+            <input class="form-input" type="text" id="city" required placeholder="Tel Aviv">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="maps-url">Google Maps ссылка</label>
+            <input class="form-input" type="url" id="maps-url" placeholder="https://maps.google.com/...">
+            <span class="form-hint">Вставьте ссылку — широта и долгота заполнятся автоматически</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="lat">Широта</label>
+              <input class="form-input" type="number" id="lat" step="0.000001" placeholder="32.085300">
+              <span class="form-hint">Автозаполнение из Maps</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="lng">Долгота</label>
+              <input class="form-input" type="number" id="lng" step="0.000001" placeholder="34.781800">
+              <span class="form-hint">Автозаполнение из Maps</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Медиа -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Медиа</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Фотографии</label>
+            <div id="location-images-upload"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="video">Видео (YouTube ссылка)</label>
+            <input class="form-input" type="url" id="video" placeholder="https://www.youtube.com/watch?v=...">
+            <span class="form-hint">Необязательно</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Парковки -->
+      <div class="card" style="margin-bottom:80px;">
+        <div class="card-header">
+          <span class="card-title">Парковки</span>
+          <button type="button" class="btn btn-ghost" style="font-size:13px;" onclick="addParking()">+ Добавить</button>
+        </div>
+        <div class="card-body">
+          <div id="parkings-container"></div>
+        </div>
+      </div>
+
+      <div class="save-bar" id="save-bar">
+        <span></span>
+        <div class="save-bar-actions">
+          <a href="locations.html" class="btn btn-ghost">Отмена</a>
+          <button class="btn btn-primary" type="submit" id="save-btn">Сохранить</button>
+        </div>
+      </div>
+    </form>
+
+  </main>
+</div>
+
+<!-- Seating Map Modal -->
+<div class="modal-overlay" id="seating-map-modal" style="display:none; align-items:flex-start; padding-top:40px;">
+  <div class="seating-map-modal-content">
+    <div class="modal-header">
+      <span class="modal-title">Редактор карты мест</span>
+      <button class="modal-close" onclick="closeSeatingMapEditor()">&times;</button>
+    </div>
+    <div class="seating-editor-container">
+
+      <div class="editor-panel">
+        <h3>1. Размер зала</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="map-rows">Рядов</label>
+            <input class="form-input" type="number" id="map-rows" min="1" max="30" value="10">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="map-seats-per-row">Мест в ряду (макс)</label>
+            <input class="form-input" type="number" id="map-seats-per-row" min="1" max="50" value="20">
+          </div>
+        </div>
+        <button class="btn btn-ghost" onclick="generateSeatingMap()">Создать сетку</button>
+
+        <div class="import-divider"><span>ИЛИ</span></div>
+
+        <div class="form-group">
+          <label class="form-label" for="eventbuzz-html">Импорт из EventBuzz</label>
+          <textarea class="form-textarea" id="eventbuzz-html" rows="4"
+            style="font-family:var(--mono);font-size:11px;"
+            placeholder="Вставьте HTML-код карты мест из EventBuzz (весь <svg>...</svg> блок)"></textarea>
+          <span class="form-hint">Откройте карту на EventBuzz, скопируйте SVG через DevTools и вставьте сюда</span>
+        </div>
+        <button class="btn btn-primary" onclick="importFromEventBuzz()">📥 Импортировать из EventBuzz</button>
+      </div>
+
+      <div class="editor-panel">
+        <h3>2. Редактирование карты</h3>
+        <div class="editor-toolbar">
+          <button onclick="seatingEditor.zoomIn()">🔍 +</button>
+          <button onclick="seatingEditor.zoomOut()">🔍 −</button>
+          <button onclick="seatingEditor.resetZoom()">↺ Сбросить</button>
+          <button id="undo-btn" onclick="seatingEditor.undo()" disabled>↶ Отменить</button>
+          <button id="redo-btn" onclick="seatingEditor.redo()" disabled>↷ Повторить</button>
+          <span class="toolbar-divider"></span>
+          <button onclick="seatingEditor.addRowAtBack()" style="background:#2196F3;">➕ Добавить ряд</button>
+          <button onclick="seatingEditor.centerRows()" style="background:#4CAF50;">🎯 Центрировать</button>
+          <button id="select-row-btn"     onclick="seatingEditor.selectEntireRow()"    disabled>📏 Ряд</button>
+          <button id="select-col-btn"     onclick="seatingEditor.selectEntireColumn()" disabled>📐 Колонка</button>
+          <button id="delete-selected-btn" onclick="seatingEditor.deleteSelected()"   disabled style="background:#f44336;">🗑️ Удалить</button>
+          <button id="enable-selected-btn" onclick="seatingEditor.enableSelected()"   disabled style="background:#4CAF50;">↩️ Восстановить</button>
+          <button id="clear-selection-btn" onclick="seatingEditor.clearSelection()"   disabled>✕ Снять выбор</button>
+          <button id="custom-number-btn"   onclick="seatingEditor.openCustomNumberModal()" disabled>🔢 Номер</button>
+        </div>
+        <div id="seating-canvas-container" class="canvas-viewport">
+          <svg id="seating-canvas" width="800" height="600"></svg>
+        </div>
+        <span class="form-hint" style="margin-top:8px;display:block;">
+          💡 Клик — выбор, Shift+клик — мультивыбор. Колесо мыши — масштаб, перетащить — панорама.
+        </span>
+      </div>
+
+      <div class="editor-panel">
+        <h3>3. Нумерация</h3>
+        <div class="form-group">
+          <label class="form-label" for="numbering-direction">Направление</label>
+          <select class="form-select" id="numbering-direction">
+            <option value="left-to-right">Слева направо (→)</option>
+            <option value="right-to-left">Справа налево (←)</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost" onclick="seatingEditor.recalculateNumbers()" style="width:100%;">
+          🔄 Пересчитать нумерацию
+        </button>
+        <span class="form-hint">⚠️ Удалит кастомные номера и пересчитает всё заново</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSeatingMapEditor()">Отмена</button>
+      <button class="btn btn-primary" onclick="saveSeatingMap()">Сохранить карту</button>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script src="shared-image-upload.js"></script>
+<script src="seating-map-editor.js"></script>
+<script>
+  let locationId      = null;
+  let parkingCounter  = 0;
+  let imageUrls       = [];
+  let seatingMapConfig = null;
+  let existingVenueType = null;
+
+  /* ── Google Maps URL parsing ── */
+  function parseGoogleMapsUrl(url) {
+    const patterns = [
+      /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+      /q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    ];
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m) return {
+        lat: parseFloat(parseFloat(m[1]).toFixed(6)),
+        lng: parseFloat(parseFloat(m[2]).toFixed(6)),
+      };
+    }
+    return null;
+  }
+
+  /* ── Parkings ── */
+  function addParking(data = null) {
+    const id  = `parking-${Date.now()}-${parkingCounter++}`;
+    const div = document.createElement('div');
+    div.className   = 'parking-item';
+    div.dataset.pid = id;
+    div.innerHTML = `
+      <div class="parking-header">
+        <span>Парковка</span>
+        <button type="button" class="btn btn-ghost" style="font-size:12px;padding:4px 8px;color:var(--red);"
+                onclick="this.closest('.parking-item').remove()">Удалить</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Описание</label>
+        <input class="form-input parking-description" value="${data?.description || ''}"
+               placeholder="Бесплатная парковка на улице">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Google Maps ссылка</label>
+        <input class="form-input parking-maps-url" type="url" placeholder="https://maps.google.com/...">
+        <span class="form-hint">Вставьте ссылку — координаты заполнятся автоматически</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Широта</label>
+          <input class="form-input parking-lat" type="number" step="0.000001"
+                 value="${data?.lat || ''}" placeholder="32.085300">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Долгота</label>
+          <input class="form-input parking-lng" type="number" step="0.000001"
+                 value="${data?.lng || ''}" placeholder="34.781800">
+        </div>
+      </div>`;
+    document.getElementById('parkings-container').appendChild(div);
+
+    div.querySelector('.parking-maps-url').addEventListener('blur', function () {
+      const coords = parseGoogleMapsUrl(this.value.trim());
+      if (coords) {
+        div.querySelector('.parking-lat').value = coords.lat;
+        div.querySelector('.parking-lng').value = coords.lng;
+        showToast('Координаты парковки извлечены!', 'success');
+      } else if (this.value.trim()) {
+        showToast('Не удалось извлечь координаты парковки', 'error');
+      }
+    });
+  }
+
+  /* ── Seating map ── */
+  function openSeatingMapEditor() {
+    if (seatingMapConfig) loadSeatingMapIntoEditor(seatingMapConfig);
+    document.getElementById('seating-map-modal').style.display = 'flex';
+    if (seatingEditor) seatingEditor.setupEventListeners();
+  }
+  function closeSeatingMapEditor() {
+    document.getElementById('seating-map-modal').style.display = 'none';
+  }
+  function generateSeatingMap() {
+    const rows = parseInt(document.getElementById('map-rows').value);
+    const spr  = parseInt(document.getElementById('map-seats-per-row').value);
+    if (rows < 1 || rows > 30) { showToast('Рядов: 1–30', 'error'); return; }
+    if (spr  < 1 || spr  > 50) { showToast('Мест в ряду: 1–50', 'error'); return; }
+    seatingEditor.generateMap(rows, spr);
+  }
+  function loadSeatingMapIntoEditor(cfg) {
+    if (seatingEditor) seatingEditor.loadConfig(cfg);
+  }
+  function saveSeatingMap() {
+    seatingMapConfig = seatingEditor.exportConfig();
+    const total = seatingMapConfig.rows * seatingMapConfig.seats_per_row - seatingMapConfig.disabled_seats.length;
+    document.getElementById('seating-map-btn-text').textContent = 'Редактировать карту';
+    const summary = document.getElementById('seating-map-summary');
+    summary.style.display = 'block';
+    summary.textContent =
+      `${seatingMapConfig.rows} рядов × ${seatingMapConfig.seats_per_row} мест `+
+      `(${seatingMapConfig.disabled_seats.length} отключено, ${total} доступно)`;
+    closeSeatingMapEditor();
+    showToast('Карта мест сохранена', 'success');
+  }
+  function importFromEventBuzz() {
+    const html = document.getElementById('eventbuzz-html').value.trim();
+    if (!html) { showToast('Вставьте HTML код карты EventBuzz', 'error'); return; }
+    try {
+      const doc     = new DOMParser().parseFromString(html, 'text/html');
+      const circles = doc.querySelectorAll('circle[id]');
+      if (!circles.length) { showToast('Мест не найдено в HTML', 'error'); return; }
+
+      let maxRow = 0, maxSeat = 0;
+      const existingSet    = new Set();
+      const disabledSet    = new Set();
+      const customNums     = {};
+
+      circles.forEach(c => {
+        const parts = c.getAttribute('id').split('-');
+        if (parts.length < 3) return;
+        const ebRow  = parseInt(parts[parts.length - 2]);
+        const ebSeat = parseInt(parts[parts.length - 1]);
+        if (isNaN(ebRow) || isNaN(ebSeat)) return;
+        maxRow  = Math.max(maxRow,  ebRow);
+        maxSeat = Math.max(maxSeat, ebSeat);
+        const sid = `${ebRow-1}-${ebSeat-1}`;
+        existingSet.add(sid);
+        customNums[sid] = { row: ebRow, seat: ebSeat };
+        if ((c.getAttribute('fill') || '').toLowerCase() === 'gray') disabledSet.add(sid);
+      });
+
+      if (!maxRow || !maxSeat) { showToast('Не удалось определить размеры зала', 'error'); return; }
+      if (maxRow > 30 || maxSeat > 50) { showToast(`Превышен максимум: ${maxRow}×${maxSeat}`, 'error'); return; }
+
+      document.getElementById('map-rows').value          = maxRow;
+      document.getElementById('map-seats-per-row').value = maxSeat;
+      seatingEditor.generateMap(maxRow, maxSeat);
+
+      for (let r = 0; r < maxRow; r++)
+        for (let s = 0; s < maxSeat; s++) {
+          const sid = `${r}-${s}`;
+          if (!existingSet.has(sid)) disabledSet.add(sid);
+        }
+
+      seatingEditor.disabledSeats  = disabledSet;
+      seatingEditor.customNumbers  = customNums;
+      seatingEditor.renderSeatingChart();
+      document.getElementById('eventbuzz-html').value = '';
+      showToast(`✅ Импортировано: ${maxRow}×${maxSeat}, доступно ${existingSet.size - disabledSet.size} мест`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Ошибка парсинга HTML', 'error');
+    }
+  }
+
+  /* ── Load existing location ── */
+  async function load() {
+    const params = new URLSearchParams(window.location.search);
+    locationId = params.get('id');
+    if (!locationId) return;
+
+    document.getElementById('page-title').textContent = 'Редактировать локацию';
+    document.getElementById('save-btn').textContent   = 'Сохранить изменения';
+
+    try {
+      const data = await API.getLocation(locationId);
+      const loc  = data.location;
+
+      document.getElementById('name').value             = loc.name             || '';
+      document.getElementById('slug').value             = loc.slug             || '';
+      document.getElementById('capacity').value         = loc.capacity         || '';
+      document.getElementById('short_description').value= loc.short_description|| '';
+      document.getElementById('description').value      = loc.description      || '';
+
+      if (loc.address) {
+        document.getElementById('street').value = loc.address.street || '';
+        document.getElementById('city').value   = loc.address.city   || '';
+        if (loc.address.coordinates) {
+          document.getElementById('lat').value  = loc.address.coordinates.lat || '';
+          document.getElementById('lng').value  = loc.address.coordinates.lng || '';
+        }
+      }
+
+      if (loc.media) {
+        if (loc.media.photos?.length) {
+          imageUrls = [...loc.media.photos];
+          displayExistingImages(imageUrls);
+        }
+        if (loc.media.videos?.length) {
+          document.getElementById('video').value = loc.media.videos[0] || '';
+        }
+      }
+
+      if (loc.parkings?.length) {
+        loc.parkings.forEach(p => addParking({
+          description: p.description,
+          lat: p.coordinates?.lat || '',
+          lng: p.coordinates?.lng || '',
+        }));
+      }
+
+      if (loc.venue_config) {
+        const vt = loc.venue_config.venue_type || 'standing';
+        document.getElementById('venue_type').value = vt;
+        existingVenueType = vt;
+        if (vt === 'seated') {
+          document.getElementById('seating-map-section').style.display = 'block';
+          if (loc.venue_config.seating_map) {
+            seatingMapConfig = loc.venue_config.seating_map;
+            const total = seatingMapConfig.rows * seatingMapConfig.seats_per_row - seatingMapConfig.disabled_seats.length;
+            document.getElementById('seating-map-btn-text').textContent = 'Редактировать карту';
+            const summary = document.getElementById('seating-map-summary');
+            summary.style.display = 'block';
+            summary.textContent =
+              `${seatingMapConfig.rows} рядов × ${seatingMapConfig.seats_per_row} мест `+
+              `(${seatingMapConfig.disabled_seats.length} отключено, ${total} доступно)`;
+          }
+        }
+      }
+    } catch (err) {
+      handleError(err, 'Ошибка загрузки локации');
+    }
+  }
+
+  function displayExistingImages(urls) {
+    const container = document.getElementById('location-images-upload-uploaded');
+    if (!container) return;
+    urls.forEach((url, i) => {
+      const cardId = `existing-img-${i}`;
+      const card = document.createElement('div');
+      card.className = 'image-upload-card';
+      card.id = cardId;
+      card.innerHTML = `
+        <img class="image-preview" src="${url}">
+        <div class="upload-status success">✓ Существующее фото</div>
+        <div class="image-url-display">
+          <input type="text" class="url-input-display" value="${url}" readonly>
+          <button class="copy-url-btn" onclick="copyImageUrl('${url}', this)">Copy</button>
+          <button class="remove-img-btn" onclick="removeExistingImage('${cardId}', '${url}')">×</button>
+        </div>`;
+      container.appendChild(card);
+    });
+  }
+
+  function removeExistingImage(cardId, url) {
+    document.getElementById(cardId)?.remove();
+    const i = imageUrls.indexOf(url);
+    if (i > -1) imageUrls.splice(i, 1);
+  }
+
+  /* ── Venue type handler ── */
+  document.getElementById('venue_type').addEventListener('change', e => {
+    const isSeated = e.target.value === 'seated';
+    document.getElementById('seating-map-section').style.display = isSeated ? 'block' : 'none';
+    if (existingVenueType && existingVenueType !== e.target.value) {
+      showToast('Тип площадки нельзя изменить после создания!', 'error');
+      e.target.value = existingVenueType;
+    }
+  });
+
+  /* ── Auto-slug from name ── */
+  document.getElementById('name').addEventListener('input', e => {
+    if (locationId) return;
+    document.getElementById('slug').value = e.target.value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  });
+
+  /* ── Maps URL → coords ── */
+  document.getElementById('maps-url').addEventListener('blur', function () {
+    const coords = parseGoogleMapsUrl(this.value.trim());
+    if (coords) {
+      document.getElementById('lat').value = coords.lat;
+      document.getElementById('lng').value = coords.lng;
+      showToast('Координаты извлечены из ссылки!', 'success');
+    } else if (this.value.trim()) {
+      showToast('Не удалось извлечь координаты. Проверьте ссылку.', 'error');
+    }
+  });
+
+  /* ── Submit ── */
+  document.getElementById('loc-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-white"></span>';
+
+    const parkings = [];
+    document.querySelectorAll('.parking-item').forEach(item => {
+      const desc = item.querySelector('.parking-description').value.trim();
+      if (!desc) return;
+      parkings.push({
+        description: desc,
+        coordinates: {
+          lat: parseFloat(item.querySelector('.parking-lat').value) || 0,
+          lng: parseFloat(item.querySelector('.parking-lng').value) || 0,
+        },
+      });
+    });
+
+    const video = document.getElementById('video').value.trim() || null;
+    const payload = {
+      name:              document.getElementById('name').value.trim(),
+      slug:              document.getElementById('slug').value.trim(),
+      capacity:          parseInt(document.getElementById('capacity').value) || null,
+      short_description: document.getElementById('short_description').value.trim(),
+      description:       document.getElementById('description').value.trim(),
+      address: {
+        street: document.getElementById('street').value.trim(),
+        city:   document.getElementById('city').value.trim(),
+        coordinates: {
+          lat: parseFloat(document.getElementById('lat').value) || 0,
+          lng: parseFloat(document.getElementById('lng').value) || 0,
+        },
+      },
+      parkings,
+      media: { photos: imageUrls, videos: video ? [video] : [] },
+      venue_config: {
+        venue_type:  document.getElementById('venue_type').value || 'standing',
+        seating_map: seatingMapConfig,
+      },
+    };
+
+    try {
+      if (locationId) {
+        await API.updateLocation(locationId, payload);
+        showToast('Локация обновлена', 'success');
+      } else {
+        await API.createLocation(payload);
+        showToast('Локация создана', 'success');
+        setTimeout(() => window.location.href = 'locations.html', 1200);
+      }
+    } catch (err) {
+      handleError(err, 'Ошибка сохранения');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Сохранить';
+    }
+  });
+
+  /* ── Init ── */
+  initImageUpload('location-images-upload', 'locations',
+    url => imageUrls.push(url),
+    err => { console.error(err); showToast('Ошибка загрузки фото', 'error'); }
+  );
+  load();
+</script>
+</body>
+</html>
