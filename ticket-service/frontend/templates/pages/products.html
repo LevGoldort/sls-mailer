@@ -8,27 +8,27 @@
 {# ── Page hero ── #}
 <section class="yb-page-hero">
   <div class="yb-page-hero__breadcrumb">
-    <a href="/">{{ strings.products.breadcrumb_home }}</a>
+    <a href="/" data-i18n="products.breadcrumb_home">{{ strings.products.breadcrumb_home }}</a>
     <span> ► </span>
-    <b style="opacity:1">{{ strings.products.breadcrumb_self }}</b>
+    <b style="opacity:1" data-i18n="products.breadcrumb_self">{{ strings.products.breadcrumb_self }}</b>
   </div>
 
   <h1 class="yb-page-hero__h1">
     <span class="yb-riso">
-      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.products.hero_line1 | upper }}</span>
-      {{ strings.products.hero_line1 | upper }}
+      <span class="yb-riso__shadow" aria-hidden="true" data-i18n="products.hero_line1">{{ strings.products.hero_line1 | upper }}</span>
+      <span data-i18n="products.hero_line1">{{ strings.products.hero_line1 | upper }}</span>
     </span>
     <span class="yb-riso" style="color:var(--yb-magenta)">
-      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.products.hero_line2 | upper }}</span>
-      {{ strings.products.hero_line2 | upper }}
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true" data-i18n="products.hero_line2">{{ strings.products.hero_line2 | upper }}</span>
+      <span data-i18n="products.hero_line2">{{ strings.products.hero_line2 | upper }}</span>
     </span>
   </h1>
 
   <div class="yb-page-hero__footer">
-    <p class="yb-page-hero__desc">{{ strings.products.hero_sub }}</p>
+    <p class="yb-page-hero__desc" data-i18n="products.hero_sub">{{ strings.products.hero_sub }}</p>
     <div class="yb-page-hero__roster">
       {{ products | length }}
-      <br><span>{{ ru_plural(products | length, 'продукт', 'продукта', 'продуктов') }}</span>
+      <br><span data-i18n="products.count_label">{{ ru_plural(products | length, 'продукт', 'продукта', 'продуктов') }}</span>
     </div>
   </div>
 </section>
@@ -52,7 +52,8 @@
           <div style="background:var(--yb-red);color:var(--yb-paper);border:3px solid var(--yb-ink);padding:10px 18px;font-family:var(--yb-font-display);font-size:20px;letter-spacing:.04em;text-transform:uppercase;transform:rotate(-6deg);box-shadow:4px 4px 0 var(--yb-ink)">★ Sold out ★</div>
         </div>
         {% endif %}
-        <div class="yb-product-card__type-stamp" style="background:{{ 'var(--yb-cyan)' if _is_group else 'var(--yb-magenta)' }};color:{{ 'var(--yb-ink)' if _is_group else 'var(--yb-paper)' }}">
+        <div class="yb-product-card__type-stamp" style="background:{{ 'var(--yb-cyan)' if _is_group else 'var(--yb-magenta)' }};color:{{ 'var(--yb-ink)' if _is_group else 'var(--yb-paper)' }}"
+             data-i18n="{{ 'products.type_group' if _is_group else 'products.type_personal' }}">
           {{ strings.products.type_group if _is_group else strings.products.type_personal }}
         </div>
       </div>
@@ -70,12 +71,12 @@
           </div>
           {% if _is_group %}
           <div class="yb-product-card__progress-label">
-            {{ strings.products.sold_label }}: {{ _sold }} /
-            {{ strings.products.group_size }}: {{ _total }}
+            <span data-i18n="products.sold_label">{{ strings.products.sold_label }}</span>: {{ _sold }} /
+            <span data-i18n="products.group_size">{{ strings.products.group_size }}</span>: {{ _total }}
           </div>
           {% else %}
           <div class="yb-product-card__progress-label">
-            {{ strings.products.remaining_label }}: {{ _available }}
+            <span data-i18n="products.remaining_label">{{ strings.products.remaining_label }}</span>: {{ _available }}
           </div>
           {% endif %}
         </div>
@@ -84,13 +85,13 @@
 
       <div class="yb-product-card__footer">
         <div class="yb-product-card__price">{{ product.price_ils }}₪</div>
-        <span class="yb-btn yb-btn--primary yb-btn--sm">{{ strings.products.buy }}</span>
+        <span class="yb-btn yb-btn--primary yb-btn--sm" data-i18n="products.buy">{{ strings.products.buy }}</span>
       </div>
     </a>
     {% endfor %}
   </div>
   {% else %}
-  <div style="padding:80px 0;text-align:center;font-family:var(--yb-font-mono);font-size:14px;letter-spacing:.1em;opacity:.6;text-transform:uppercase">
+  <div style="padding:80px 0;text-align:center;font-family:var(--yb-font-mono);font-size:14px;letter-spacing:.1em;opacity:.6;text-transform:uppercase" data-i18n="products.no_products">
     Пока нет доступных продуктов.
   </div>
   {% endif %}

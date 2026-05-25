@@ -261,7 +261,10 @@
             'large': 1.3,
             'xlarge': 1.5
         };
-        document.documentElement.style.setProperty('--a11y-font-scale', scales[level] || 1);
+        const scale = scales[level] || 1;
+        document.documentElement.style.setProperty('--a11y-font-scale', scale);
+        // zoom scales px-based layouts; fallback to transform for unsupported browsers
+        document.body.style.zoom = scale === 1 ? '' : scale;
         preferences.fontSize = level;
     }
 
@@ -391,6 +394,38 @@
         document.body.appendChild(panel);
 
         renderToolbar();
+
+        // ONE-TIME listeners — must not be inside renderToolbar (would accumulate)
+        button.addEventListener('click', togglePanel);
+
+        // All panel interactions via a single delegated listener on the persistent panel element
+        panel.addEventListener('click', (e) => {
+            if (e.target.closest('.a11y-close')) {
+                togglePanel();
+                return;
+            }
+            if (e.target.closest('.a11y-lang-toggle')) {
+                applyLanguage(currentLanguage === 'he' ? 'en' : 'he');
+                savePreferences();
+                return;
+            }
+            const target = e.target.closest('[data-action]');
+            if (target) {
+                handleFeatureToggle(target.dataset.action, target.dataset.value);
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isOpen) togglePanel();
+        });
+
+        // composedPath captures the original DOM path before innerHTML replacement,
+        // so panel.contains check works correctly even after renderToolbar() re-renders
+        document.addEventListener('click', (e) => {
+            if (isOpen && !e.composedPath().includes(panel) && !e.composedPath().includes(button)) {
+                togglePanel();
+            }
+        });
     }
 
     // Render toolbar content
@@ -513,7 +548,6 @@
             </div>
         `;
 
-        attachEventListeners();
     }
 
     // Toggle panel open/close
@@ -590,56 +624,6 @@
         updateButtonStates();
     }
 
-    // Attach event listeners
-    function attachEventListeners() {
-        const button = document.getElementById('a11y-button');
-        const panel = document.getElementById('a11y-panel');
-
-        if (!button || !panel) return;
-
-        // Toggle button
-        button.addEventListener('click', togglePanel);
-
-        // Close button
-        const closeBtn = panel.querySelector('.a11y-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', togglePanel);
-        }
-
-        // Language toggle
-        const langBtn = panel.querySelector('.a11y-lang-toggle');
-        if (langBtn) {
-            langBtn.addEventListener('click', () => {
-                const newLang = currentLanguage === 'he' ? 'en' : 'he';
-                applyLanguage(newLang);
-                savePreferences();
-            });
-        }
-
-        // Feature controls
-        panel.addEventListener('click', (e) => {
-            const target = e.target.closest('[data-action]');
-            if (target) {
-                const action = target.dataset.action;
-                const value = target.dataset.value;
-                handleFeatureToggle(action, value);
-            }
-        });
-
-        // Keyboard handling
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && isOpen) {
-                togglePanel();
-            }
-        });
-
-        // Click outside to close
-        document.addEventListener('click', (e) => {
-            if (isOpen && !panel.contains(e.target) && !button.contains(e.target)) {
-                togglePanel();
-            }
-        });
-    }
 
     // Check browser preferences
     function checkBrowserPreferences() {

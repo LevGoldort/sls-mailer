@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru" dir="ltr">
 <head>
+  <script>(function(){var l=localStorage.getItem('yb_lang');if(l&&l!=='ru')document.documentElement.setAttribute('lang',l);})();</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="origin">
@@ -53,7 +54,7 @@
   {% block extra_css %}{% endblock %}
 </head>
 <body class="yb-page">
-  <a href="#main-content" class="skip-link">К содержимому</a>
+  <a href="#main-content" class="skip-link" data-i18n="base.skip_link">К содержимому</a>
 
   {% include 'shared/_header.html' %}
 
@@ -68,20 +69,21 @@
        data-ga4="{{ ga4_id or '' }}">
     <div class="cookie-consent-content">
       <div class="cookie-consent-text">
-        <h3>Мы используем cookies</h3>
-        <p>
+        <h3 data-i18n="base.cookie_heading">Мы используем cookies</h3>
+        <p data-i18n-html="base.cookie_body">
           Этот сайт использует cookies и аналитические сервисы (Google Analytics, Facebook Pixel)
           для улучшения вашего опыта.
           <a href="/privacy.html" target="_blank">Подробнее</a>
         </p>
       </div>
       <div class="cookie-consent-buttons">
-        <button id="cookie-accept" class="cookie-consent-btn cookie-consent-btn-accept">Принять</button>
-        <button id="cookie-decline" class="cookie-consent-btn cookie-consent-btn-decline">Отклонить</button>
+        <button id="cookie-accept" class="cookie-consent-btn cookie-consent-btn-accept" data-i18n="base.cookie_accept">Принять</button>
+        <button id="cookie-decline" class="cookie-consent-btn cookie-consent-btn-decline" data-i18n="base.cookie_decline">Отклонить</button>
       </div>
     </div>
   </div>
 
+  <script src="/static/js/i18n.js"></script>
   <script src="/static/js/cookie-consent.js"></script>
   <script src="/static/js/accessibility-toolbar.js"></script>
   {% block extra_js %}{% endblock %}

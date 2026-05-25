@@ -23,6 +23,23 @@
 }
 
 /* ========================================
+   Design token bridge — maps old generic vars
+   onto the YallaBalagan --yb-* design system
+   ======================================== */
+:root {
+    --primary:      var(--yb-magenta, #e535ab);
+    --primary-dark: var(--yb-magenta-deep, #c01d8b);
+    --danger:       var(--yb-red, #ef4444);
+    --gray-50:  #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-700: #374151;
+    --gray-900: #111827;
+}
+
+/* ========================================
    Accessibility Button (Trigger)
    ======================================== */
 .a11y-button {
@@ -337,10 +354,14 @@ html[dir="rtl"] .a11y-panel:not([hidden]) {
    Accessibility Feature Classes
    ======================================== */
 
-/* Font Size Scaling */
+/* Font Size Scaling + Line Height */
 html {
     --a11y-font-scale: 1;
     --a11y-line-height: 1.6;
+}
+
+body {
+    line-height: var(--a11y-line-height);
 }
 
 /* Contrast Modes */
@@ -357,10 +378,10 @@ html.a11y-contrast-dark a {
     color: #FFD700 !important;
 }
 
-html.a11y-contrast-dark .event-card,
-html.a11y-contrast-dark .event-detail,
-html.a11y-contrast-dark header,
-html.a11y-contrast-dark footer {
+html.a11y-contrast-dark .yb-event-card,
+html.a11y-contrast-dark .yb-page,
+html.a11y-contrast-dark .yb-header,
+html.a11y-contrast-dark .yb-footer {
     background: #1a1a1a !important;
     color: #fff !important;
     border-color: #333 !important;
@@ -379,10 +400,10 @@ html.a11y-contrast-light a {
     color: #0000EE !important;
 }
 
-html.a11y-contrast-light .event-card,
-html.a11y-contrast-light .event-detail,
-html.a11y-contrast-light header,
-html.a11y-contrast-light footer {
+html.a11y-contrast-light .yb-event-card,
+html.a11y-contrast-light .yb-page,
+html.a11y-contrast-light .yb-header,
+html.a11y-contrast-light .yb-footer {
     background: #fff !important;
     color: #000 !important;
     border-color: #ccc !important;

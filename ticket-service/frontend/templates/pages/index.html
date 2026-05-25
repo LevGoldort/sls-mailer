@@ -13,20 +13,20 @@
   <h1 class="yb-home-hero__h1">
     <div style="margin-left: 0.42em">
       <span class="yb-riso">
-        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.hero_line1 }}</span>
-        {{ strings.home.hero_line1 }}
+        <span class="yb-riso__shadow" aria-hidden="true" data-i18n="home.hero_line1">{{ strings.home.hero_line1 }}</span>
+        <span data-i18n="home.hero_line1">{{ strings.home.hero_line1 }}</span>
       </span>
     </div>
     <div style="margin-left: clamp(40px, 8%, 140px)">
       <span class="yb-riso" style="color:var(--yb-magenta)">
-        <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.home.hero_line2 }}</span>
-        {{ strings.home.hero_line2 }}
+        <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true" data-i18n="home.hero_line2">{{ strings.home.hero_line2 }}</span>
+        <span data-i18n="home.hero_line2">{{ strings.home.hero_line2 }}</span>
       </span>
     </div>
   </h1>
 
   <div class="yb-home-hero__sub">
-    <p class="yb-home-hero__desc">{{ strings.home.hero_sub }}</p>
+    <p class="yb-home-hero__desc" data-i18n="home.hero_sub">{{ strings.home.hero_sub }}</p>
   </div>
 </section>
 
@@ -46,13 +46,13 @@
   <div class="yb-section-head">
     <h2>
       <span class="yb-riso">
-        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.section_programme }}</span>
-        {{ strings.home.section_programme }}
+        <span class="yb-riso__shadow" aria-hidden="true" data-i18n="home.section_programme">{{ strings.home.section_programme }}</span>
+        <span data-i18n="home.section_programme">{{ strings.home.section_programme }}</span>
       </span>
     </h2>
     <div class="yb-section-head__meta">
       <span>{{ events | length }}</span>
-      <span>{{ ru_plural(events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}</span>
+      <span data-i18n="events.count_label">{{ ru_plural(events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}</span>
     </div>
   </div>
 
@@ -65,16 +65,16 @@
   </div>
   {% else %}
   <div style="padding: 80px 0; text-align: center; font-family: var(--yb-font-mono); font-size: 14px; letter-spacing: .1em; opacity: .6; text-transform: uppercase;">
-    <p>Пока нет ближайших событий.</p>
-    <p style="opacity: .7; margin-top: 8px;">Следите за обновлениями.</p>
+    <p data-i18n="home.no_events">Пока нет ближайших событий.</p>
+    <p style="opacity: .7; margin-top: 8px;" data-i18n="home.no_events_sub">Следите за обновлениями.</p>
   </div>
   {% endif %}
 
   <div class="yb-all-events-link">
     <a href="/events.html">
       <span class="yb-riso">
-        <span class="yb-riso__shadow" aria-hidden="true">{{ strings.home.all_events }}</span>
-        {{ strings.home.all_events }}
+        <span class="yb-riso__shadow" aria-hidden="true" data-i18n="home.all_events">{{ strings.home.all_events }}</span>
+        <span data-i18n="home.all_events">{{ strings.home.all_events }}</span>
       </span>
       <span>→</span>
     </a>
@@ -88,27 +88,27 @@
     <div style="position:absolute; top:-16px; right:60px; width:130px; height:26px; background:rgba(255,212,0,.85); transform:rotate(4deg); border:3px solid var(--yb-ink);" aria-hidden="true"></div>
 
     <div style="position:relative">
-      <div class="yb-podcast__eyebrow">{{ strings.podcast.eyebrow }}</div>
-      <h2 class="yb-podcast__name">{{ strings.podcast.name }}</h2>
-      <p class="yb-podcast__desc">{{ strings.podcast.description }}</p>
+      <div class="yb-podcast__eyebrow" data-i18n="podcast.eyebrow">{{ strings.podcast.eyebrow }}</div>
+      <h2 class="yb-podcast__name" data-i18n="podcast.name">{{ strings.podcast.name }}</h2>
+      <p class="yb-podcast__desc" data-i18n="podcast.description">{{ strings.podcast.description }}</p>
     </div>
 
     <div class="yb-podcast__right">
       <div class="yb-podcast__latest">
-        <div class="yb-podcast__latest-label">{{ strings.podcast.latest_label }}</div>
+        <div class="yb-podcast__latest-label" data-i18n="podcast.latest_label">{{ strings.podcast.latest_label }}</div>
         <div class="yb-podcast__latest-title">{{ latest_podcast.title if latest_podcast else '«Что происходит в Израиле — снова обо всём»' }}</div>
       </div>
       <div class="yb-podcast__ctas">
         {% if latest_podcast %}
-        <a href="https://www.youtube.com/watch?v={{ latest_podcast.video_id }}" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener">
+        <a href="https://www.youtube.com/watch?v={{ latest_podcast.video_id }}" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener" data-i18n="podcast.watch_youtube">
           {{ strings.podcast.watch_youtube }}
         </a>
         {% else %}
-        <a href="https://youtube.com/@yallabalagan" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener">
+        <a href="https://youtube.com/@yallabalagan" class="yb-btn yb-btn--primary yb-btn--full" target="_blank" rel="noopener" data-i18n="podcast.watch_youtube">
           {{ strings.podcast.watch_youtube }}
         </a>
         {% endif %}
-        <a href="https://open.spotify.com" class="yb-btn yb-btn--paper yb-btn--full" target="_blank" rel="noopener">
+        <a href="https://open.spotify.com" class="yb-btn yb-btn--paper yb-btn--full" target="_blank" rel="noopener" data-i18n="podcast.listen_spotify">
           {{ strings.podcast.listen_spotify }}
         </a>
       </div>
@@ -119,8 +119,8 @@
 {# ── Socials grid ── #}
 <section class="yb-socials yb-pad">
   <div class="yb-socials__head">
-    <h3>{{ strings.socials.heading }}</h3>
-    <span class="yb-socials__sub">{{ strings.socials.sub }}</span>
+    <h3 data-i18n="socials.heading">{{ strings.socials.heading }}</h3>
+    <span class="yb-socials__sub" data-i18n="socials.sub">{{ strings.socials.sub }}</span>
   </div>
   <div class="yb-socials__grid">
     <a href="https://instagram.com/yallabala" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">

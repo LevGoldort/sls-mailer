@@ -503,6 +503,12 @@ aws s3 sync "$SCRIPT_DIR/admin-v2/" "s3://$ADMIN_BUCKET/" \
   --exclude "*.md" --exclude ".DS_Store" \
   --delete
 
+echo "Copying shared accessibility files..."
+cp "$SCRIPT_DIR/../accessibility/accessibility-toolbar.css" "$SCRIPT_DIR/frontend/static/css/"
+cp "$SCRIPT_DIR/../accessibility/accessibility-toolbar.js" "$SCRIPT_DIR/frontend/static/js/"
+mkdir -p "$SCRIPT_DIR/frontend/static/fonts/OpenDyslexic"
+cp "$SCRIPT_DIR/../accessibility/fonts/"* "$SCRIPT_DIR/frontend/static/fonts/OpenDyslexic/"
+
 echo "Syncing frontend static files to S3..."
 aws s3 sync "$SCRIPT_DIR/frontend/static/" "s3://$FRONTEND_BUCKET/static/" \
   --profile "$PROFILE" \

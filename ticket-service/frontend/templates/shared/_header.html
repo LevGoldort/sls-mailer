@@ -3,31 +3,38 @@
   <div class="yb-header__main">
 
     <a href="/" class="yb-header__logo" aria-label="{{ strings.site.name }}">
-      <span class="yb-header__logo-box">ЯЛЛА<br>БАЛАГАН</span>
+      <span class="yb-header__logo-box" data-i18n-html="site.logo_box">ЯЛЛА<br>БАЛАГАН</span>
     </a>
 
     <nav class="yb-header__nav" aria-label="Основная навигация">
-      <a href="/events.html"{% if _active == 'events' %} class="is-active" aria-current="page"{% endif %}>
+      <a href="/events.html"{% if _active == 'events' %} class="is-active" aria-current="page"{% endif %} data-i18n="header.nav_events">
         {{ strings.header.nav_events }}
       </a>
-      <a href="/performers.html"{% if _active == 'performers' %} class="is-active" aria-current="page"{% endif %}>
+      <a href="/performers.html"{% if _active == 'performers' %} class="is-active" aria-current="page"{% endif %} data-i18n="header.nav_performers">
         {{ strings.header.nav_performers }}
       </a>
-      <a href="/products.html"{% if _active == 'merch' %} class="is-active" aria-current="page"{% endif %}>
+      <a href="/products.html"{% if _active == 'merch' %} class="is-active" aria-current="page"{% endif %} data-i18n="header.nav_merch">
         {{ strings.header.nav_merch }}
       </a>
-      <a href="/shows.html"{% if _active == 'content' %} class="is-active" aria-current="page"{% endif %}>
+      <a href="/shows.html"{% if _active == 'content' %} class="is-active" aria-current="page"{% endif %} data-i18n="header.nav_content">
         {{ strings.header.nav_content }}
       </a>
-      <a href="#" onclick="return false" style="opacity:.45;cursor:default">
+      <a href="#" onclick="return false" style="opacity:.45;cursor:default" data-i18n="header.nav_about">
         {{ strings.header.nav_about }}
       </a>
     </nav>
 
+    <div class="yb-header__lang" aria-label="Language / Язык">
+      <button class="yb-header__lang-btn" id="lang-btn-ru" onclick="window.i18n.setLang('ru')">RU</button>
+      <span class="yb-header__lang-sep" aria-hidden="true">/</span>
+      <button class="yb-header__lang-btn" id="lang-btn-en" onclick="window.i18n.setLang('en')">EN</button>
+    </div>
+    <script>(function(){var l=localStorage.getItem('yb_lang')||'ru';var b=document.getElementById('lang-btn-'+l);if(b)b.classList.add('is-active');})();</script>
+
   </div>
 
   <div class="yb-header__ticker" aria-hidden="true">
-    <span>{{ strings.header.ticker_left }}</span>
+    <span data-i18n="header.ticker_left">{{ strings.header.ticker_left }}</span>
     <span class="yb-header__ticker-center">{{ strings.header.ticker_center }}</span>
     <span class="yb-header__ticker-right">{{ strings.header.ticker_right }}</span>
   </div>

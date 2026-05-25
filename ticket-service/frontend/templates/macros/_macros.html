@@ -16,8 +16,8 @@
 {% macro filter_bar(tags, active_tag='') %}
 {% set _colors = ['ink', 'magenta', 'cyan', 'magenta', 'cyan', 'red'] %}
 {% set _rotations = ['-1deg','1.5deg','-0.5deg','2deg','-1.5deg','0.5deg'] %}
-<div class="yb-filter" role="search" aria-label="Фильтр по тегам">
-  <span class="yb-filter__label">{{ strings.filter.label }}</span>
+<div class="yb-filter" role="search" aria-label="Фильтр по тегам" data-i18n-aria="filter.aria_label">
+  <span class="yb-filter__label" data-i18n="filter.label">{{ strings.filter.label }}</span>
   {% for tag in tags %}
   {% set _ci = loop.index0 % (_colors | length) %}
   <span class="yb-stamp yb-stamp--lg yb-stamp--{{ _colors[_ci] }}{% if tag == active_tag %} yb-stamp--active{% endif %}"
@@ -109,7 +109,8 @@
       <div class="yb-event-card__perf-dot yb-event-card__perf-dot--bot"></div>
     </div>
 
-    <div class="yb-event-card__stub-admit" aria-hidden="true">
+    <div class="yb-event-card__stub-admit" aria-hidden="true"
+         data-i18n="{{ 'event_card.external_stub' if _is_external else 'event_card.admit_one' }}">
       {{ strings.event_card.external_stub if _is_external else strings.event_card.admit_one }}
     </div>
 
@@ -120,14 +121,14 @@
 
     {% if _is_external %}
     <div style="position:relative">
-      <div class="yb-event-card__stub-label">{{ strings.event_card.external_label }}</div>
-      <div class="yb-event-card__stub-price" style="font-size:26px;line-height:1.1">
+      <div class="yb-event-card__stub-label" data-i18n="event_card.external_label">{{ strings.event_card.external_label }}</div>
+      <div class="yb-event-card__stub-price" style="font-size:26px;line-height:1.1" data-i18n="event_card.external_sub">
         {{ strings.event_card.external_sub }}
       </div>
     </div>
     {% else %}
     <div style="position:relative">
-      <div class="yb-event-card__stub-label">{{ strings.event_card.tickets_from }}</div>
+      <div class="yb-event-card__stub-label" data-i18n="event_card.tickets_from">{{ strings.event_card.tickets_from }}</div>
       {% if event.get('min_price') %}
       <div class="yb-event-card__stub-price">{{ event['min_price'] }}<sup>₪</sup></div>
       {% endif %}
@@ -136,7 +137,8 @@
 
     <a href="/events/{{ _slug }}.html"
        class="yb-btn yb-btn--primary yb-btn--full"
-       style="position:relative">
+       style="position:relative"
+       data-i18n="{{ 'event_card.external_goto' if _is_external else 'event_card.buy' }}">
       {{ strings.event_card.external_goto if _is_external else strings.event_card.buy }}
     </a>
   </div>
@@ -151,11 +153,11 @@
 #}
 {% macro month_divider(label, count) %}
 <div class="yb-month-divider">
-  <div class="yb-month-divider__eyebrow">{{ strings.events.month_label }}</div>
-  <div class="yb-month-divider__name">{{ label }}</div>
+  <div class="yb-month-divider__eyebrow" data-i18n="events.month_label">{{ strings.events.month_label }}</div>
+  <div class="yb-month-divider__name" data-i18n-month>{{ label }}</div>
   <div class="yb-month-divider__count">
     {{ count }}
-    <span>{{ ru_plural(count, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}
+    <span data-i18n="events.in_month">{{ ru_plural(count, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }}
     {{ strings.events.in_month }}</span>
   </div>
 </div>
@@ -189,7 +191,7 @@
 
     <div class="yb-performer-card__footer">
       <span>{{ performer.get('role', '') }}</span>
-      <span class="yb-performer-card__dossier">{{ strings.performers.dossier }}</span>
+      <span class="yb-performer-card__dossier" data-i18n="performers.dossier">{{ strings.performers.dossier }}</span>
     </div>
   </div>
 
@@ -199,7 +201,7 @@
 
 {# ── Breadcrumb ── #}
 {% macro breadcrumb(items) %}
-<nav class="yb-breadcrumb" aria-label="Хлебные крошки">
+<nav class="yb-breadcrumb" aria-label="Хлебные крошки" data-i18n-aria="base.breadcrumb_aria">
   {% for item in items %}
   {% if not loop.last %}
   <a href="{{ item.url }}">{{ item.label }}</a>

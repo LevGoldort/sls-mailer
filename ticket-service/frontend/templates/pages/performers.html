@@ -9,30 +9,30 @@
 {# ── Page hero ── #}
 <section class="yb-page-hero">
   <div class="yb-page-hero__breadcrumb">
-    <a href="/">{{ strings.performers.breadcrumb_home }}</a>
+    <a href="/" data-i18n="performers.breadcrumb_home">{{ strings.performers.breadcrumb_home }}</a>
     <span> ► </span>
-    <b style="opacity:1">{{ strings.performers.breadcrumb_self }}</b>
+    <b style="opacity:1" data-i18n="performers.breadcrumb_self">{{ strings.performers.breadcrumb_self }}</b>
     <span> · </span>
     <span>{{ strings.site.cities }}</span>
   </div>
 
   <h1 class="yb-page-hero__h1">
     <span class="yb-riso">
-      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.performers.hero_line1 | upper }}</span>
-      {{ strings.performers.hero_line1 | upper }}
+      <span class="yb-riso__shadow" aria-hidden="true" data-i18n="performers.hero_line1">{{ strings.performers.hero_line1 | upper }}</span>
+      <span data-i18n="performers.hero_line1">{{ strings.performers.hero_line1 | upper }}</span>
     </span>
     <span class="yb-riso" style="color:var(--yb-magenta)">
-      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.performers.hero_line2 | upper }}</span>
-      {{ strings.performers.hero_line2 | upper }}
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true" data-i18n="performers.hero_line2">{{ strings.performers.hero_line2 | upper }}</span>
+      <span data-i18n="performers.hero_line2">{{ strings.performers.hero_line2 | upper }}</span>
     </span>
   </h1>
 
   <div class="yb-page-hero__footer">
-    <p class="yb-page-hero__desc">{{ strings.performers.hero_sub }}</p>
+    <p class="yb-page-hero__desc" data-i18n="performers.hero_sub">{{ strings.performers.hero_sub }}</p>
     <div class="yb-page-hero__roster">
-      {{ strings.performers.roster_label }}
+      <span data-i18n="performers.roster_label">{{ strings.performers.roster_label }}</span>
       <br><span>{{ performers | length }}
-      {{ ru_plural(performers | length, strings.plurals.people_1, strings.plurals.people_2_4, strings.plurals.people_many) }}</span>
+      <span data-i18n="performers.count_label">{{ ru_plural(performers | length, strings.plurals.people_1, strings.plurals.people_2_4, strings.plurals.people_many) }}</span></span>
     </div>
   </div>
 </section>
@@ -71,7 +71,7 @@
 
         <div class="yb-performer-card__footer">
           <span>{{ performer.get('role', '') }}</span>
-          <span class="yb-performer-card__dossier">{{ strings.performers.dossier }}</span>
+          <span class="yb-performer-card__dossier" data-i18n="performers.dossier">{{ strings.performers.dossier }}</span>
         </div>
       </div>
 

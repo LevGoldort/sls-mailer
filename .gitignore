@@ -129,3 +129,11 @@ ticket-service/tmp/
 *.png
 *.jpg
 *.jpeg
+
+# Generated accessibility files (built from accessibility/ by deploy scripts)
+ticket-service/frontend/static/css/accessibility-toolbar.css
+ticket-service/frontend/static/js/accessibility-toolbar.js
+ticket-service/frontend/static/fonts/OpenDyslexic/
+donate-site/static/css/accessibility-toolbar.css
+donate-site/static/js/accessibility-toolbar.js
+donate-site/static/fonts/OpenDyslexic/

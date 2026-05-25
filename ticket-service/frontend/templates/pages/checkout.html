@@ -8,20 +8,20 @@
     <!-- Loading State -->
     <div id="loading-state" style="text-align: center; padding: 3rem;">
         <div style="width: 60px; height: 60px; border: 4px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 2rem;"></div>
-        <p>Загрузка...</p>
+        <p data-i18n="checkout.loading">Загрузка...</p>
     </div>
 
     <!-- Error State -->
     <div id="error-state" style="display: none; text-align: center; padding: 3rem;">
         <div style="font-size: 4rem; margin-bottom: 1rem;">❌</div>
-        <h1>Ошибка</h1>
-        <p id="error-message" style="color: var(--danger); margin-bottom: 2rem;">Не удалось загрузить данные</p>
-        <a href="/" class="btn btn-primary">Вернуться на главную</a>
+        <h1 data-i18n="checkout.error">Ошибка</h1>
+        <p id="error-message" style="color: var(--danger); margin-bottom: 2rem;" data-i18n="checkout.error_default">Не удалось загрузить данные</p>
+        <a href="/" class="btn btn-primary" data-i18n="checkout.back_home">Вернуться на главную</a>
     </div>
 
     <!-- Checkout Content (will be populated by JS) -->
     <div id="checkout-content" style="display: none;">
-        <h1 class="page-title" style="font-size: 2rem;">Оформление заказа</h1>
+        <h1 class="page-title" style="font-size: 2rem;" data-i18n="checkout.heading">Оформление заказа</h1>
 
         <!-- Event Info Card -->
         <div class="checkout-card" id="event-info">
@@ -30,15 +30,16 @@
 
         <!-- Customer Information -->
         <div class="checkout-card">
-            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Контактная информация</h2>
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;" data-i18n="checkout.contact_heading">Контактная информация</h2>
             <form id="checkout-form">
                 <div class="form-group">
-                    <label class="form-label" for="customer_name">Полное имя *</label>
+                    <label class="form-label" for="customer_name" data-i18n="checkout.name_label">Полное имя *</label>
                     <input type="text"
                            id="customer_name"
                            name="customer_name"
                            class="form-input"
                            placeholder="Иван Иванов"
+                           data-i18n-placeholder="checkout.name_placeholder"
                            required>
                 </div>
 
@@ -50,13 +51,13 @@
                            class="form-input"
                            placeholder="ivan@example.com"
                            required>
-                    <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;">
+                    <p style="color: var(--gray-600); font-size: 0.875rem; margin-top: 0.5rem;" data-i18n="checkout.email_note">
                         Билеты будут отправлены на этот email
                     </p>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="customer_phone">Телефон *</label>
+                    <label class="form-label" for="customer_phone" data-i18n="checkout.phone_label">Телефон *</label>
                     <input type="tel"
                            id="customer_phone"
                            name="customer_phone"
@@ -67,7 +68,7 @@
 
                 <!-- Order Summary -->
                 <div class="order-summary">
-                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Итого</h3>
+                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;" data-i18n="checkout.summary_heading">Итого</h3>
 
                     <div class="summary-row">
                         <span><span id="summary-ticket-name"></span> × <span id="summary-quantity">1</span></span>
@@ -76,30 +77,30 @@
 
                     <!-- Selected Seats (for seated venues) -->
                     <div id="selected-seats-section" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 0.5rem;">
-                        <h4 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem;">Выбранные места:</h4>
+                        <h4 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem;" data-i18n="checkout.seats_heading">Выбранные места:</h4>
                         <div id="selected-seats-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                             <!-- Seats will be populated by JS -->
                         </div>
                     </div>
 
                     <div class="summary-row" id="coupon-row" style="display: none; color: var(--success, #059669);">
-                        <span>Купон (<span id="summary-coupon-code"></span>)</span>
+                        <span><span data-i18n="checkout.coupon_label">Купон</span> (<span id="summary-coupon-code"></span>)</span>
                         <span id="summary-discount"></span>
                     </div>
 
                     <div class="summary-row" id="service-fee-row" style="display: none;">
-                        <span>Сервисный сбор</span>
+                        <span data-i18n="checkout.service_fee">Сервисный сбор</span>
                         <span id="summary-fee"></span>
                     </div>
 
                     <div class="summary-row total">
-                        <span>Всего к оплате</span>
+                        <span data-i18n="checkout.total_label">Всего к оплате</span>
                         <span id="summary-total" style="color: var(--primary);"></span>
                     </div>
                 </div>
 
                 <!-- Payment Button -->
-                <button type="submit" class="btn btn-primary btn-large" style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary btn-large" style="margin-top: 1.5rem;" data-i18n="checkout.to_payment">
                     Перейти к оплате
                 </button>
 
@@ -109,7 +110,7 @@
                   <div id="order-error-msg" style="font-family:var(--yb-font-mono); font-size:13px; line-height:1.5;"></div>
                 </div>
 
-                <p style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1rem;">
+                <p style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1rem;" data-i18n="checkout.redirect_note">
                     После нажатия вы будете перенаправлены на защищенную страницу оплаты
                 </p>
             </form>
@@ -117,12 +118,12 @@
 
         <!-- Security Notice -->
         <div style="text-align: center; color: var(--gray-600); font-size: 0.875rem; margin-top: 1.5rem;">
-            🔒 Безопасная оплата через All-Pay
+            <span data-i18n="checkout.secure_payment">🔒 Безопасная оплата через All-Pay</span>
         </div>
 
         <!-- Back Link -->
         <div style="text-align: center; margin-top: 1rem;">
-            <a href="#" id="back-link" style="color: var(--gray-600); text-decoration: none; font-size: 0.875rem;">
+            <a href="#" id="back-link" style="color: var(--gray-600); text-decoration: none; font-size: 0.875rem;" data-i18n="checkout.back_to_event">
                 ← Вернуться к событию
             </a>
         </div>
@@ -434,15 +435,16 @@ function renderCheckout() {
           </div>` : ''}
           <div style="padding: 20px 24px;">
             <div style="font-family: var(--yb-font-mono); font-size: 11px; letter-spacing: .08em; opacity: .45; margin-bottom: 10px;">★ ЗАКАЗ · ORDER</div>
+
             <h2 style="font-family: var(--yb-font-display); font-size: clamp(22px, 4vw, 34px); line-height: .95; letter-spacing: -.01em; margin: 0 0 16px; color: var(--yb-ink);">${eventData.title}</h2>
             <div style="display: flex; gap: 24px; flex-wrap: wrap; border-top: 1px solid rgba(26,20,16,.12); padding-top: 14px;">
               <div>
-                <div style="font-family: var(--yb-font-mono); font-size: 10px; letter-spacing: .08em; opacity: .4; margin-bottom: 3px;">ДАТА И ВРЕМЯ</div>
+                <div style="font-family: var(--yb-font-mono); font-size: 10px; letter-spacing: .08em; opacity: .4; margin-bottom: 3px;">${window.i18n.isEN ? 'DATE & TIME' : 'ДАТА И ВРЕМЯ'}</div>
                 <div style="font-family: var(--yb-font-mono); font-size: 13px;">${eventData.date_formatted} · ${eventData.time_formatted}</div>
               </div>
               ${eventData.location_name ? `
               <div>
-                <div style="font-family: var(--yb-font-mono); font-size: 10px; letter-spacing: .08em; opacity: .4; margin-bottom: 3px;">ПЛОЩАДКА</div>
+                <div style="font-family: var(--yb-font-mono); font-size: 10px; letter-spacing: .08em; opacity: .4; margin-bottom: 3px;">${window.i18n.isEN ? 'VENUE' : 'ПЛОЩАДКА'}</div>
                 <div style="font-family: var(--yb-font-mono); font-size: 13px;">${eventData.location_name}</div>
               </div>` : ''}
             </div>
@@ -451,7 +453,7 @@ function renderCheckout() {
 
         <!-- Ticket Selection (only for unseated venues) -->
         <div style="margin-top: 1.5rem; ${orderDataFromSession ? 'display: none;' : ''}">
-            <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Тип билета</h3>
+            <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">${window.i18n.t('checkout.ticket_type_heading') || 'Тип билета'}</h3>
             <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
@@ -472,7 +474,7 @@ function renderCheckout() {
 
                 <!-- Quantity Selector -->
                 <div class="form-group" id="quantity-selector" style="margin-bottom: 0;">
-                    <label class="form-label">Количество билетов</label>
+                    <label class="form-label">${window.i18n.t('checkout.qty_label') || 'Количество билетов'}</label>
                     <select id="quantity" class="form-select" onchange="updateTotal()">
                         ${Array.from({length: Math.min(ticketTypeData.available, 10)}, (_, i) => i + 1)
                             .map(i => `<option value="${i}">${i}</option>`)
@@ -498,7 +500,7 @@ function renderCheckout() {
     if (orderDataFromSession) {
         // Seated venue: show all tickets
         const totalTickets = orderDataFromSession.tickets.reduce((sum, t) => sum + t.quantity, 0);
-        document.getElementById('summary-ticket-name').textContent = 'Билеты';
+        document.getElementById('summary-ticket-name').textContent = window.i18n.t('checkout.step1') || 'Билеты';
         document.getElementById('summary-quantity').textContent = totalTickets;
 
         // Display selected seats in summary section
@@ -557,7 +559,9 @@ function getSeatDisplayLabel(seatId, seatingMapConfig) {
             seatDisplay = enabledCount;
         }
     }
-    return `Ряд ${rowDisplay}, Место ${seatDisplay}`;
+    const rowLbl = window.i18n.t('checkout.row_label') || 'Ряд';
+    const seatLbl = window.i18n.t('checkout.seat_label') || 'Место';
+    return `${rowLbl} ${rowDisplay}, ${seatLbl} ${seatDisplay}`;
 }
 
 // Display selected seats (summary section - compact badges)
@@ -599,7 +603,7 @@ function displayCheckoutSeats(orderData) {
     });
 
     let html = '<div style="margin-top: 0.5rem;">';
-    html += '<label class="form-label" style="margin-bottom: 0.5rem;">Выбранные места:</label>';
+    html += `<label class="form-label" style="margin-bottom: 0.5rem;">${window.i18n.t('checkout.seats_heading') || 'Выбранные места:'}</label>`;
 
     Object.values(seatsByType).forEach(typeInfo => {
         html += `<div style="margin-bottom: 0.75rem;">`;
@@ -798,7 +802,7 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 
     const submitButton = this.querySelector('button[type="submit"]');
     submitButton.disabled = true;
-    submitButton.textContent = 'Обработка...';
+    submitButton.textContent = window.i18n.t('checkout.processing') || 'Обработка...';
 
     try {
         const formData = new FormData(this);
@@ -917,7 +921,7 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
                         console.error('Payment error:', error_n, error_msg);
                         showOrderError('Ошибка оплаты: ' + error_msg + ' (код: ' + error_n + ')');
                         submitButton.disabled = false;
-                        submitButton.textContent = 'Перейти к оплате';
+                        submitButton.textContent = window.i18n.t('checkout.to_payment') || 'Перейти к оплате';
                         document.getElementById('checkout-content').style.display = 'block';
                         paymentContainer.style.display = 'none';
                     }
@@ -944,7 +948,7 @@ function processPayment() {
     if (AllpayInstance) {
         const paymentBtn = document.getElementById('complete-payment-btn');
         paymentBtn.disabled = true;
-        paymentBtn.textContent = 'Обработка...';
+        paymentBtn.textContent = window.i18n.t('checkout.processing') || 'Обработка...';
 
         AllpayInstance.pay();
     }

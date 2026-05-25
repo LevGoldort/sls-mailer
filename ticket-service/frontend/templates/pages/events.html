@@ -9,29 +9,29 @@
 {# ── Page hero ── #}
 <section class="yb-page-hero">
   <div class="yb-page-hero__breadcrumb">
-    <a href="/">{{ strings.events.breadcrumb_home }}</a>
+    <a href="/" data-i18n="events.breadcrumb_home">{{ strings.events.breadcrumb_home }}</a>
     <span> ► </span>
-    <b style="opacity:1">{{ strings.events.breadcrumb_self }}</b>
+    <b style="opacity:1" data-i18n="events.breadcrumb_self">{{ strings.events.breadcrumb_self }}</b>
     <span> · </span>
     <span>{{ strings.site.cities }}</span>
   </div>
 
   <h1 class="yb-page-hero__h1">
     <span class="yb-riso">
-      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.events.hero_line1 }}</span>
-      {{ strings.events.hero_line1 }}
+      <span class="yb-riso__shadow" aria-hidden="true" data-i18n="events.hero_line1">{{ strings.events.hero_line1 }}</span>
+      <span data-i18n="events.hero_line1">{{ strings.events.hero_line1 }}</span>
     </span>
     <span class="yb-riso" style="color:var(--yb-magenta)">
-      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.events.hero_line2 }}</span>
-      {{ strings.events.hero_line2 }}
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true" data-i18n="events.hero_line2">{{ strings.events.hero_line2 }}</span>
+      <span data-i18n="events.hero_line2">{{ strings.events.hero_line2 }}</span>
     </span>
   </h1>
 
   <div class="yb-page-hero__footer">
-    <p class="yb-page-hero__desc">{{ strings.events.hero_sub }}</p>
+    <p class="yb-page-hero__desc" data-i18n="events.hero_sub">{{ strings.events.hero_sub }}</p>
     <div class="yb-page-hero__roster">
       {{ events | length }}
-      <br><span>{{ ru_plural(events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }} в афише</span>
+      <br><span data-i18n="events.count_label">{{ ru_plural(events | length, strings.plurals.events_1, strings.plurals.events_2_4, strings.plurals.events_many) }} в афише</span>
     </div>
   </div>
 </section>
@@ -61,10 +61,10 @@
   </div>
   {% else %}
   <div style="padding:120px 0 80px; text-align:center; border:3px dashed var(--yb-ink); margin-top:16px">
-    <div style="font-family:var(--yb-font-display); font-size:48px; letter-spacing:-.02em; text-transform:uppercase; margin-bottom:12px">
+    <div style="font-family:var(--yb-font-display); font-size:48px; letter-spacing:-.02em; text-transform:uppercase; margin-bottom:12px" data-i18n="events.empty_heading">
       Пока ничего
     </div>
-    <div style="font-family:var(--yb-font-mono); font-size:14px; letter-spacing:.08em; opacity:.7; text-transform:uppercase">
+    <div style="font-family:var(--yb-font-mono); font-size:14px; letter-spacing:.08em; opacity:.7; text-transform:uppercase" data-i18n="events.empty_sub">
       Следите за обновлениями.
     </div>
   </div>
@@ -75,8 +75,8 @@
 {# ── Socials strip ── #}
 <section class="yb-socials yb-pad">
   <div class="yb-socials__head">
-    <h3>{{ strings.socials.heading }}</h3>
-    <span class="yb-socials__sub">{{ strings.socials.sub }}</span>
+    <h3 data-i18n="socials.heading">{{ strings.socials.heading }}</h3>
+    <span class="yb-socials__sub" data-i18n="socials.sub">{{ strings.socials.sub }}</span>
   </div>
   <div class="yb-socials__grid">
     <a href="https://instagram.com/yallabala" class="yb-socials__tile" target="_blank" rel="noopener noreferrer">

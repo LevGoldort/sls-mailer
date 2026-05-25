@@ -8,24 +8,24 @@
 {# ── Page hero ── #}
 <section class="yb-page-hero">
   <div class="yb-page-hero__breadcrumb">
-    <a href="/">{{ strings.shows.breadcrumb_home }}</a>
+    <a href="/" data-i18n="shows.breadcrumb_home">{{ strings.shows.breadcrumb_home }}</a>
     <span> ► </span>
-    <b style="opacity:1">{{ strings.shows.breadcrumb_self }}</b>
+    <b style="opacity:1" data-i18n="shows.breadcrumb_self">{{ strings.shows.breadcrumb_self }}</b>
   </div>
 
   <h1 class="yb-page-hero__h1">
     <span class="yb-riso">
-      <span class="yb-riso__shadow" aria-hidden="true">{{ strings.shows.hero_line1 | upper }}</span>
-      {{ strings.shows.hero_line1 | upper }}
+      <span class="yb-riso__shadow" aria-hidden="true" data-i18n="shows.hero_line1">{{ strings.shows.hero_line1 | upper }}</span>
+      <span data-i18n="shows.hero_line1">{{ strings.shows.hero_line1 | upper }}</span>
     </span>
     <span class="yb-riso" style="color:var(--yb-magenta)">
-      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">{{ strings.shows.hero_line2 | upper }}</span>
-      {{ strings.shows.hero_line2 | upper }}
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true" data-i18n="shows.hero_line2">{{ strings.shows.hero_line2 | upper }}</span>
+      <span data-i18n="shows.hero_line2">{{ strings.shows.hero_line2 | upper }}</span>
     </span>
   </h1>
 
   <div class="yb-page-hero__footer">
-    <p class="yb-page-hero__sub">{{ strings.shows.hero_sub }}</p>
+    <p class="yb-page-hero__sub" data-i18n="shows.hero_sub">{{ strings.shows.hero_sub }}</p>
   </div>
 </section>
 
@@ -47,13 +47,13 @@
         {% endif %}
         {% if show_episode_counts %}
         <div style="font-family:var(--yb-font-mono);font-size:11px;opacity:.6;margin-top:6px;letter-spacing:.06em">
-          {{ show_episode_counts.get(show.show_id, 0) }} ЭП.
+          {{ show_episode_counts.get(show.show_id, 0) }} <span data-i18n="shows.episode_abbr">ЭП.</span>
         </div>
         {% endif %}
       </div>
     </a>
     {% else %}
-    <p style="opacity:.5">Шоу появятся здесь.</p>
+    <p style="opacity:.5" data-i18n="shows.no_shows">Шоу появятся здесь.</p>
     {% endfor %}
   </div>
 </section>

@@ -1954,3 +1954,37 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-episode-hero__thumb { min-height: 240px; border-right: none; border-bottom: var(--yb-border); }
   .yb-episode-hero__info { padding: 24px; }
 }
+
+/* ── Language switcher ── */
+.yb-header__lang {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+.yb-header__lang-btn {
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  padding: 3px 7px;
+  border: 2px solid var(--yb-ink);
+  background: transparent;
+  color: var(--yb-ink);
+  cursor: pointer;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+.yb-header__lang-btn.is-active {
+  background: var(--yb-ink);
+  color: var(--yb-paper);
+}
+.yb-header__lang-btn:hover:not(.is-active) {
+  background: rgba(26,20,16,.08);
+}
+.yb-header__lang-sep {
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  opacity: 0.35;
+  user-select: none;
+}
