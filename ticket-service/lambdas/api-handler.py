@@ -20,6 +20,7 @@ from models.performer import Performer, SocialLinks
 from models.product import Product
 from models.show import Show, Episode, ShowLink
 from models.merchandise_order import MerchandiseOrder, BuyerInfo
+from models.influencer import Influencer
 from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
 from utils.auth import get_admin_authenticator, is_scanner_or_admin, verify_scanner_token
@@ -136,6 +137,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_shows(event, http_method, path)
         elif path.startswith('/api/episodes'):
             return handle_episodes(event, http_method, path)
+        elif path.startswith('/api/influencers'):
+            return handle_influencers(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
         elif path == '/api/admin/regenerate-site' and http_method == 'POST':
@@ -250,6 +253,7 @@ def list_events(request_event: Dict = None) -> Dict:
                 'performer_ids': item.get('performer_ids', []),
                 'external_url': item.get('external_url', ''),
                 'tags': item.get('tags', []),
+                'allow_auto_discounts': evt.allow_auto_discounts,
             })
         except Exception as e:
             print(f"Error parsing event: {e}")
@@ -604,6 +608,7 @@ def create_event(request_event: Dict) -> Dict:
             slug=slug_value,
             seat_allocation=seat_allocation,
             owner_id=ctx.get('user_id'),
+            allow_auto_discounts=bool(body.get('allow_auto_discounts', False)),
         )
 
         # Сохраняем в DynamoDB
@@ -825,6 +830,9 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
                 sold = sold_by_type.get(tt.id, 0)
                 tt.available = max(0, allocated - sold)
                 print(f"Recalculated '{tt.name}': allocated={allocated}, sold={sold}, available={tt.available}")
+
+        if 'allow_auto_discounts' in body:
+            evt.allow_auto_discounts = bool(body['allow_auto_discounts'])
 
         evt.updated_at = datetime.utcnow().isoformat()
 
@@ -1501,6 +1509,14 @@ def create_order(request_event: Dict) -> Dict:
             # NOTE: Coupon usage will be incremented ONLY after successful payment
             # (in webhook handler when payment_status == 'completed')
 
+        # Auto discount — only when no coupon applied
+        if not coupon_code and evt.allow_auto_discounts:
+            total_tickets = sum(t.quantity for t in order_tickets)
+            if total_tickets >= 5:
+                discount_amount = round(subtotal * 0.15, 2)
+            elif total_tickets >= 3:
+                discount_amount = round(subtotal * 0.10, 2)
+
         # Calculate total with discount
         total_amount = round(subtotal - discount_amount, 2)
 
@@ -2048,6 +2064,24 @@ def cancel_tickets(order_id: str, request_event: Dict) -> Dict:
 
         print(f"Cancelled {cancelled_count} tickets for order {order_id}: {qr_codes_to_cancel}. Reason: {reason}")
 
+        # Reverse influencer commission if all tickets in the order are now cancelled
+        all_cancelled = all(qr.cancelled for qr in order.qr_codes)
+        if all_cancelled and order.coupon_code:
+            try:
+                coupon_data = db.get_coupon(order.coupon_code)
+                if coupon_data:
+                    coupon = Coupon.from_dynamodb_item(coupon_data)
+                    if coupon.influencer_id:
+                        commission_record = db.get_influencer_commission(coupon.influencer_id, order.order_id)
+                        if commission_record:
+                            sales = float(commission_record.get('subtotal', 0))
+                            commission = float(commission_record.get('commission', 0))
+                            db.delete_influencer_commission(coupon.influencer_id, order.order_id)
+                            db.subtract_influencer_totals(coupon.influencer_id, sales, commission)
+                            print(f"Reversed commission {commission} for influencer {coupon.influencer_id} on order {order_id}")
+            except Exception as e:
+                print(f"Warning: Failed to reverse influencer commission for order {order_id}: {e}")
+
         # Send cancellation email
         try:
             lambda_client = boto3.client('lambda')
@@ -2512,6 +2546,11 @@ def handle_coupons(event: Dict, method: str, path: str) -> Dict:
     if method == 'GET' and path == '/api/coupons':
         query_params = event.get('queryStringParameters', {}) or {}
         status = query_params.get('status')
+        # ?check=CODE — quick availability check for influencer registration
+        check_code = query_params.get('check')
+        if check_code:
+            existing = db.get_coupon(check_code.strip().upper())
+            return success_response({'available': existing is None})
         return list_coupons(status, event)
 
     # GET /api/coupons/{code} - детали купона
@@ -2626,10 +2665,17 @@ def create_coupon(request_event: Dict) -> Dict:
         if existing:
             return error_response(400, "Coupon with this code already exists")
 
+        # Нормализуем discount_type: 'percent' → 'percentage', 'fixed' → 'fixed_amount'
+        _dtype = body['discount_type']
+        if _dtype == 'percent':
+            _dtype = 'percentage'
+        elif _dtype == 'fixed':
+            _dtype = 'fixed_amount'
+
         # Создаем купон
         coupon = Coupon(
             coupon_code=coupon_code,
-            discount_type=body['discount_type'],
+            discount_type=_dtype,
             discount_value=float(body['discount_value']),
             event_ids=body['event_ids'],
             valid_from=body.get('valid_from'),
@@ -2727,7 +2773,12 @@ def update_coupon(coupon_code: str, request_event: Dict) -> Dict:
 
         # Обновляем поля
         if 'discount_type' in body:
-            coupon.discount_type = body['discount_type']
+            _dtype = body['discount_type']
+            if _dtype == 'percent':
+                _dtype = 'percentage'
+            elif _dtype == 'fixed':
+                _dtype = 'fixed_amount'
+            coupon.discount_type = _dtype
         if 'discount_value' in body:
             coupon.discount_value = float(body['discount_value'])
         if 'event_ids' in body:
@@ -4080,6 +4131,32 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                         db.put_coupon(coupon.to_dynamodb_item())
                         print(f"Incremented coupon usage for {order.coupon_code}, now at {coupon.current_uses} uses")
 
+                        # Record influencer commission if this is an influencer coupon
+                        if coupon.influencer_id:
+                            try:
+                                subtotal = float(order.total_amount) + float(order.discount_amount or 0)
+                                commission = round(subtotal * coupon.commission_rate, 2)
+                                event_item = db.get_event(order.event_id)
+                                event_title = event_item.get('title', order.event_id) if event_item else order.event_id
+                                total_tickets = sum(t.quantity for t in order.tickets)
+                                commission_record = {
+                                    'PK': f'INFLUENCER#{coupon.influencer_id}',
+                                    'SK': f'COMMISSION#{order.order_id}',
+                                    'influencer_id': coupon.influencer_id,
+                                    'order_id': order.order_id,
+                                    'event_id': order.event_id,
+                                    'event_title': event_title,
+                                    'tickets': total_tickets,
+                                    'subtotal': Decimal(str(round(subtotal, 2))),
+                                    'commission': Decimal(str(commission)),
+                                    'created_at': datetime.now(timezone.utc).isoformat(),
+                                }
+                                db.add_influencer_commission(commission_record)
+                                db.update_influencer_totals(coupon.influencer_id, subtotal, commission)
+                                print(f"Recorded commission {commission} for influencer {coupon.influencer_id}")
+                            except Exception as e:
+                                print(f"Error recording influencer commission: {e}")
+
                 # Сохраняем обновленный заказ с QR кодами
                 db.put_order(order.to_dynamodb_item())
                 print(f"Order {order_id} finalized with QR codes and tickets decremented")
@@ -4177,6 +4254,139 @@ def handle_scanner_search(request_event: Dict) -> Dict:
         return success_response({'results': results})
     except Exception as e:
         return error_response(500, str(e))
+
+
+##############################################################################
+# Influencer / Loyalty Program
+##############################################################################
+
+def handle_influencers(event: Dict, method: str, path: str) -> Dict:
+    segments = [s for s in path.split('/') if s]
+    # /api/influencers
+    if len(segments) == 2:
+        if method == 'POST':
+            return register_influencer(event)
+        elif method == 'GET':
+            return list_influencers_admin(event)
+    # /api/influencers/{id}
+    elif len(segments) == 3:
+        influencer_id = segments[2]
+        if method == 'GET':
+            return get_influencer_dashboard(influencer_id)
+    return error_response(404, "Endpoint not found")
+
+
+def register_influencer(request_event: Dict) -> Dict:
+    """POST /api/influencers — public registration"""
+    try:
+        body = json.loads(request_event.get('body') or '{}')
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON")
+
+    required = ['name', 'email', 'phone', 'social_link', 'audience_size', 'coupon_code']
+    for field_name in required:
+        if not body.get(field_name, '').strip():
+            return error_response(400, f"Missing required field: {field_name}")
+
+    raw_code = body['coupon_code'].strip().upper()
+    if not re.match(r'^[A-Z0-9][A-Z0-9\-]{1,19}$', raw_code):
+        return error_response(400, "Промо-код: 2–20 символов, только буквы, цифры и дефис")
+
+    # Check code availability
+    if db.get_coupon(raw_code):
+        return error_response(409, "Этот промо-код уже занят")
+
+    import uuid as _uuid
+    influencer_id = str(_uuid.uuid4())
+
+    coupon = Coupon(
+        coupon_code=raw_code,
+        discount_type='percentage',
+        discount_value=10.0,
+        event_ids=['*'],
+        status='active',
+        description=f'Промо-код блогера {body["name"].strip()}',
+        influencer_id=influencer_id,
+        commission_rate=0.10,
+    )
+    db.put_coupon(coupon.to_dynamodb_item())
+
+    influencer = Influencer(
+        influencer_id=influencer_id,
+        name=body['name'].strip(),
+        email=body['email'].strip().lower(),
+        phone=body['phone'].strip(),
+        social_link=body['social_link'].strip(),
+        audience_size=body['audience_size'].strip(),
+        coupon_code=raw_code,
+    )
+    db.put_influencer(influencer.to_dynamodb_item())
+
+    # Send welcome email asynchronously
+    try:
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://yallabalagan.org')
+        dashboard_url = f"{frontend_url}/loyalty-dashboard.html?id={influencer_id}"
+        lambda_client = boto3.client('lambda')
+        lambda_client.invoke(
+            FunctionName=os.environ.get('EMAIL_SENDER_LAMBDA', 'yallabalagan-email-sender'),
+            InvocationType='Event',
+            Payload=json.dumps({
+                'email_type': 'influencer_welcome',
+                'influencer_id': influencer_id,
+                'name': influencer.name,
+                'email': influencer.email,
+                'coupon_code': raw_code,
+                'dashboard_url': dashboard_url,
+            })
+        )
+    except Exception as e:
+        print(f"Warning: failed to trigger welcome email: {e}")
+
+    return success_response({
+        'influencer_id': influencer_id,
+        'coupon_code': raw_code,
+    }, status_code=201)
+
+
+def get_influencer_dashboard(influencer_id: str) -> Dict:
+    """GET /api/influencers/{id} — public, UUID-gated"""
+    item = db.get_influencer(influencer_id)
+    if not item:
+        return error_response(404, "Influencer not found")
+    influencer = Influencer.from_dynamodb_item(item)
+    commissions_raw = db.get_influencer_commissions(influencer_id)
+    commissions = [
+        {
+            'order_id': c.get('order_id', ''),
+            'event_id': c.get('event_id', ''),
+            'event_title': c.get('event_title', ''),
+            'tickets': int(c.get('tickets', 0)),
+            'subtotal': float(c.get('subtotal', 0)),
+            'commission': float(c.get('commission', 0)),
+            'created_at': c.get('created_at', ''),
+        }
+        for c in commissions_raw
+    ]
+    return success_response({
+        'influencer': influencer.to_dict(),
+        'commissions': commissions,
+    })
+
+
+def list_influencers_admin(request_event: Dict) -> Dict:
+    """GET /api/influencers — admin only"""
+    auth = get_admin_authenticator()
+    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+        return error_response(401, "Unauthorized")
+    items = db.list_influencers()
+    influencers = []
+    for item in items:
+        try:
+            inf = Influencer.from_dynamodb_item(item)
+            influencers.append(inf.to_dict())
+        except Exception as e:
+            print(f"Error parsing influencer: {e}")
+    return success_response({'influencers': influencers})
 
 
 # For local testing

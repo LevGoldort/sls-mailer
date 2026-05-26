@@ -74,31 +74,87 @@
     <div class="page-header">
       <div><h1 class="page-title">Купоны</h1></div>
       <div class="page-actions">
-        <button class="btn btn-primary" onclick="openCreateModal()">+ Создать купон</button>
+        <button class="btn btn-primary" id="create-btn" onclick="openCreateModal()">+ Создать купон</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-body">
-        <div class="search-bar">
-          <div class="search-input-wrap">
-            <span class="search-input-icon">🔍</span>
-            <input class="search-input" id="search" placeholder="Поиск по коду...">
-          </div>
-          <select class="form-select" id="status-filter" style="width:180px;">
-            <option value="">Все статусы</option>
-            <option value="active">Активные</option>
-            <option value="inactive">Неактивные</option>
-          </select>
-        </div>
-
-        <div class="table-wrap">
-          <table class="table">
-            <thead><tr><th>Код</th><th>Скидка</th><th class="hide-mobile">Использовано</th><th class="hide-mobile">Срок</th><th>Статус</th><th>Действия</th></tr></thead>
-            <tbody id="coupons-tbody"><tr><td colspan="6"><div class="loading">Загрузка...</div></td></tr></tbody>
-          </table>
+      <div class="card-body" style="padding-bottom:0;">
+        <div class="tabs">
+          <button class="tab active" id="tab-regular" onclick="switchTab('regular')">
+            Купоны <span class="tab-count" id="count-regular">0</span>
+          </button>
+          <button class="tab" id="tab-influencer" onclick="switchTab('influencer')">
+            Инфлюенсеры <span class="tab-count" id="count-influencer">0</span>
+          </button>
         </div>
       </div>
+
+      <!-- Tab: regular coupons -->
+      <div id="regular-tab" class="tab-content active">
+        <div class="card-body">
+          <div class="search-bar">
+            <div class="search-input-wrap">
+              <span class="search-input-icon">🔍</span>
+              <input class="search-input" id="search" placeholder="Поиск по коду...">
+            </div>
+            <select class="form-select" id="status-filter" style="width:180px;">
+              <option value="">Все статусы</option>
+              <option value="active">Активные</option>
+              <option value="inactive">Неактивные</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr>
+                <th>Код</th>
+                <th>Скидка</th>
+                <th class="hide-mobile">Использовано</th>
+                <th class="hide-mobile">Срок</th>
+                <th>Статус</th>
+                <th>Действия</th>
+              </tr></thead>
+              <tbody id="coupons-tbody">
+                <tr><td colspan="6"><div class="loading">Загрузка...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: influencer coupons -->
+      <div id="influencer-tab" class="tab-content">
+        <div class="card-body">
+          <div class="search-bar">
+            <div class="search-input-wrap">
+              <span class="search-input-icon">🔍</span>
+              <input class="search-input" id="inf-search" placeholder="Поиск по коду или имени...">
+            </div>
+            <select class="form-select" id="inf-status-filter" style="width:180px;">
+              <option value="">Все статусы</option>
+              <option value="active">Активные</option>
+              <option value="inactive">Неактивные</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr>
+                <th>Код</th>
+                <th>Инфлюенсер</th>
+                <th class="hide-mobile">Использовано</th>
+                <th class="hide-mobile">Продажи</th>
+                <th class="hide-mobile">Комиссия</th>
+                <th>Статус</th>
+                <th></th>
+              </tr></thead>
+              <tbody id="influencer-coupons-tbody">
+                <tr><td colspan="7"><div class="loading">Загрузка...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
   </main>
 </div>
@@ -106,14 +162,23 @@
 <script src="auth.js"></script>
 <script src="shared.js"></script>
 <script>
-  let allCoupons = [], allEvents = [], editingCode = null;
+  let allCoupons = [], allEvents = [], allInfluencers = [], editingCode = null;
+  let influencerById = {};
 
   async function load() {
     if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
     try {
-      const [couponsData, eventsData] = await Promise.all([API.getCoupons(), API.getEvents()]);
-      allCoupons = couponsData.coupons || [];
-      allEvents  = eventsData.events   || [];
+      const [couponsData, eventsData, influencersData] = await Promise.all([
+        API.getCoupons(),
+        API.getEvents(),
+        API.getInfluencers(),
+      ]);
+      allCoupons     = couponsData.coupons     || [];
+      allEvents      = eventsData.events       || [];
+      allInfluencers = influencersData.influencers || [];
+
+      influencerById = {};
+      allInfluencers.forEach(inf => { influencerById[inf.influencer_id] = inf; });
 
       const sel = document.getElementById('event_id_filter');
       allEvents.forEach(e => {
@@ -122,14 +187,32 @@
         opt.textContent = e.title;
         sel.appendChild(opt);
       });
+
+      const regular    = allCoupons.filter(c => !c.influencer_id);
+      const influenced = allCoupons.filter(c =>  !!c.influencer_id);
+      document.getElementById('count-regular').textContent    = regular.length;
+      document.getElementById('count-influencer').textContent = influenced.length;
+
       render();
+      renderInfluencerCoupons();
     } catch (err) { handleError(err, 'Ошибка загрузки'); }
   }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    document.getElementById(tab + '-tab').classList.add('active');
+    document.getElementById('create-btn').style.display = tab === 'regular' ? '' : 'none';
+  }
+
+  // ── Regular coupons ──────────────────────────────────────────────────────
 
   function render() {
     const q      = document.getElementById('search').value.toLowerCase();
     const status = document.getElementById('status-filter').value;
-    const filtered = allCoupons.filter(c => {
+    const regular = allCoupons.filter(c => !c.influencer_id);
+    const filtered = regular.filter(c => {
       const matchQ = !q || c.coupon_code.toLowerCase().includes(q);
       const matchS = !status || c.status === status;
       return matchQ && matchS;
@@ -141,7 +224,7 @@
       return;
     }
     tbody.innerHTML = filtered.map(c => {
-      const discountLabel = c.discount_type === 'percent'
+      const discountLabel = (c.discount_type === 'percent' || c.discount_type === 'percentage')
         ? `${c.discount_value}%`
         : formatCurrency(c.discount_value);
       const usageLabel = c.max_uses ? `${c.used_count || 0}/${c.max_uses}` : (c.used_count || 0) + '/∞';
@@ -161,6 +244,52 @@
     }).join('');
   }
 
+  // ── Influencer coupons ───────────────────────────────────────────────────
+
+  function renderInfluencerCoupons() {
+    const q      = document.getElementById('inf-search').value.toLowerCase();
+    const status = document.getElementById('inf-status-filter').value;
+    const influenced = allCoupons.filter(c => !!c.influencer_id);
+    const filtered = influenced.filter(c => {
+      const inf = influencerById[c.influencer_id] || {};
+      const matchQ = !q
+        || c.coupon_code.toLowerCase().includes(q)
+        || (inf.name || '').toLowerCase().includes(q);
+      const matchS = !status || c.status === status;
+      return matchQ && matchS;
+    });
+
+    const tbody = document.getElementById('influencer-coupons-tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><span class="empty-text">Нет купонов инфлюенсеров</span></div></td></tr>';
+      return;
+    }
+
+    const FRONTEND_URL = 'https://yallabalagan.org';
+    tbody.innerHTML = filtered.map(c => {
+      const inf = influencerById[c.influencer_id] || {};
+      const name = inf.name ? escapeHtml(inf.name) : `<span style="opacity:.4;">${c.influencer_id.slice(0,8)}…</span>`;
+      const usageLabel = (c.used_count || 0) + '/∞';
+      const sales      = inf.total_sales      != null ? Number(inf.total_sales).toFixed(0)      + '₪' : '—';
+      const commission = inf.total_commission != null ? Number(inf.total_commission).toFixed(2) + '₪' : '—';
+      const statusClass = c.status === 'active' ? 'badge-active' : 'badge-inactive';
+      const dashUrl = inf.influencer_id
+        ? `${FRONTEND_URL}/loyalty-dashboard.html?id=${encodeURIComponent(inf.influencer_id)}`
+        : '#';
+      return `<tr>
+        <td style="font-weight:600;font-family:var(--mono);">${escapeHtml(c.coupon_code)}</td>
+        <td>${name}</td>
+        <td class="hide-mobile">${usageLabel}</td>
+        <td class="hide-mobile" style="font-family:var(--mono);">${sales}</td>
+        <td class="hide-mobile" style="font-family:var(--mono);font-weight:700;color:var(--accent);">${commission}</td>
+        <td><span class="badge ${statusClass}">${c.status}</span></td>
+        <td><a href="${escapeHtml(dashUrl)}" target="_blank" class="btn btn-ghost btn-sm">→</a></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Modal ────────────────────────────────────────────────────────────────
+
   function openCreateModal() {
     editingCode = null;
     document.getElementById('modal-title').textContent = 'Новый купон';
@@ -176,7 +305,8 @@
     document.getElementById('modal-title').textContent = 'Редактировать купон';
     document.getElementById('code').value          = c.coupon_code;
     document.getElementById('code').disabled       = true;
-    document.getElementById('discount_type').value  = c.discount_type || 'percent';
+    const _dt = c.discount_type === 'percentage' ? 'percent' : (c.discount_type === 'fixed_amount' ? 'fixed' : (c.discount_type || 'percent'));
+    document.getElementById('discount_type').value  = _dt;
     document.getElementById('discount_value').value = c.discount_value || '';
     document.getElementById('max_uses').value       = c.max_uses || '';
     document.getElementById('expires_at').value     = c.expires_at ? c.expires_at.slice(0,10) : '';
@@ -222,6 +352,8 @@
 
   document.getElementById('search').addEventListener('input', render);
   document.getElementById('status-filter').addEventListener('change', render);
+  document.getElementById('inf-search').addEventListener('input', renderInfluencerCoupons);
+  document.getElementById('inf-status-filter').addEventListener('change', renderInfluencerCoupons);
   document.getElementById('coupon-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 
   load();

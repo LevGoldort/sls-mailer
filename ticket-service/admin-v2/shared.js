@@ -92,6 +92,9 @@ const API = {
     updateCoupon:  (code, data)    => apiCall(`/api/coupons/${code}`, 'PUT', data),
     deleteCoupon:  (code)          => apiCall(`/api/coupons/${code}`, 'DELETE'),
 
+    // Influencers
+    getInfluencers: () => apiCall('/api/influencers'),
+
     // Users (admin only)
     getUsers:           ()              => apiCall('/api/users'),
     getUser:            (id)            => apiCall(`/api/users/${id}`),
@@ -380,6 +383,7 @@ const NAV_ITEMS = [
     { sep: true },
     { href: 'locations.html',    icon: '📍', label: 'Локации',        permission: 'locations:write' },
     { href: 'coupons.html',      icon: '🏷', label: 'Купоны',         adminOnly: true },
+    { href: 'influencers.html', icon: '★', label: 'Инфлюенсеры',    adminOnly: true },
     { href: 'performers.html',   icon: '🎤', label: 'Артисты',        permission: 'performers:write' },
     { href: 'products.html',     icon: '🛍', label: 'Товары',         permission: 'products:write' },
     { href: 'merch-orders.html', icon: '📦', label: 'Мерч-заказы',    adminOnly: true },

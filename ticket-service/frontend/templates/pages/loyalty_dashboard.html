@@ -1,0 +1,257 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}Мой дашборд — {{ strings.site.name }}{% endblock %}
+{% block description %}Статистика продаж и комиссии по твоему промо-коду.{% endblock %}
+
+{% block content %}
+
+<section class="yb-page-hero" id="dash-hero" style="display:none">
+  <div class="yb-page-hero__breadcrumb">
+    <a href="/">{{ strings.site.name }}</a>
+    <span> ► </span>
+    <a href="/loyalty.html">Лояльность</a>
+    <span> ► </span>
+    <b style="opacity:1" id="dash-breadcrumb-name">Дашборд</b>
+  </div>
+  <h1 class="yb-page-hero__h1">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">★ ДАШБОРД</span>
+      ★ ДАШБОРД
+    </span>
+  </h1>
+</section>
+
+<div id="dash-loading" class="yb-pad-x" style="padding-top:4rem;padding-bottom:4rem;text-align:center;font-family:var(--yb-font-mono);font-size:13px;opacity:.5;">
+  Загрузка…
+</div>
+<div id="dash-error" style="display:none;" class="yb-pad-x" style="padding-top:3rem;padding-bottom:3rem;">
+  <div style="max-width:480px;margin:3rem auto;border:3px solid #e53935;padding:24px;font-family:var(--yb-font-mono);font-size:13px;background:#fdecea;color:#c62828;">
+    <strong>Дашборд не найден.</strong><br>
+    Проверь ссылку или <a href="/loyalty.html" style="color:#c62828;">зарегистрируйся</a>.
+  </div>
+</div>
+
+<section id="dash-content" style="display:none" class="yb-pad-x" style="padding-bottom:4rem;">
+
+  {# Promo code card #}
+  <div class="yb-dash-header">
+    <div>
+      <div class="yb-dash-header__label">Промо-код</div>
+      <div class="yb-dash-header__code" id="dash-code"></div>
+    </div>
+    <button class="yb-btn yb-btn--paper" onclick="copyCode()" id="copy-code-btn">Скопировать код</button>
+  </div>
+
+  {# Stats row #}
+  <div class="yb-dash-stats">
+    <div class="yb-dash-stat">
+      <div class="yb-dash-stat__label">Продажи всего</div>
+      <div class="yb-dash-stat__value"><span id="stat-sales">0</span>₪</div>
+    </div>
+    <div class="yb-dash-stat">
+      <div class="yb-dash-stat__label">Твоя доля</div>
+      <div class="yb-dash-stat__value yb-dash-stat__value--highlight"><span id="stat-commission">0</span>₪</div>
+    </div>
+    <div class="yb-dash-stat">
+      <div class="yb-dash-stat__label">Заказов</div>
+      <div class="yb-dash-stat__value"><span id="stat-orders">0</span></div>
+    </div>
+  </div>
+
+  {# Orders table #}
+  <div class="yb-dash-section">
+    <div class="yb-dash-section__title">История продаж</div>
+
+    <div id="dash-empty" style="display:none;font-family:var(--yb-font-mono);font-size:13px;opacity:.55;padding:24px 0;">
+      Пока нет продаж — поделись своим промо-кодом!
+    </div>
+
+    <div class="yb-dash-table-wrap" id="dash-table-wrap" style="display:none">
+      <table class="yb-dash-table">
+        <thead>
+          <tr>
+            <th>Событие</th>
+            <th>Дата</th>
+            <th>Билетов</th>
+            <th>Сумма</th>
+            <th>Твоя доля</th>
+          </tr>
+        </thead>
+        <tbody id="dash-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</section>
+
+<style>
+.yb-dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: var(--yb-border);
+  background: var(--yb-yellow);
+  box-shadow: var(--yb-shadow);
+  padding: 20px 24px;
+  margin: 2rem 0 1.5rem;
+  flex-wrap: wrap;
+}
+.yb-dash-header__label {
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  opacity: .6;
+  margin-bottom: 4px;
+}
+.yb-dash-header__code {
+  font-family: var(--yb-font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+.yb-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 2rem;
+}
+@media (max-width: 600px) {
+  .yb-dash-stats { grid-template-columns: 1fr; }
+}
+.yb-dash-stat {
+  border: var(--yb-border);
+  background: var(--yb-paper);
+  padding: 16px 20px;
+}
+.yb-dash-stat__label {
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  opacity: .5;
+  margin-bottom: 6px;
+}
+.yb-dash-stat__value {
+  font-family: var(--yb-font-display);
+  font-size: 32px;
+  line-height: 1;
+}
+.yb-dash-stat__value--highlight {
+  color: var(--yb-magenta);
+}
+.yb-dash-section__title {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  opacity: .5;
+  margin-bottom: 12px;
+}
+.yb-dash-table-wrap {
+  overflow-x: auto;
+}
+.yb-dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.yb-dash-table th {
+  text-align: left;
+  font-family: var(--yb-font-mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  opacity: .5;
+  padding: 8px 12px;
+  border-bottom: var(--yb-border);
+}
+.yb-dash-table td {
+  padding: 10px 12px;
+  border-bottom: 1px dashed rgba(26,20,16,.12);
+  vertical-align: middle;
+}
+.yb-dash-table tr:last-child td { border-bottom: none; }
+.yb-dash-table td:nth-child(5) { font-weight: 700; font-family: var(--yb-font-mono); }
+</style>
+
+<script>
+const API_URL = '{{ api_url }}';
+
+function formatDate(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch { return isoStr.slice(0, 10); }
+}
+
+async function loadDashboard() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  if (!id) {
+    document.getElementById('dash-loading').style.display = 'none';
+    document.getElementById('dash-error').style.display = '';
+    return;
+  }
+
+  try {
+    const resp = await fetch(API_URL + '/api/influencers/' + encodeURIComponent(id));
+    if (!resp.ok) throw new Error('not found');
+    const data = await resp.json();
+    const inf = data.influencer;
+    const commissions = data.commissions || [];
+
+    // Update hero
+    document.getElementById('dash-hero').style.display = '';
+    document.getElementById('dash-breadcrumb-name').textContent = inf.name;
+    document.title = '★ ' + inf.name + ' — YallaBalagan';
+
+    // Promo code
+    document.getElementById('dash-code').textContent = inf.coupon_code;
+
+    // Stats
+    document.getElementById('stat-sales').textContent = Number(inf.total_sales || 0).toFixed(0);
+    document.getElementById('stat-commission').textContent = Number(inf.total_commission || 0).toFixed(0);
+    document.getElementById('stat-orders').textContent = inf.orders_count || 0;
+
+    // Table
+    if (commissions.length === 0) {
+      document.getElementById('dash-empty').style.display = '';
+    } else {
+      document.getElementById('dash-table-wrap').style.display = '';
+      const tbody = document.getElementById('dash-table-body');
+      tbody.innerHTML = commissions.map(c => `
+        <tr>
+          <td>${c.event_title || '—'}</td>
+          <td style="font-family:var(--yb-font-mono);font-size:12px;">${formatDate(c.created_at)}</td>
+          <td style="text-align:center;">${c.tickets || 0}</td>
+          <td style="font-family:var(--yb-font-mono);">${Number(c.subtotal || 0).toFixed(0)}₪</td>
+          <td style="color:var(--yb-magenta);">+${Number(c.commission || 0).toFixed(2)}₪</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('dash-loading').style.display = 'none';
+    document.getElementById('dash-content').style.display = '';
+
+  } catch (e) {
+    document.getElementById('dash-loading').style.display = 'none';
+    document.getElementById('dash-error').style.display = '';
+  }
+}
+
+function copyCode() {
+  const code = document.getElementById('dash-code').textContent;
+  const btn = document.getElementById('copy-code-btn');
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = '✓ Скопировано';
+    setTimeout(() => { btn.textContent = 'Скопировать код'; }, 2000);
+  });
+}
+
+loadDashboard();
+</script>
+
+{% endblock %}

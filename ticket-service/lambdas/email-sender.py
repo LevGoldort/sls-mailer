@@ -250,6 +250,72 @@ def format_event_date(event_date: str) -> str:
         return event_date
 
 
+def send_influencer_welcome_email(payload: Dict) -> Dict:
+    """Send welcome email to newly registered influencer"""
+    name = payload.get('name', '')
+    email = payload.get('email', '')
+    coupon_code = payload.get('coupon_code', '')
+    dashboard_url = payload.get('dashboard_url', '')
+    from_email = os.environ.get('FROM_EMAIL', 'noreply@yallabalagan.org')
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://yallabalagan.org')
+
+    if not email:
+        print("influencer_welcome: no email provided")
+        return {'statusCode': 400, 'body': json.dumps({'error': 'email required'})}
+
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:3px solid #1a1410;box-shadow:8px 8px 0 #1a1410;">
+  <div style="background:#ffd400;border-bottom:3px solid #1a1410;padding:24px 28px;">
+    <div style="font-family:monospace;font-size:11px;letter-spacing:.12em;opacity:.6;">YALLA BALAGAN · ПРОГРАММА ЛОЯЛЬНОСТИ</div>
+    <h1 style="margin:8px 0 0;font-size:28px;line-height:1.1;">★ Добро пожаловать,<br>{name}!</h1>
+  </div>
+  <div style="padding:28px;">
+    <p style="font-size:15px;line-height:1.6;margin-top:0;">Ты успешно зарегистрирован в программе лояльности YallaBalagan.</p>
+
+    <div style="background:#f8f8f8;border:2px solid #1a1410;padding:16px 20px;margin:20px 0;">
+      <div style="font-family:monospace;font-size:11px;letter-spacing:.1em;opacity:.5;margin-bottom:6px;">ТВОЙ ПРОМО-КОД</div>
+      <div style="font-family:monospace;font-size:26px;font-weight:700;letter-spacing:.08em;">{coupon_code}</div>
+      <p style="font-size:13px;margin:8px 0 0;opacity:.7;">Покупатели введут этот код и получат скидку 10% на билеты.</p>
+    </div>
+
+    <p style="font-size:14px;line-height:1.6;">С каждого заказа по твоему коду тебе начисляется <strong>10% комиссии</strong> (от цены до скидки).</p>
+
+    <div style="margin:24px 0;">
+      <a href="{dashboard_url}" style="display:inline-block;background:#1a1410;color:#ffd400;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.06em;border:2px solid #1a1410;box-shadow:4px 4px 0 #ffd400;">★ МОЙ ДАШБОРД →</a>
+    </div>
+
+    <p style="font-size:13px;color:#666;line-height:1.5;">Сохрани эту ссылку — она даёт доступ к твоей статистике:<br>
+    <a href="{dashboard_url}" style="color:#1a1410;word-break:break-all;">{dashboard_url}</a></p>
+
+    <hr style="border:0;border-top:1px dashed #ccc;margin:24px 0;">
+    <p style="font-size:12px;color:#999;">Вопросы? Пиши нам — <a href="mailto:hello@yallabalagan.org" style="color:#1a1410;">hello@yallabalagan.org</a></p>
+  </div>
+</div>
+</body></html>"""
+
+    text_body = f"Добро пожаловать в программу лояльности YallaBalagan!\n\nТвой промо-код: {coupon_code}\nДашборд: {dashboard_url}\n\nС каждой продажи по твоему коду тебе начисляется 10% комиссии."
+
+    try:
+        ses_client.send_email(
+            Source=f'YallaBalagan <{from_email}>',
+            Destination={'ToAddresses': [email]},
+            Message={
+                'Subject': {'Data': f'★ Твой промо-код {coupon_code} — YallaBalagan', 'Charset': 'UTF-8'},
+                'Body': {
+                    'Html': {'Data': html_body, 'Charset': 'UTF-8'},
+                    'Text': {'Data': text_body, 'Charset': 'UTF-8'},
+                },
+            }
+        )
+        print(f"Influencer welcome email sent to {email}")
+        return {'statusCode': 200, 'body': json.dumps({'message': 'Email sent'})}
+    except Exception as e:
+        print(f"Error sending influencer welcome email: {e}")
+        return {'statusCode': 500, 'body': json.dumps({'error': str(e)})}
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler для отправки email с билетами
@@ -278,6 +344,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         force_resend = payload.get('force_resend', False)
         custom_message = payload.get('custom_message')
         cancelled_codes = payload.get('cancelled_codes', [])
+
+        # Influencer welcome email — separate flow
+        if email_type == 'influencer_welcome':
+            return send_influencer_welcome_email(payload)
 
         if not order_id:
             print("Error: order_id not provided")

@@ -496,6 +496,20 @@ def generate_html_files(site_data, output_dir, templates_dir):
     (output_dir / 'accessibility.html').write_text(html, encoding='utf-8')
     pages_generated += 1
 
+    # Generate loyalty.html
+    print("Generating loyalty.html...")
+    template = env.get_template('pages/loyalty.html')
+    html = template.render(active_nav='')
+    (output_dir / 'loyalty.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
+
+    # Generate loyalty-dashboard.html
+    print("Generating loyalty-dashboard.html...")
+    template = env.get_template('pages/loyalty_dashboard.html')
+    html = template.render(active_nav='')
+    (output_dir / 'loyalty-dashboard.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
+
     # Generate 404.html
     print("Generating 404.html...")
     template = env.get_template('pages/404.html')

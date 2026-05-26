@@ -33,6 +33,8 @@ class DynamoDBClient:
         self.merchandise_orders_table = self.dynamodb.Table(self.merchandise_orders_table_name)
         self.shows_table = self.dynamodb.Table(self.shows_table_name)
         self.episodes_table = self.dynamodb.Table(self.episodes_table_name)
+        self.influencers_table_name = os.environ.get('INFLUENCERS_TABLE', 'yallabalagan-influencers')
+        self.influencers_table = self.dynamodb.Table(self.influencers_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -756,3 +758,82 @@ class DynamoDBClient:
         return self.episodes_table.delete_item(
             Key={'PK': f'EPISODE#{episode_id}', 'SK': 'METADATA'}
         )
+
+    # ===== Influencers =====
+
+    def put_influencer(self, item: Dict):
+        return self.influencers_table.put_item(Item=item)
+
+    def get_influencer(self, influencer_id: str) -> Optional[Dict]:
+        response = self.influencers_table.get_item(
+            Key={'PK': f'INFLUENCER#{influencer_id}', 'SK': 'METADATA'}
+        )
+        return response.get('Item')
+
+    def get_influencer_commissions(self, influencer_id: str) -> List[Dict]:
+        from boto3.dynamodb.conditions import Key as DKey
+        response = self.influencers_table.query(
+            KeyConditionExpression=DKey('PK').eq(f'INFLUENCER#{influencer_id}') & DKey('SK').begins_with('COMMISSION#'),
+            ScanIndexForward=False
+        )
+        return response.get('Items', [])
+
+    def list_influencers(self) -> List[Dict]:
+        from boto3.dynamodb.conditions import Attr
+        response = self.influencers_table.scan(
+            FilterExpression=Attr('SK').eq('METADATA')
+        )
+        return response.get('Items', [])
+
+    def add_influencer_commission(self, commission_item: Dict):
+        return self.influencers_table.put_item(Item=commission_item)
+
+    def update_influencer_totals(self, influencer_id: str, sales_delta: float, commission_delta: float):
+        from decimal import Decimal
+        self.influencers_table.update_item(
+            Key={'PK': f'INFLUENCER#{influencer_id}', 'SK': 'METADATA'},
+            UpdateExpression='ADD total_sales :s, total_commission :c, orders_count :one',
+            ExpressionAttributeValues={
+                ':s': Decimal(str(round(sales_delta, 2))),
+                ':c': Decimal(str(round(commission_delta, 2))),
+                ':one': 1,
+            }
+        )
+
+    def get_influencer_commission(self, influencer_id: str, order_id: str) -> Optional[Dict]:
+        response = self.influencers_table.get_item(
+            Key={'PK': f'INFLUENCER#{influencer_id}', 'SK': f'COMMISSION#{order_id}'}
+        )
+        return response.get('Item')
+
+    def delete_influencer_commission(self, influencer_id: str, order_id: str):
+        self.influencers_table.delete_item(
+            Key={'PK': f'INFLUENCER#{influencer_id}', 'SK': f'COMMISSION#{order_id}'}
+        )
+
+    def subtract_influencer_totals(self, influencer_id: str, sales_delta: float, commission_delta: float):
+        from decimal import Decimal
+        self.influencers_table.update_item(
+            Key={'PK': f'INFLUENCER#{influencer_id}', 'SK': 'METADATA'},
+            UpdateExpression='ADD total_sales :s, total_commission :c, orders_count :neg_one',
+            ExpressionAttributeValues={
+                ':s': Decimal(str(round(-abs(sales_delta), 2))),
+                ':c': Decimal(str(round(-abs(commission_delta), 2))),
+                ':neg_one': -1,
+            }
+        )
+
+    def list_orders_by_coupon(self, coupon_code: str) -> List[Dict]:
+        from boto3.dynamodb.conditions import Attr
+        items = []
+        scan_params = {
+            'FilterExpression': Attr('coupon_code').eq(coupon_code) & Attr('SK').eq('METADATA')
+        }
+        while True:
+            response = self.orders_table.scan(**scan_params)
+            items.extend(response.get('Items', []))
+            last_key = response.get('LastEvaluatedKey')
+            if not last_key:
+                break
+            scan_params['ExclusiveStartKey'] = last_key
+        return items

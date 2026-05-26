@@ -1,0 +1,538 @@
+{% extends 'shared/_base.html' %}
+
+{% block title %}Программа лояльности — {{ strings.site.name }}{% endblock %}
+{% block description %}Стань партнёром YallaBalagan: получи личный промо-код и зарабатывай с каждой продажи билетов.{% endblock %}
+
+{% block content %}
+
+<section class="yb-page-hero">
+  <div class="yb-page-hero__breadcrumb">
+    <a href="/">{{ strings.site.name }}</a>
+    <span> ► </span>
+    <b style="opacity:1">Лояльность</b>
+  </div>
+  <h1 class="yb-page-hero__h1">
+    <span class="yb-riso">
+      <span class="yb-riso__shadow" aria-hidden="true">ПРОГРАММА</span>
+      ПРОГРАММА
+    </span>
+    <span class="yb-riso" style="color:var(--yb-magenta)">
+      <span class="yb-riso__shadow" style="color:var(--yb-cyan)" aria-hidden="true">ЛОЯЛЬНОСТИ</span>
+      ЛОЯЛЬНОСТИ
+    </span>
+  </h1>
+</section>
+
+{# ── Multi-step form ── #}
+<section class="yb-pad-x" style="max-width:640px;margin:0 auto;padding-bottom:5rem;">
+
+  {# Step indicator #}
+  <div class="yb-loyalty-steps" id="step-indicator">
+    <div class="yb-loyalty-step active" id="dot-1">1</div>
+    <div class="yb-loyalty-step__line"></div>
+    <div class="yb-loyalty-step" id="dot-2">2</div>
+    <div class="yb-loyalty-step__line"></div>
+    <div class="yb-loyalty-step" id="dot-3">3</div>
+  </div>
+
+  {# Step 1: About you #}
+  <div class="yb-loyalty-form-step" id="step-1">
+    <div class="yb-loyalty-intro">
+      Это программа лояльности для блогеров, администраторов чатов и людей, которые хотят сотрудничать с нами. Заполните свои данные, пожалуйста:
+    </div>
+    <div class="yb-loyalty-field">
+      <label class="yb-loyalty-label" for="reg-name">Имя или псевдоним *</label>
+      <input class="yb-loyalty-input" type="text" id="reg-name" placeholder="Введи имя или ник">
+    </div>
+    <div class="yb-loyalty-field">
+      <label class="yb-loyalty-label" for="reg-email">Email *</label>
+      <input class="yb-loyalty-input" type="email" id="reg-email" placeholder="your@email.com">
+    </div>
+    <div class="yb-loyalty-field">
+      <label class="yb-loyalty-label" for="reg-phone">Телефон *</label>
+      <input class="yb-loyalty-input" type="tel" id="reg-phone" placeholder="+972 50 000 0000">
+    </div>
+    <div class="yb-loyalty-field">
+      <label class="yb-loyalty-label" for="reg-social">Ссылка на соцсеть *</label>
+      <input class="yb-loyalty-input" type="url" id="reg-social" placeholder="https://instagram.com/yourhandle">
+    </div>
+    <div class="yb-loyalty-field">
+      <label class="yb-loyalty-label" for="reg-audience">Примерный охват (подписчиков) *</label>
+      <select class="yb-loyalty-input" id="reg-audience">
+        <option value="">— выбери —</option>
+        <option value="<1k">Менее 1 000</option>
+        <option value="1k–5k">1 000 – 5 000</option>
+        <option value="5k–20k">5 000 – 20 000</option>
+        <option value="20k+">Более 20 000</option>
+      </select>
+    </div>
+    <div id="step1-error" class="yb-loyalty-error" style="display:none"></div>
+    <button class="yb-btn yb-btn--primary yb-btn--lg" onclick="goStep2()">Далее →</button>
+  </div>
+
+  {# Step 2: Promo code #}
+  <div class="yb-loyalty-form-step" id="step-2" style="display:none">
+    <div class="yb-loyalty-pitch__grid" style="margin-bottom:1.8rem;">
+      <div class="yb-loyalty-pitch__card">
+        <div class="yb-loyalty-pitch__icon">★</div>
+        <div class="yb-loyalty-pitch__label">Твой промо-код</div>
+        <p>Делишься кодом — покупатели получают <strong>скидку 10%</strong> на любые билеты.</p>
+      </div>
+      <div class="yb-loyalty-pitch__card">
+        <div class="yb-loyalty-pitch__icon">₪</div>
+        <div class="yb-loyalty-pitch__label">Твоя комиссия</div>
+        <p>С каждой продажи по твоему коду тебе начисляется <strong>10%</strong> от стоимости билетов.</p>
+      </div>
+      <div class="yb-loyalty-pitch__card">
+        <div class="yb-loyalty-pitch__icon">◎</div>
+        <div class="yb-loyalty-pitch__label">Твой дашборд</div>
+        <p>Видишь все продажи и накопленную сумму в личном дашборде по уникальной ссылке.</p>
+      </div>
+    </div>
+    <h2 class="yb-loyalty-form__title">Твой промо-код</h2>
+    <p style="font-size:13px;line-height:1.6;margin-bottom:1.5rem;font-family:var(--yb-font-mono);opacity:.7;">
+      Придумай короткий код, который твои подписчики введут при покупке билетов. Только латинские буквы, цифры и дефис.
+    </p>
+    <div class="yb-loyalty-field">
+      <label class="yb-loyalty-label" for="reg-code">Промо-код *</label>
+      <div style="display:flex;gap:10px;align-items:stretch;">
+        <input class="yb-loyalty-input" type="text" id="reg-code"
+               placeholder="MYCODE" maxlength="20"
+               style="flex:1;text-transform:uppercase;"
+               oninput="onCodeInput()">
+        <button class="yb-btn yb-btn--paper" onclick="suggestCode()" id="suggest-btn" style="white-space:nowrap;font-size:13px;">Сгенерировать</button>
+      </div>
+      <div id="code-status" style="font-family:var(--yb-font-mono);font-size:12px;margin-top:6px;min-height:18px;"></div>
+    </div>
+    <div id="code-preview" class="yb-loyalty-code-preview" style="display:none">
+      <span class="yb-loyalty-code-preview__label">Покупатели введут:</span>
+      <span class="yb-loyalty-code-preview__code" id="code-preview-val"></span>
+      <span class="yb-loyalty-code-preview__note">и получат скидку 10%</span>
+    </div>
+    <div id="step2-error" class="yb-loyalty-error" style="display:none"></div>
+    <div style="display:flex;gap:12px;margin-top:1.5rem;">
+      <button class="yb-btn yb-btn--ghost" onclick="showStep(1)">← Назад</button>
+      <button class="yb-btn yb-btn--primary yb-btn--lg" onclick="goStep3()">Далее →</button>
+    </div>
+  </div>
+
+  {# Step 3: Terms #}
+  <div class="yb-loyalty-form-step" id="step-3" style="display:none">
+    <h2 class="yb-loyalty-form__title">Условия программы</h2>
+    <div class="yb-loyalty-terms">
+      <p><strong>Скидка для покупателей:</strong> 10% на любые билеты при использовании твоего кода.</p>
+      <p><strong>Твоя комиссия:</strong> 10% от стоимости билетов до скидки с каждого успешного заказа.</p>
+      <p><strong>Выплата:</strong> Накопленная сумма выплачивается по договорённости. Минимальная сумма для выплаты — 100₪.</p>
+      <p><strong>Ограничения:</strong> YallaBalagan оставляет за собой право деактивировать промо-код при нарушении условий или злоупотреблении программой.</p>
+      <p><strong>Совместимость:</strong> Промо-код не суммируется с другими скидками.</p>
+    </div>
+    <label class="yb-loyalty-checkbox-label" style="display:flex;align-items:flex-start;gap:10px;margin-top:1.5rem;cursor:pointer;">
+      <input type="checkbox" id="reg-terms" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">
+      <span style="font-size:14px;line-height:1.5;">Я принимаю условия программы лояльности</span>
+    </label>
+    <div id="step3-error" class="yb-loyalty-error" style="display:none"></div>
+    <div style="display:flex;gap:12px;margin-top:1.5rem;">
+      <button class="yb-btn yb-btn--ghost" onclick="showStep(2)">← Назад</button>
+      <button class="yb-btn yb-btn--primary yb-btn--lg" id="submit-btn" onclick="submitRegistration()">Зарегистрироваться ★</button>
+    </div>
+  </div>
+
+  {# Success screen #}
+  <div class="yb-loyalty-form-step" id="step-success" style="display:none">
+    <div class="yb-loyalty-success">
+      <div class="yb-loyalty-success__icon">★</div>
+      <h2 class="yb-loyalty-success__title">Добро пожаловать!</h2>
+      <p class="yb-loyalty-success__sub">Твой промо-код активен и готов к использованию.</p>
+
+      <div class="yb-loyalty-success__code-block">
+        <div class="yb-loyalty-success__code-label">Твой промо-код:</div>
+        <div class="yb-loyalty-success__code" id="success-code"></div>
+        <button class="yb-btn yb-btn--paper" onclick="copyText(document.getElementById('success-code').textContent, this)">Скопировать код</button>
+      </div>
+
+      <div class="yb-loyalty-success__link-block">
+        <div class="yb-loyalty-success__code-label">Ссылка на твой дашборд:</div>
+        <div class="yb-loyalty-success__link" id="success-link"></div>
+        <button class="yb-btn yb-btn--paper" onclick="copyText(document.getElementById('success-link').textContent, this)">Скопировать ссылку</button>
+        <a id="success-link-btn" href="#" class="yb-btn yb-btn--primary" style="margin-top:10px;display:inline-block;">Открыть дашборд →</a>
+      </div>
+
+      <p style="font-size:13px;font-family:var(--yb-font-mono);opacity:.6;margin-top:1.5rem;">
+        Ссылку мы также отправили на твой email.
+      </p>
+    </div>
+  </div>
+
+</section>
+
+<style>
+.yb-loyalty-pitch {
+  padding-top: 2.5rem;
+  padding-bottom: 2rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+.yb-loyalty-pitch__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+@media (max-width: 640px) {
+  .yb-loyalty-pitch__grid { grid-template-columns: 1fr; }
+}
+.yb-loyalty-pitch__card {
+  border: var(--yb-border);
+  padding: 20px;
+  background: var(--yb-paper);
+}
+.yb-loyalty-pitch__icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+.yb-loyalty-pitch__label {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  opacity: .6;
+  margin-bottom: 8px;
+}
+.yb-loyalty-pitch__card p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Intro box */
+.yb-loyalty-intro {
+  border: var(--yb-border);
+  background: var(--yb-yellow);
+  padding: 18px 20px;
+  font-size: 15px;
+  line-height: 1.65;
+  margin-bottom: 1.8rem;
+  box-shadow: var(--yb-shadow-sm);
+}
+
+/* Steps indicator */
+.yb-loyalty-steps {
+  display: flex;
+  align-items: center;
+  margin: 2rem 0 2.5rem;
+}
+.yb-loyalty-step {
+  width: 36px;
+  height: 36px;
+  border: var(--yb-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--yb-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--yb-paper);
+  flex-shrink: 0;
+  transition: background .2s;
+}
+.yb-loyalty-step.active {
+  background: var(--yb-yellow);
+  box-shadow: var(--yb-shadow-sm);
+}
+.yb-loyalty-step.done {
+  background: var(--yb-ink);
+  color: var(--yb-yellow);
+}
+.yb-loyalty-step__line {
+  flex: 1;
+  height: 3px;
+  background: var(--yb-ink);
+  opacity: .15;
+}
+
+/* Form fields */
+.yb-loyalty-form__title {
+  font-family: var(--yb-font-display);
+  font-size: 22px;
+  margin: 0 0 1.5rem;
+}
+.yb-loyalty-field { margin-bottom: 1.2rem; }
+.yb-loyalty-label {
+  display: block;
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  opacity: .6;
+  margin-bottom: 6px;
+}
+.yb-loyalty-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: var(--yb-border);
+  background: var(--yb-paper);
+  font-family: var(--yb-font-body, inherit);
+  font-size: 15px;
+  color: var(--yb-ink);
+  box-sizing: border-box;
+  outline: none;
+}
+.yb-loyalty-input:focus { box-shadow: 4px 4px 0 var(--yb-yellow); }
+.yb-loyalty-error {
+  background: #fdecea;
+  border: 2px solid #e53935;
+  color: #c62828;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-top: 12px;
+  font-family: var(--yb-font-mono);
+}
+.yb-loyalty-code-preview {
+  background: var(--yb-yellow);
+  border: var(--yb-border);
+  padding: 12px 16px;
+  font-family: var(--yb-font-mono);
+  font-size: 13px;
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.yb-loyalty-code-preview__code {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: .06em;
+}
+.yb-loyalty-terms {
+  background: var(--yb-paper);
+  border: var(--yb-border-thin);
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.yb-loyalty-terms p { margin: 0 0 10px; }
+.yb-loyalty-terms p:last-child { margin-bottom: 0; }
+.yb-loyalty-success {
+  text-align: center;
+  padding: 2rem 0;
+}
+.yb-loyalty-success__icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.yb-loyalty-success__title {
+  font-family: var(--yb-font-display);
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+.yb-loyalty-success__sub {
+  font-size: 15px;
+  opacity: .7;
+  margin-bottom: 2rem;
+}
+.yb-loyalty-success__code-block,
+.yb-loyalty-success__link-block {
+  border: var(--yb-border);
+  background: var(--yb-paper);
+  padding: 20px;
+  margin-bottom: 16px;
+  text-align: left;
+  box-shadow: var(--yb-shadow-sm);
+}
+.yb-loyalty-success__code-label {
+  font-family: var(--yb-font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  opacity: .5;
+  margin-bottom: 6px;
+}
+.yb-loyalty-success__code {
+  font-family: var(--yb-font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  margin-bottom: 12px;
+}
+.yb-loyalty-success__link {
+  font-family: var(--yb-font-mono);
+  font-size: 12px;
+  word-break: break-all;
+  margin-bottom: 12px;
+  opacity: .8;
+}
+</style>
+
+<script>
+const API_URL = '{{ api_url }}';
+const FRONTEND_URL = window.location.origin;
+
+let codeCheckTimer = null;
+let codeIsAvailable = false;
+
+function showStep(n) {
+  [1, 2, 3].forEach(i => {
+    document.getElementById('step-' + i).style.display = i === n ? '' : 'none';
+    const dot = document.getElementById('dot-' + i);
+    dot.classList.remove('active', 'done');
+    if (i < n) dot.classList.add('done');
+    else if (i === n) dot.classList.add('active');
+  });
+  document.getElementById('step-indicator').style.display = '';
+}
+
+function showError(elId, msg) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.style.display = '';
+}
+function clearError(elId) {
+  const el = document.getElementById(elId);
+  el.style.display = 'none';
+}
+
+function goStep2() {
+  clearError('step1-error');
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
+  const social = document.getElementById('reg-social').value.trim();
+  const audience = document.getElementById('reg-audience').value;
+  if (!name || !email || !phone || !social || !audience) {
+    showError('step1-error', 'Заполни все обязательные поля.');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showError('step1-error', 'Введи корректный email.');
+    return;
+  }
+  showStep(2);
+}
+
+function onCodeInput() {
+  clearError('step2-error');
+  const code = document.getElementById('reg-code').value.trim().toUpperCase();
+  document.getElementById('reg-code').value = code;
+  const preview = document.getElementById('code-preview');
+  const status = document.getElementById('code-status');
+
+  if (!code) {
+    preview.style.display = 'none';
+    status.textContent = '';
+    codeIsAvailable = false;
+    return;
+  }
+
+  if (!/^[A-Z0-9][A-Z0-9\-]{1,19}$/.test(code)) {
+    status.textContent = '✗ Только буквы A-Z, цифры и дефис, 2–20 символов';
+    status.style.color = 'var(--yb-red, #e53935)';
+    codeIsAvailable = false;
+    preview.style.display = 'none';
+    return;
+  }
+
+  preview.style.display = '';
+  document.getElementById('code-preview-val').textContent = code;
+  status.textContent = '… проверяем…';
+  status.style.color = 'inherit';
+  codeIsAvailable = false;
+
+  clearTimeout(codeCheckTimer);
+  codeCheckTimer = setTimeout(() => checkCodeAvailability(code), 500);
+}
+
+function checkCodeAvailability(code) {
+  const status = document.getElementById('code-status');
+  fetch(API_URL + '/api/coupons?check=' + encodeURIComponent(code))
+    .then(r => r.json())
+    .then(data => {
+      if (data.available) {
+        status.textContent = '✓ Код свободен';
+        status.style.color = 'var(--yb-cyan, #00b4cc)';
+        codeIsAvailable = true;
+      } else {
+        status.textContent = '✗ Код занят, попробуй другой';
+        status.style.color = 'var(--yb-red, #e53935)';
+        codeIsAvailable = false;
+      }
+    })
+    .catch(() => {
+      status.textContent = '';
+      codeIsAvailable = false;
+    });
+}
+
+function suggestCode() {
+  const name = document.getElementById('reg-name').value.trim().replace(/\s+/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const code = (name || 'YB') + suffix;
+  document.getElementById('reg-code').value = code;
+  onCodeInput();
+}
+
+function goStep3() {
+  clearError('step2-error');
+  const code = document.getElementById('reg-code').value.trim().toUpperCase();
+  if (!code) { showError('step2-error', 'Введи промо-код.'); return; }
+  if (!codeIsAvailable) { showError('step2-error', 'Дождись проверки доступности кода.'); return; }
+  showStep(3);
+}
+
+async function submitRegistration() {
+  clearError('step3-error');
+  if (!document.getElementById('reg-terms').checked) {
+    showError('step3-error', 'Необходимо принять условия программы.');
+    return;
+  }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Отправляем…';
+
+  const payload = {
+    name: document.getElementById('reg-name').value.trim(),
+    email: document.getElementById('reg-email').value.trim(),
+    phone: document.getElementById('reg-phone').value.trim(),
+    social_link: document.getElementById('reg-social').value.trim(),
+    audience_size: document.getElementById('reg-audience').value,
+    coupon_code: document.getElementById('reg-code').value.trim().toUpperCase(),
+  };
+
+  try {
+    const resp = await fetch(API_URL + '/api/influencers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      showError('step3-error', data.error || 'Ошибка регистрации. Попробуй ещё раз.');
+      btn.disabled = false;
+      btn.textContent = 'Зарегистрироваться ★';
+      return;
+    }
+    const dashboardUrl = FRONTEND_URL + '/loyalty-dashboard.html?id=' + data.influencer_id;
+    document.getElementById('success-code').textContent = data.coupon_code;
+    document.getElementById('success-link').textContent = dashboardUrl;
+    const linkBtn = document.getElementById('success-link-btn');
+    linkBtn.href = dashboardUrl;
+    // Show success
+    [1, 2, 3].forEach(i => document.getElementById('step-' + i).style.display = 'none');
+    document.getElementById('step-indicator').style.display = 'none';
+    document.getElementById('step-success').style.display = '';
+  } catch (e) {
+    showError('step3-error', 'Сетевая ошибка. Проверь соединение и попробуй ещё раз.');
+    btn.disabled = false;
+    btn.textContent = 'Зарегистрироваться ★';
+  }
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Скопировано';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+</script>
+
+{% endblock %}

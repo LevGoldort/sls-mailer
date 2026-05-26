@@ -37,6 +37,7 @@
     var qty = {};
     var prices = {};
     var discount = 0;
+    var autoDiscounts = widget.dataset.autoDiscounts === 'true';
 
     tiers.forEach(function (tier) {
       var id = tier.dataset.tierId;
@@ -51,15 +52,28 @@
         totalPrice += qty[id] * prices[id];
       });
       totalPrice = Math.max(0, totalPrice - discount);
-      return { count: totalCount, price: totalPrice };
+
+      var autoDiscountPct = 0;
+      if (autoDiscounts && discount === 0) {
+        if (totalCount >= 5) autoDiscountPct = 0.15;
+        else if (totalCount >= 3) autoDiscountPct = 0.10;
+      }
+      var autoDiscountAmt = Math.round(totalPrice * autoDiscountPct * 100) / 100;
+
+      return { count: totalCount, price: Math.round((totalPrice - autoDiscountAmt) * 100) / 100, autoDiscountPct: autoDiscountPct };
     }
+
+    var discountInfoEl = widget.querySelector('.yb-ticket-widget__discount-info');
 
     function update() {
       var t = calcTotal();
       if (totalEl) totalEl.textContent = t.price;
       if (totalLabelEl) {
-        totalLabelEl.textContent = 'Итого · ' + t.count + ' ' + ruPlural(t.count, TICKETS_RU);
+        var label = 'Итого · ' + t.count + ' ' + ruPlural(t.count, TICKETS_RU);
+        if (t.autoDiscountPct > 0) label += ' (−' + (t.autoDiscountPct * 100) + '%)';
+        totalLabelEl.textContent = label;
       }
+      if (discountInfoEl) discountInfoEl.style.display = discount > 0 ? 'none' : '';
       if (buyBtn) {
         if (t.count > 0) {
           buyBtn.style.opacity = '1';
@@ -105,7 +119,7 @@
           event_id: widget.dataset.eventId,
           tickets: tickets,
         };
-        if (discount > 0 && promoInput && promoInput.value.trim()) {
+        if (promoInput && promoInput.value.trim()) {
           orderData.coupon_code = promoInput.value.trim().toUpperCase();
         }
 
@@ -163,6 +177,17 @@
             showPromoMsg('Ошибка при проверке промокода', true);
           });
       });
+    }
+
+    // Pre-fill promo code from URL ?c=CODE (influencer deep links)
+    var urlCode = new URLSearchParams(window.location.search).get('c');
+    if (urlCode && promoInput) {
+      promoInput.value = urlCode.toUpperCase();
+      if (promoMsg) {
+        promoMsg.textContent = 'Промокод из ссылки — нажми «Применить» для расчёта скидки';
+        promoMsg.style.color = 'var(--yb-ink, #333)';
+        promoMsg.style.display = 'block';
+      }
     }
 
     update();

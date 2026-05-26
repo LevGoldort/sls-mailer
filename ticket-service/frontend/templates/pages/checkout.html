@@ -83,6 +83,11 @@
                         </div>
                     </div>
 
+                    <div class="summary-row" id="auto-discount-row" style="display: none; color: var(--success, #059669);">
+                        <span id="auto-discount-label">Автоскидка</span>
+                        <span id="auto-discount-amount"></span>
+                    </div>
+
                     <div class="summary-row" id="coupon-row" style="display: none; color: var(--success, #059669);">
                         <span><span data-i18n="checkout.coupon_label">Купон</span> (<span id="summary-coupon-code"></span>)</span>
                         <span id="summary-discount"></span>
@@ -678,6 +683,29 @@ function updateTotal() {
     // Apply coupon discount
     let discount = 0;
     let discountedTotal = subtotal;
+
+    // Auto discount (only when no coupon)
+    if (!appliedCoupon && eventData && eventData.allow_auto_discounts) {
+        let autoDiscountPct = 0;
+        if (quantity >= 5) autoDiscountPct = 0.15;
+        else if (quantity >= 3) autoDiscountPct = 0.10;
+
+        if (autoDiscountPct > 0) {
+            discount = Math.round(subtotal * autoDiscountPct * 100) / 100;
+            discountedTotal = Math.round((subtotal - discount) * 100) / 100;
+            document.getElementById('auto-discount-label').textContent = 'Скидка ' + (autoDiscountPct * 100) + '%';
+            document.getElementById('auto-discount-amount').textContent = '-' + discount + '₪';
+            document.getElementById('auto-discount-row').style.display = 'flex';
+            document.getElementById('ticket-price-display').innerHTML = `
+                <div style="text-decoration: line-through; color: var(--gray-500); font-size: 0.875rem;">${subtotal}₪</div>
+                <div style="font-size: 1.25rem; font-weight: 600; color: var(--primary);">${discountedTotal}₪</div>
+            `;
+        } else {
+            document.getElementById('auto-discount-row').style.display = 'none';
+        }
+    } else {
+        document.getElementById('auto-discount-row').style.display = 'none';
+    }
 
     if (appliedCoupon) {
         const discountType = appliedCoupon.coupon.discount_type;

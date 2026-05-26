@@ -12,7 +12,7 @@ class Coupon:
     coupon_code: str
     discount_type: str  # "percentage" | "fixed_amount"
     discount_value: float
-    event_ids: List[str]  # Список ID событий, к которым применим купон
+    event_ids: List[str]  # ["*"] = all events, [] = no events, [id, ...] = specific events
     valid_from: Optional[str] = None  # ISO format: "2025-01-01T00:00:00Z" or None for permanent
     valid_until: Optional[str] = None  # ISO format: "2025-12-31T23:59:59Z" or None for permanent
     status: str = "active"  # "active" | "inactive" | "expired"
@@ -21,6 +21,8 @@ class Coupon:
     description: str = ""
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    influencer_id: Optional[str] = None
+    commission_rate: float = 0.0
 
     @staticmethod
     def generate_code() -> str:
@@ -55,9 +57,13 @@ class Coupon:
             # Для постоянных купонов используем далекую дату для GSI
             item["GSI1SK"] = "9999-12-31T23:59:59Z"
 
-        # Добавляем max_uses только если указан
         if self.max_uses is not None:
             item["max_uses"] = Decimal(str(self.max_uses))
+
+        if self.influencer_id:
+            item["influencer_id"] = self.influencer_id
+        if self.commission_rate:
+            item["commission_rate"] = Decimal(str(self.commission_rate))
 
         return item
 
@@ -76,7 +82,9 @@ class Coupon:
             current_uses=int(item.get("current_uses", 0)),
             description=item.get("description", ""),
             created_at=item.get("created_at"),
-            updated_at=item.get("updated_at")
+            updated_at=item.get("updated_at"),
+            influencer_id=item.get("influencer_id"),
+            commission_rate=float(item["commission_rate"]) if item.get("commission_rate") else 0.0,
         )
 
     def is_valid(self, event_id: str, current_time: datetime = None) -> Tuple[bool, str]:
@@ -94,8 +102,8 @@ class Coupon:
         if self.status != "active":
             return False, "Купон неактивен"
 
-        # Проверка применимости к событию
-        if event_id not in self.event_ids:
+        # Проверка применимости к событию ("*" = все события)
+        if self.event_ids != ["*"] and event_id not in self.event_ids:
             return False, "Купон не применим к этому событию"
 
         # Проверка даты действия (только если даты указаны)

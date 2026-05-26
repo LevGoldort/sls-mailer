@@ -142,7 +142,8 @@
   {% else %}
   <aside class="yb-ticket-widget"
          data-event-id="{{ event.event_id }}"
-         data-api-url="{{ api_url }}">
+         data-api-url="{{ api_url }}"
+         data-auto-discounts="{{ 'true' if event.get('allow_auto_discounts') else 'false' }}">
     <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
     <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tl" aria-hidden="true"></div>
     <div class="yb-ticket-widget__corner yb-ticket-widget__corner--tr" aria-hidden="true"></div>
@@ -179,6 +180,12 @@
       {% endfor %}
     </div>
 
+    {% if event.get('allow_auto_discounts') %}
+    <div class="yb-ticket-widget__discount-info">
+      ★ Скидка 10% от 3 билетов · 15% от 5 билетов
+    </div>
+    {% endif %}
+
     <div class="yb-ticket-widget__promo">
       <input type="text" id="promo-code" placeholder="{{ strings.event_detail.promo_placeholder }}" autocomplete="off">
       <button class="yb-ticket-widget__promo-btn" id="promo-apply">{{ strings.event_detail.promo_apply }}</button>
@@ -208,6 +215,13 @@
       {{ strings.event_detail.refund_note }}
     </div>
   </aside>
+  {% endif %}
+
+  {% if not _is_external and not _is_seated %}
+  <div class="yb-loyalty-banner">
+    Вы блогер, лидер мнений или у вас просто есть чатик друзей? &nbsp;
+    <a href="/loyalty.html" class="yb-loyalty-banner__link">Зацените нашу программу лояльности — будут скидки! →</a>
+  </div>
   {% endif %}
 
 </section>
@@ -309,6 +323,11 @@
           <div class="yb-seats__chips" id="order-chips"></div>
         </div>
 
+        <div class="yb-seats__order-zone-row" id="order-auto-discount-row" style="display:none; color:var(--yb-ink); opacity:1; font-weight:600;">
+          <span id="order-auto-discount-label">СКИДКА</span>
+          <span id="order-auto-discount-amount"></span>
+        </div>
+
         <div class="yb-seats__order-total">
           <div class="yb-seats__order-total-lbl">ИТОГО · <span id="order-seats-label">0 {{ strings.event_detail.seats_count }}</span></div>
           <div class="yb-seats__order-total-price"><span id="order-total-num">0</span>₪</div>
@@ -316,7 +335,12 @@
       </div>
 
       {# CTA block (dark) #}
-      <div class="yb-seats__cta">
+      <div class="yb-seats__cta" data-auto-discounts="{{ 'true' if event.get('allow_auto_discounts') else 'false' }}">
+        {% if event.get('allow_auto_discounts') %}
+        <div class="yb-ticket-widget__discount-info" id="seats-discount-info">
+          ★ Скидка 10% от 3 билетов · 15% от 5 билетов
+        </div>
+        {% endif %}
         <div class="yb-seats__promo">
           <input type="text" id="promo-code" placeholder="{{ strings.event_detail.promo_placeholder | upper }}" autocomplete="off">
           <button id="promo-apply" class="yb-seats__promo-btn">ОК</button>
@@ -329,6 +353,11 @@
           {{ strings.event_detail.seats_proceed }}
         </button>
         <div class="yb-seats__reserve-note">Бронь держится 15 минут</div>
+      </div>
+
+      <div class="yb-loyalty-banner">
+        Вы блогер, лидер мнений или у вас просто есть чатик друзей? &nbsp;
+        <a href="/loyalty.html" class="yb-loyalty-banner__link">Зацените нашу программу лояльности — будут скидки! →</a>
       </div>
 
     </div>
@@ -799,7 +828,31 @@
       chips += '<span class="yb-seats__chip">' + seatLabel(seatId) + ' ×</span>';
     });
 
-    if (totalEl) totalEl.textContent = Math.max(0, total - discount);
+    var autoDiscountBanner = document.getElementById('seats-discount-info');
+    var autoDiscountRow    = document.getElementById('order-auto-discount-row');
+    var autoDiscountLbl    = document.getElementById('order-auto-discount-label');
+    var autoDiscountAmtEl  = document.getElementById('order-auto-discount-amount');
+    var autoDiscountPct = 0;
+    if (discount === 0) {
+      var ctaEl = document.querySelector('.yb-seats__cta[data-auto-discounts="true"]');
+      if (ctaEl) {
+        if (seats.length >= 5) autoDiscountPct = 0.15;
+        else if (seats.length >= 3) autoDiscountPct = 0.10;
+      }
+    }
+    var autoDiscountAmt = Math.round(total * autoDiscountPct * 100) / 100;
+    if (autoDiscountBanner) autoDiscountBanner.style.display = discount > 0 ? 'none' : '';
+    if (autoDiscountRow) {
+      if (autoDiscountAmt > 0) {
+        autoDiscountRow.style.display = '';
+        if (autoDiscountLbl) autoDiscountLbl.textContent = 'СКИДКА ' + Math.round(autoDiscountPct * 100) + '%';
+        if (autoDiscountAmtEl) autoDiscountAmtEl.textContent = '−' + autoDiscountAmt + '₪';
+      } else {
+        autoDiscountRow.style.display = 'none';
+      }
+    }
+
+    if (totalEl) totalEl.textContent = Math.max(0, total - discount - autoDiscountAmt);
     if (chipsEl) chipsEl.innerHTML = chips;
     if (secEl) secEl.style.display = seats.length ? '' : 'none';
     if (zoneRow && firstTt) {
@@ -857,6 +910,17 @@
         showPromoMsg('Ошибка при проверке промокода', true);
       });
     });
+  }
+
+  // Pre-fill promo code from URL ?c=CODE (influencer deep links)
+  var _urlCode = new URLSearchParams(window.location.search).get('c');
+  if (_urlCode && promoInput) {
+    promoInput.value = _urlCode.toUpperCase();
+    if (promoMsg) {
+      promoMsg.textContent = 'Промокод из ссылки — скидка применится при оформлении';
+      promoMsg.style.color = 'var(--yb-ink, #333)';
+      promoMsg.style.display = 'block';
+    }
   }
 
   document.getElementById('seat-picker-container').addEventListener('seatPicker:seatsReserved', function(e) {

@@ -182,11 +182,10 @@ function initImageUpload(containerId, folder, onUploadComplete, onUploadError, o
     const fileInput = document.getElementById(`${containerId}-file-input`);
     const uploadedContainer = document.getElementById(`${containerId}-uploaded`);
 
-    // Click to select files
+    // Click to select files (skip label clicks — the label's `for` attr already opens the dialog)
     dropZone.addEventListener('click', (e) => {
-        if (e.target !== fileInput) {
-            fileInput.click();
-        }
+        if (e.target.tagName === 'LABEL' || e.target === fileInput) return;
+        fileInput.click();
     });
 
     // File input change

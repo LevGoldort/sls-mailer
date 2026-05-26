@@ -165,6 +165,7 @@ cat > /tmp/ticket-api-env.json <<EOF
     "MERCHANDISE_ORDERS_TABLE": "yallabalagan-merchandise-orders",
     "SHOWS_TABLE": "yallabalagan-shows",
     "EPISODES_TABLE": "yallabalagan-episodes",
+    "INFLUENCERS_TABLE": "yallabalagan-influencers",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
     "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
   }
@@ -301,6 +302,7 @@ cat > /tmp/site-regen-env.json <<EOF
   "Variables": {
     "API_URL": "${API_URL}",
     "S3_BUCKET": "${S3_BUCKET}",
+    "CLOUDFRONT_DISTRIBUTION_ID": "E1QVQ0JRE575WR",
     "GA4_ID": "${GA4_ID}",
     "FB_PIXEL_ID": "${FB_PIXEL_ID}",
     "YOUTUBE_API_KEY": "${YOUTUBE_API_KEY}",
@@ -315,6 +317,7 @@ cat > /tmp/site-regen-env.json <<EOF
     "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
     "SHOWS_TABLE": "yallabalagan-shows",
     "EPISODES_TABLE": "yallabalagan-episodes",
+    "INFLUENCERS_TABLE": "yallabalagan-influencers",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
     "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
   }
@@ -494,6 +497,20 @@ ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-shows"
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-episodes"
 ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-shows"
 ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-episodes"
+
+ensure_table "yallabalagan-influencers" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-influencers"
+
+# Allow site-regenerator to invalidate CloudFront
+echo "  Ensuring CloudFront invalidation policy for site-regenerator..."
+aws iam put-role-policy \
+  --role-name "$REGEN_ROLE" \
+  --policy-name "CloudFront-Invalidation" \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"cloudfront:CreateInvalidation","Resource":"*"}]}' \
+  --profile "$PROFILE" 2>/dev/null && echo "  Policy attached: $REGEN_ROLE → cloudfront:CreateInvalidation" || true
 
 # Sync S3
 echo ""

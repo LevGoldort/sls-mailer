@@ -198,6 +198,19 @@
           </div>
         </div>
 
+        <!-- Discounts & Loyalty -->
+        <div class="card" id="discounts-section">
+          <div class="card-header"><span class="card-title">Скидки</span></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="allow_auto_discounts" onchange="markDirty()">
+                <span>Автоматические скидки (−10% от 3 билетов, −15% от 5+)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
         <!-- Ticket types (internal only, hidden for external events) -->
         <div class="card" id="ticket-types-section" style="display:none;">
           <div class="card-header">
@@ -264,6 +277,7 @@
     document.getElementById('btn-external').classList.toggle('active', type === 'external');
     document.getElementById('external-url-group').style.display  = type === 'external' ? '' : 'none';
     document.getElementById('ticket-types-section').style.display = type === 'internal' ? '' : 'none';
+    document.getElementById('discounts-section').style.display   = type === 'internal' ? '' : 'none';
     if (dirty) markDirty();
   }
 
@@ -337,7 +351,7 @@
 
   function addTicketType(data = {}) {
     ticketTypeCounter++;
-    const id  = data.type_id || `tt-${Date.now()}-${ticketTypeCounter}`;
+    const id  = data.id || data.type_id || `tt-${Date.now()}-${ticketTypeCounter}`;
     const div = document.createElement('div');
     div.className = 'ticket-type-block';
     div.dataset.typeId = id;
@@ -377,7 +391,7 @@
 
   function collectTicketTypes() {
     return Array.from(document.querySelectorAll('.ticket-type-block')).map(block => ({
-      type_id:   block.dataset.typeId,
+      id:        block.dataset.typeId,
       name:      block.querySelector('.tt-name').value.trim(),
       price:     parseFloat(block.querySelector('.tt-price').value) || 0,
       total:     parseInt(block.querySelector('.tt-total').value) || 0,
@@ -399,6 +413,7 @@
       event_type:  currentEventType,
       performer_ids: getSelectedPerformerIds(),
       images:      imageUrls,
+      allow_auto_discounts: document.getElementById('allow_auto_discounts').checked,
     };
     if (currentEventType === 'external') {
       data.external_url = document.getElementById('external_url').value.trim();
@@ -467,6 +482,7 @@
       document.getElementById('time').value = timePart.slice(0,5);
 
       document.getElementById('location_id').value = event.location_id;
+      document.getElementById('allow_auto_discounts').checked = !!event.allow_auto_discounts;
 
       setEventType(event.event_type === 'external' ? 'external' : 'internal', false);
       if (event.event_type === 'external') {

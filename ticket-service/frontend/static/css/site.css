@@ -1748,6 +1748,7 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-socials__grid { grid-template-columns: repeat(2, 1fr); }
   .yb-performer-grid { grid-template-columns: repeat(2, 1fr); }
   .yb-event-body { grid-template-columns: 1fr; padding: 24px 24px 16px; }
+  .yb-event-body > .yb-loyalty-banner { grid-column: 1; }
   .yb-ticket-widget { position: static; }
   .yb-venue__box { grid-template-columns: 1fr; }
   .yb-venue__map { border-right: none; border-bottom: var(--yb-border); }
@@ -1987,4 +1988,39 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   font-size: 10px;
   opacity: 0.35;
   user-select: none;
+}
+
+/* ── Auto-discount info banner (inside ticket widget) ── */
+.yb-ticket-widget__discount-info {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: var(--yb-cyan);
+  color: var(--yb-ink);
+  font-family: var(--yb-font-mono);
+  font-size: 12px;
+  letter-spacing: .05em;
+  border: 1.5px solid var(--yb-ink);
+  text-align: center;
+}
+
+/* ── Loyalty program banner (right column, below ticket widget) ── */
+.yb-loyalty-banner {
+  padding: 14px 18px;
+  border: var(--yb-border);
+  background: var(--yb-yellow);
+  box-shadow: var(--yb-shadow);
+  font-family: var(--yb-font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--yb-ink);
+}
+.yb-event-body > .yb-loyalty-banner {
+  grid-column: 2;
+}
+.yb-loyalty-banner__link {
+  color: var(--yb-ink);
+  text-decoration: underline;
+}
+.yb-loyalty-banner__link:hover {
+  opacity: .65;
 }

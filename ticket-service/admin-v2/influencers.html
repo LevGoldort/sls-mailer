@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Инфлюенсеры — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Инфлюенсеры</h1>
+        <p class="page-subtitle">Участники программы лояльности</p>
+      </div>
+      <div class="page-actions">
+        <span id="total-info" style="font-family:monospace;font-size:13px;opacity:.6;"></span>
+      </div>
+    </div>
+
+    <div id="loading" class="loading-indicator">Загрузка...</div>
+    <div id="error-msg" class="alert alert-error" style="display:none;"></div>
+
+    <div class="card" id="stats-card" style="display:none;margin-bottom:20px;">
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+        <div>
+          <div style="font-size:11px;font-family:monospace;letter-spacing:.1em;opacity:.5;margin-bottom:4px;">ВСЕГО ИНФЛЮЕНСЕРОВ</div>
+          <div style="font-size:28px;font-weight:700;" id="agg-count">0</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-family:monospace;letter-spacing:.1em;opacity:.5;margin-bottom:4px;">ПРОДАЖИ ВСЕГО</div>
+          <div style="font-size:28px;font-weight:700;" id="agg-sales">0₪</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-family:monospace;letter-spacing:.1em;opacity:.5;margin-bottom:4px;">КОМИССИЯ К ВЫПЛАТЕ</div>
+          <div style="font-size:28px;font-weight:700;color:var(--accent);" id="agg-commission">0₪</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap" id="table-card" style="display:none;">
+      <table class="table">
+        <thead><tr>
+          <th>Имя</th>
+          <th class="hide-mobile">Email / Тел.</th>
+          <th class="hide-mobile">Соцсеть</th>
+          <th class="hide-mobile">Охват</th>
+          <th>Промо-код</th>
+          <th>Заказов</th>
+          <th>Продажи</th>
+          <th>Комиссия</th>
+          <th class="hide-mobile">Дата</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="influencers-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="empty-msg" style="display:none;text-align:center;padding:3rem;opacity:.5;font-family:monospace;">
+      Нет зарегистрированных инфлюенсеров
+    </div>
+
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+const FRONTEND_URL = 'https://yallabalagan.org';
+
+async function loadInfluencers() {
+  try {
+    const data = await apiCall('/api/influencers');
+    renderInfluencers(data.influencers || []);
+  } catch (e) {
+    showError(e.message || 'Ошибка загрузки');
+  }
+}
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+function renderInfluencers(list) {
+  document.getElementById('loading').style.display = 'none';
+
+  if (list.length === 0) {
+    document.getElementById('empty-msg').style.display = '';
+    return;
+  }
+
+  // Aggregate stats
+  let totalSales = 0, totalComm = 0;
+  list.forEach(inf => {
+    totalSales += Number(inf.total_sales || 0);
+    totalComm += Number(inf.total_commission || 0);
+  });
+  document.getElementById('agg-count').textContent = list.length;
+  document.getElementById('agg-sales').textContent = totalSales.toFixed(0) + '₪';
+  document.getElementById('agg-commission').textContent = totalComm.toFixed(2) + '₪';
+  document.getElementById('stats-card').style.display = '';
+  document.getElementById('total-info').textContent = list.length + ' участников';
+
+  // Sort by total_commission desc
+  list.sort((a, b) => Number(b.total_commission || 0) - Number(a.total_commission || 0));
+
+  const tbody = document.getElementById('influencers-tbody');
+  tbody.innerHTML = list.map(inf => {
+    const dashUrl = FRONTEND_URL + '/loyalty-dashboard.html?id=' + encodeURIComponent(inf.influencer_id);
+    const social = inf.social_link ? `<a href="${escHtml(inf.social_link)}" target="_blank" rel="noopener" style="color:inherit;">↗</a>` : '—';
+    const dateStr = inf.created_at ? inf.created_at.slice(0, 10) : '—';
+    const commission = Number(inf.total_commission || 0).toFixed(2);
+    const sales = Number(inf.total_sales || 0).toFixed(0);
+    return `<tr>
+      <td style="font-weight:500;">${escHtml(inf.name)}</td>
+      <td class="hide-mobile" style="font-size:13px;">${escHtml(inf.email)}<br><span style="opacity:.6;">${escHtml(inf.phone)}</span></td>
+      <td class="hide-mobile">${social}</td>
+      <td class="hide-mobile mono" style="font-size:12px;">${escHtml(inf.audience_size || '—')}</td>
+      <td><span class="status-badge status-active mono">${escHtml(inf.coupon_code)}</span></td>
+      <td style="text-align:center;">${inf.orders_count || 0}</td>
+      <td class="mono">${sales}₪</td>
+      <td class="mono" style="font-weight:700;color:var(--accent);">${commission}₪</td>
+      <td class="hide-mobile" style="font-size:13px;">${dateStr}</td>
+      <td><a href="${escHtml(dashUrl)}" target="_blank" class="btn btn-sm btn-ghost">→</a></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('table-card').style.display = '';
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+  loadInfluencers();
+</script>
+</body>
+</html>

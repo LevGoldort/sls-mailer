@@ -120,7 +120,8 @@
         o.order_id.toLowerCase().includes(q) ||
         (o.customer?.email || '').toLowerCase().includes(q) ||
         (o.customer?.phone || '').toLowerCase().includes(q) ||
-        (o.customer?.name  || '').toLowerCase().includes(q);
+        (o.customer?.name  || '').toLowerCase().includes(q) ||
+        (o.coupon_code || '').toLowerCase().includes(q);
       const matchStatus = !status || (o.payment?.status || '') === status;
       const matchEvent  = !evId   || o.event_id === evId;
       return matchQ && matchStatus && matchEvent;
