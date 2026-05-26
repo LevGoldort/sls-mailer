@@ -2,6 +2,26 @@
 
 {% block title %}{{ episode.title }} — {{ show.name }} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ episode.description | truncate(160, True, '…') }}{% endblock %}
+{% block og_type %}video.other{% endblock %}
+{% block og_image %}{{ episode.get('thumbnail_url') or super() }}{% endblock %}
+{% block canonical %}https://yallabalagan.org/episodes/{{ episode.get('slug', episode.episode_id) }}.html{% endblock %}
+{% block og_url %}https://yallabalagan.org/episodes/{{ episode.get('slug', episode.episode_id) }}.html{% endblock %}
+
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  "name": {{ episode.title | tojson }},
+  "description": {{ (episode.get('description', '') | truncate(500, True, '…')) | tojson }},
+  "thumbnailUrl": {{ (episode.get('thumbnail_url') or '') | tojson }},
+  "url": {{ (episode.get('url') or '') | tojson }},
+  "embedUrl": {{ (episode.get('url', '') | youtube_embed_url) | tojson }},
+  "uploadDate": {{ episode.get('published_at', episode.get('created_at', '')) | tojson }},
+  "publisher": { "@type": "Organization", "name": "Ялла Балаган", "url": "https://yallabalagan.org" }
+}
+</script>
+{% endblock %}
 
 {% block content %}
 

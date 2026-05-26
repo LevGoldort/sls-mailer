@@ -11,6 +11,37 @@
 {% block description %}{{ event.description | truncate(160, True, '…') if event.description else strings.site.tagline }}{% endblock %}
 {% block og_type %}event{% endblock %}
 {% block og_image %}{{ event.photo_url or super() }}{% endblock %}
+{% block canonical %}https://yallabalagan.org/events/{{ _slug }}.html{% endblock %}
+{% block og_url %}https://yallabalagan.org/events/{{ _slug }}.html{% endblock %}
+
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": {{ event.title | tojson }},
+  "description": {{ (event.description | truncate(500, True, '…')) | tojson if event.description else '' | tojson }},
+  "startDate": {{ event.date | tojson }},
+  "image": {{ (event.photo_url or '') | tojson }},
+  "url": "https://yallabalagan.org/events/{{ _slug }}.html",
+  "eventStatus": "https://schema.org/EventScheduled",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "location": {
+    "@type": "Place",
+    "name": {{ location.name | tojson if location else 'null' }},
+    "address": { "@type": "PostalAddress", "addressCountry": "IL" }
+  },
+  "organizer": { "@type": "Organization", "name": "Ялла Балаган", "url": "https://yallabalagan.org" }{% if _ticket_types %},
+  "offers": {
+    "@type": "AggregateOffer",
+    "priceCurrency": "ILS",
+    "lowPrice": {{ _ticket_types | map(attribute='price') | min }},
+    "url": "https://yallabalagan.org/events/{{ _slug }}.html"
+  }{% endif %}{% if event_performers %},
+  "performer": [{% for p in event_performers %}{"@type":"Person","name":{{ p.name | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]{% endif %}
+}
+</script>
+{% endblock %}
 
 {% block content %}
 

@@ -3,6 +3,29 @@
 {% block title %}{{ product.name }} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ product.short_description or product.name }}{% endblock %}
 {% block og_image %}{{ product.get('photo_url') or super() }}{% endblock %}
+{% block og_type %}product{% endblock %}
+{% block canonical %}https://yallabalagan.org/products/{{ product.get('slug', product.product_id) }}.html{% endblock %}
+{% block og_url %}https://yallabalagan.org/products/{{ product.get('slug', product.product_id) }}.html{% endblock %}
+
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": {{ product.name | tojson }},
+  "description": {{ (product.get('short_description') or product.name) | tojson }},
+  "image": {{ (product.get('photo_url') or '') | tojson }},
+  "url": "https://yallabalagan.org/products/{{ product.get('slug', product.product_id) }}.html",
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "ILS",
+    "price": {{ product.price_ils }},
+    "availability": "{% if product.get('sold_slots', 0) < product.get('total_slots', 1) %}https://schema.org/InStock{% else %}https://schema.org/SoldOut{% endif %}",
+    "seller": { "@type": "Organization", "name": "Ялла Балаган" }
+  }
+}
+</script>
+{% endblock %}
 
 {% block content %}
 

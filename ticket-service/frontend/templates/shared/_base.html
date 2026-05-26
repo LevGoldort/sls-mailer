@@ -5,12 +5,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="origin">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#ffd400">
   <title>{% block title %}{{ strings.site.name }}{% endblock %}</title>
   <meta name="description" content="{% block description %}{{ strings.site.tagline }}{% endblock %}">
 
   <meta name="keywords" content="{% block keywords %}стендап, комедия, события, Тель-Авив, Израиль, YallaBalagan{% endblock %}">
   <meta name="author" content="Ялла Балаган">
-  <meta name="robots" content="index, follow">
+  <meta name="robots" content="{% block robots %}index, follow{% endblock %}">
   <link rel="canonical" href="{% block canonical %}https://yallabalagan.org/{% endblock %}">
 
   <meta property="og:type" content="{% block og_type %}website{% endblock %}">
@@ -24,7 +27,8 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{% block tw_title %}{{ self.title() }}{% endblock %}">
   <meta name="twitter:description" content="{% block tw_desc %}{{ self.description() }}{% endblock %}">
-  <meta name="twitter:image" content="{% block tw_image %}https://events-site-yallabalagan.s3.eu-north-1.amazonaws.com/images/yalla_square.jpg{% endblock %}">
+  <meta name="twitter:image" content="{% block tw_image %}{{ self.og_image() }}{% endblock %}">
+  <meta name="twitter:site" content="@yallabala">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,6 +56,7 @@
   </script>
 
   {% block extra_css %}{% endblock %}
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="yb-page">
   <a href="#main-content" class="skip-link" data-i18n="base.skip_link">К содержимому</a>

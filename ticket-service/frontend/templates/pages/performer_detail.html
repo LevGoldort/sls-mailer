@@ -4,6 +4,23 @@
 {% block title %}{{ performer.name }} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ performer.tagline or (performer.bio | truncate(160, True, '…')) if performer.bio else performer.name }}{% endblock %}
 {% block og_image %}{{ performer.photo_url or super() }}{% endblock %}
+{% block og_type %}profile{% endblock %}
+{% block canonical %}https://yallabalagan.org/performer/{{ performer.get('slug', performer.performer_id) }}/{% endblock %}
+{% block og_url %}https://yallabalagan.org/performer/{{ performer.get('slug', performer.performer_id) }}/{% endblock %}
+
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": {{ performer.name | tojson }},
+  "description": {{ (performer.bio | truncate(500, True, '…')) | tojson if performer.bio else performer.name | tojson }},
+  "image": {{ (performer.photo_url or '') | tojson }},
+  "url": "https://yallabalagan.org/performer/{{ performer.get('slug', performer.performer_id) }}/"{% if performer.get('social') %},
+  "sameAs": [{% set social = performer.get('social', {}) %}{% set ns = namespace(first=true) %}{% for key in ['instagram','telegram','youtube','facebook'] %}{% if social.get(key) %}{% if not ns.first %},{% endif %}{{ social[key] | tojson }}{% set ns.first = false %}{% endif %}{% endfor %}]{% endif %}
+}
+</script>
+{% endblock %}
 
 {% block content %}
 

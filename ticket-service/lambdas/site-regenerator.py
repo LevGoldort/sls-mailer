@@ -48,52 +48,70 @@ def get_latest_youtube_video(api_key, playlist_id):
         return None
 
 
-def generate_sitemap(events, locations, performers=None):
+def generate_sitemap(events, locations, performers=None, products=None, shows=None, episodes=None):
     """Generate sitemap.xml"""
     from xml.etree.ElementTree import Element, SubElement, tostring
     from xml.dom import minidom
 
+    BASE = 'https://yallabalagan.org'
     urlset = Element('urlset', xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
 
+    def add_url(loc, changefreq='monthly', priority='0.5', lastmod=None):
+        url = SubElement(urlset, 'url')
+        SubElement(url, 'loc').text = loc
+        if lastmod:
+            SubElement(url, 'lastmod').text = str(lastmod)[:10]
+        SubElement(url, 'changefreq').text = changefreq
+        SubElement(url, 'priority').text = priority
+
     # Homepage
-    url = SubElement(urlset, 'url')
-    SubElement(url, 'loc').text = 'https://yallabalagan.org/'
-    SubElement(url, 'changefreq').text = 'daily'
-    SubElement(url, 'priority').text = '1.0'
+    add_url(f'{BASE}/', 'daily', '1.0')
 
-    # Static pages
-    for page in ['accessibility.html']:
-        url = SubElement(urlset, 'url')
-        SubElement(url, 'loc').text = f'https://yallabalagan.org/{page}'
-        SubElement(url, 'changefreq').text = 'monthly'
-        SubElement(url, 'priority').text = '0.5'
+    # Static listing pages
+    add_url(f'{BASE}/events.html',     'daily',   '0.9')
+    add_url(f'{BASE}/performers.html', 'weekly',  '0.7')
+    add_url(f'{BASE}/shows.html',      'weekly',  '0.6')
+    add_url(f'{BASE}/loyalty.html',    'monthly', '0.5')
+    add_url(f'{BASE}/accessibility.html', 'monthly', '0.3')
 
-    # Events
-    for event in events:
-        url = SubElement(urlset, 'url')
-        SubElement(url, 'loc').text = f"https://yallabalagan.org/events/{event['event_id']}.html"
-        SubElement(url, 'changefreq').text = 'weekly'
-        SubElement(url, 'priority').text = '0.8'
-
-    # Locations
-    for location in locations:
-        url = SubElement(urlset, 'url')
-        slug = location.get('slug', location['location_id'])
-        SubElement(url, 'loc').text = f"https://yallabalagan.org/locations/{slug}.html"
-        SubElement(url, 'changefreq').text = 'monthly'
-        SubElement(url, 'priority').text = '0.6'
+    # Events — prefer slug URL, include lastmod
+    for event in (events or []):
+        slug = event.get('slug') or event['event_id']
+        add_url(f'{BASE}/events/{slug}.html', 'weekly', '0.8',
+                event.get('updated_at') or event.get('date'))
 
     # Performers
     for performer in (performers or []):
         if performer.get('slug'):
-            url = SubElement(urlset, 'url')
-            SubElement(url, 'loc').text = f"https://yallabalagan.org/performer/{performer['slug']}/"
-            SubElement(url, 'changefreq').text = 'weekly'
-            SubElement(url, 'priority').text = '0.7'
+            add_url(f'{BASE}/performer/{performer["slug"]}/', 'weekly', '0.7',
+                    performer.get('updated_at'))
 
-    # Pretty print
+    # Shows
+    for show in (shows or []):
+        if show.get('slug'):
+            add_url(f'{BASE}/shows/{show["slug"]}.html', 'monthly', '0.6')
+
+    # Episodes
+    for ep in (episodes or []):
+        if ep.get('slug'):
+            add_url(f'{BASE}/episodes/{ep["slug"]}.html', 'monthly', '0.6',
+                    ep.get('published_at') or ep.get('created_at'))
+
+    # Products
+    for product in (products or []):
+        slug = product.get('slug', product['product_id'])
+        add_url(f'{BASE}/products/{slug}.html', 'monthly', '0.5')
+
+    # Locations
+    for location in (locations or []):
+        slug = location.get('slug', location['location_id'])
+        add_url(f'{BASE}/locations/{slug}.html', 'monthly', '0.4')
+
     xml_str = minidom.parseString(tostring(urlset)).toprettyxml(indent="  ")
-    return xml_str
+    lines = xml_str.split('\n')
+    if lines[0].startswith('<?xml'):
+        lines[0] = '<?xml version="1.0" encoding="UTF-8"?>'
+    return '\n'.join(lines)
 
 def is_event_past(event_date_str):
     """Check if event is past (event_date + 30 minutes < now)"""
@@ -579,10 +597,25 @@ def generate_html_files(site_data, output_dir, templates_dir):
 
     # Generate sitemap.xml
     print("Generating sitemap.xml...")
-    sitemap = generate_sitemap(events, locations, performers)
+    sitemap = generate_sitemap(events, locations, performers,
+                               products=products, shows=shows, episodes=episodes)
     (output_dir / 'sitemap.xml').write_text(sitemap, encoding='utf-8')
 
-    print(f"Generated {pages_generated} HTML pages + sitemap.xml")
+    # Generate robots.txt
+    print("Generating robots.txt...")
+    robots_txt = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /checkout.html\n"
+        "Disallow: /loyalty-dashboard.html\n"
+        "Disallow: /processing.html\n"
+        "Disallow: /mock_payment.html\n"
+        "\n"
+        "Sitemap: https://yallabalagan.org/sitemap.xml\n"
+    )
+    (output_dir / 'robots.txt').write_text(robots_txt, encoding='utf-8')
+
+    print(f"Generated {pages_generated} HTML pages + sitemap.xml + robots.txt")
 
 def upload_to_s3(local_dir):
     """Upload generated files to S3 bucket"""
