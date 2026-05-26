@@ -7,7 +7,7 @@
 {% set _ticket_types = event.get('ticket_types', []) %}
 {% set _is_seated = location and location.get('venue_config', {}).get('venue_type') == 'seated' %}
 
-{% block title %}{{ event.title }} — {{ strings.site.name }}{% endblock %}
+{% block title %}{{ event.title }}{% if location and location.address is mapping %} — Стендап в {{ location.address.city }}{% endif %} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ event.description | truncate(160, True, '…') if event.description else strings.site.tagline }}{% endblock %}
 {% block og_type %}event{% endblock %}
 {% block og_image %}{{ event.photo_url or super() }}{% endblock %}
