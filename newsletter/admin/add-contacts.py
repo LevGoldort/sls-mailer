@@ -13,14 +13,14 @@ REGION = 'eu-north-1'
 # Contacts to add
 contacts = [
     {
-        'email': 'lev.goldort@gmail.com',
-        'name': 'Lev Goldort',
+        'email': 'user@example.com',
+        'name': 'Example User',
         'tags': ['stand-up', 'tel-aviv', 'vip'],
         'status': 'active',
     },
     {
-        'email': 'glevgo@gmail.com',
-        'name': 'Glev Go',
+        'email': 'user2@example.com',
+        'name': 'Another User',
         'tags': ['stand-up', 'tel-aviv'],
         'status': 'active',
     },

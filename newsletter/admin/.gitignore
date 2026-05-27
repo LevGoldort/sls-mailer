@@ -33,3 +33,9 @@ venv/
 
 # Test files
 test-*.html
+
+# Secrets
+.env
+*.key
+*.pem
+secrets.json

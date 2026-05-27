@@ -11,7 +11,7 @@ region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
     "Environment=prod",
-    "SenderEmail=newsletter@yallabalagan.org"
+    "SenderEmail=newsletter@yourdomain.com"
 ]
 confirm_changeset = true
 image_repositories = []
@@ -31,7 +31,7 @@ region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
     "Environment=dev",
-    "SenderEmail=newsletter-dev@yallabalagan.org"
+    "SenderEmail=newsletter-dev@yourdomain.com"
 ]
 confirm_changeset = false
 image_repositories = []
