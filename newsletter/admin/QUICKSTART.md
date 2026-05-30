@@ -50,7 +50,7 @@ AWS Console → Lambda → Create Function (повторить 4 раза):
 ### 2.5. Загрузить код
 
 ```bash
-cd /Users/levgoldort/Documents/yallabalagan
+cd /path/to/your/newsletter
 ./upload-lambdas.sh
 ```
 

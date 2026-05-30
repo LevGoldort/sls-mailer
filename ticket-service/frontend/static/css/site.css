@@ -1760,6 +1760,8 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-performer-hero__portrait { height: 360px; }
   .yb-performer-hero { padding: 4px 24px 0; }
   .yb-event-hero { padding: 4px 24px 0; }
+  .yb-event-hero__banner { aspect-ratio: 16/9; height: auto; }
+  .yb-event-hero__date-stamp, .yb-event-hero__poster-stamp { display: none; }
   .yb-event-hero__title-card { margin: -60px 16px 0; }
   .yb-event-meta { padding: 24px 24px 8px; }
   .yb-venue { padding: 16px 24px 24px; }
@@ -1783,6 +1785,7 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-performer-hero__portrait { height: 260px; }
   .yb-performer-hero__info { padding: 24px 20px; }
   .yb-event-hero { padding: 4px 16px 0; }
+  .yb-event-hero__banner { aspect-ratio: 16/9; height: auto; }
   .yb-event-hero__title-card { margin: -50px 0 0; }
   .yb-event-meta { padding: 16px 16px 8px; }
   .yb-event-body { padding: 20px 16px 16px; }

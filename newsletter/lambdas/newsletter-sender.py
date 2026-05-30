@@ -134,7 +134,8 @@ def personalize_html(html_body, email, campaign_id, preview_text=''):
         html = html_body
 
     # Replace unsubscribe link
-    unsubscribe_url = f"https://newsletter.yallabalagan.org/unsubscribe.html?email={quote(email)}&token={token}"
+    unsubscribe_base = os.environ.get('UNSUBSCRIBE_BASE_URL', TRACKING_BASE_URL)
+    unsubscribe_url = f"{unsubscribe_base}/unsubscribe.html?email={quote(email)}&token={token}"
     html = html.replace('{{UNSUBSCRIBE_LINK}}', unsubscribe_url)
 
     # Add tracking pixel before </body>

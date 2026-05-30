@@ -136,6 +136,7 @@
 </div>
 <script src="auth.js"></script>
 <script src="shared.js"></script>
+<script src="shared-image-upload.js"></script>
 <script>
   const performerId = new URLSearchParams(window.location.search).get('id');
   let galleryUrls = [];
@@ -158,7 +159,7 @@
   document.getElementById('gallery-file').addEventListener('change', async function() {
     for (const file of Array.from(this.files)) {
       try {
-        const url = await uploadFile(file, 'performers');
+        const url = await uploadFileWithCrop(file, 'performers');
         if (url) addGalleryPhoto(url);
       } catch { showToast('Ошибка загрузки фото галереи', 'error'); }
     }

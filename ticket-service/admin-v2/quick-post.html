@@ -109,6 +109,21 @@
         <label class="form-label">Адрес *</label>
         <input class="form-input" type="text" id="loc-address" placeholder="ул. Дизенгоф, 50">
       </div>
+      <div class="form-group">
+        <label class="form-label">Ссылка Google Maps</label>
+        <input class="form-input" type="url" id="loc-maps-url" placeholder="https://maps.google.com/..." oninput="parseMapsUrl(this.value)">
+        <div class="form-hint">Вставьте ссылку — координаты заполнятся автоматически</div>
+      </div>
+      <div class="form-group" style="display:flex;gap:8px;">
+        <div style="flex:1;">
+          <label class="form-label">Широта (lat)</label>
+          <input class="form-input" type="number" step="any" id="loc-lat" placeholder="32.0853">
+        </div>
+        <div style="flex:1;">
+          <label class="form-label">Долгота (lng)</label>
+          <input class="form-input" type="number" step="any" id="loc-lng" placeholder="34.7818">
+        </div>
+      </div>
       <div id="loc-error" style="color:#ef4444;font-size:13px;display:none;"></div>
     </div>
     <div class="modal-footer">
@@ -118,14 +133,33 @@
   </div>
 </div>
 
-<script src="auth.js"></script>
-<script src="shared.js"></script>
+<script src="shared-image-upload.js"></script>
 <script>
   const SECRET_KEY = 'yallafriend';
+  const API_BASE_URL = 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
+
+  // Simple password gate — no JWT required
+  (function() {
+    if (sessionStorage.getItem('qp_auth') === '1') return;
+    const pwd = prompt('Пароль:');
+    if (pwd === SECRET_KEY) { sessionStorage.setItem('qp_auth', '1'); return; }
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:sans-serif;color:#e53935;font-size:18px;">Неверный пароль.</div>';
+    throw new Error('auth');
+  })();
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  async function apiFetch(path) {
+    const r = await fetch(API_BASE_URL + path);
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }
 
   async function loadLocations(selectId) {
     try {
-      const data = await API.getLocations();
+      const data = await apiFetch('/api/locations');
       const sel = document.getElementById('location');
       sel.innerHTML = '<option value="">— не выбрано —</option>';
       (data.locations || []).forEach(loc => {
@@ -141,7 +175,7 @@
   async function loadPerformers() {
     const container = document.getElementById('performer-list');
     try {
-      const data = await API.getPerformers();
+      const data = await apiFetch('/api/performers');
       const performers = data.performers || [];
       if (!performers.length) { container.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:4px;">Нет перформеров</div>'; return; }
       container.innerHTML = '';
@@ -183,16 +217,19 @@
   });
 
   async function uploadImage(file) {
+    const blob = await new Promise(resolve => showCropModal(file, 1200, 675, 0.88, resolve));
+    if (!blob) return; // cancelled
+
     uploadArea.textContent = 'Загрузка...';
     try {
-      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
-      const result = await fetch(`${API_BASE_URL}/api/upload-image/quick`, {
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
+      const resp = await fetch(`${API_BASE_URL}/api/upload-image/quick`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: SECRET_KEY, filename: file.name || 'upload.jpg', contentType: file.type || 'image/jpeg', data: b64 }),
+        body: JSON.stringify({ secret: SECRET_KEY, data: b64, contentType: 'image/jpeg', filename: 'image.jpg' }),
       });
-      if (!result.ok) throw new Error();
-      const data = await result.json();
+      if (!resp.ok) throw new Error();
+      const data = await resp.json();
       document.getElementById('image-url').value = data.url;
       document.getElementById('image-preview-img').src = data.url;
       document.getElementById('image-preview').style.display = 'block';
@@ -282,11 +319,24 @@
     }
   }
 
+  function parseMapsUrl(url) {
+    const m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+             || url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+             || url.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (m) {
+      document.getElementById('loc-lat').value = m[1];
+      document.getElementById('loc-lng').value = m[2];
+    }
+  }
+
   function openLocationPopup() {
     document.getElementById('location-modal').classList.add('active');
     document.getElementById('loc-name').value = '';
     document.getElementById('loc-city').value = '';
     document.getElementById('loc-address').value = '';
+    document.getElementById('loc-maps-url').value = '';
+    document.getElementById('loc-lat').value = '';
+    document.getElementById('loc-lng').value = '';
     document.getElementById('loc-error').style.display = 'none';
   }
   function closeLocationPopup() { document.getElementById('location-modal').classList.remove('active'); }
@@ -299,10 +349,12 @@
     const btn = document.getElementById('loc-save-btn');
     if (!name || !city || !addr) { errDiv.textContent = 'Заполните все поля'; errDiv.style.display = 'block'; return; }
     btn.disabled = true; btn.textContent = 'Сохранение...'; errDiv.style.display = 'none';
+    const lat = parseFloat(document.getElementById('loc-lat').value) || 0;
+    const lng = parseFloat(document.getElementById('loc-lng').value) || 0;
     try {
       const res = await fetch(`${API_BASE_URL}/api/locations/quick`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: SECRET_KEY, name, city, address: addr }),
+        body: JSON.stringify({ secret: SECRET_KEY, name, city, address: addr, lat, lng }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`);

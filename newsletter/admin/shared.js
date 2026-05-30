@@ -1,6 +1,6 @@
 // ===== Newsletter Admin Shared JS =====
 
-const API_BASE_URL = 'https://op16rbjl3l.execute-api.eu-north-1.amazonaws.com/prod';
+const API_BASE_URL = 'https://YOUR_API_GATEWAY_URL';
 
 // ===== API Key Management =====
 function getAdminKey() {

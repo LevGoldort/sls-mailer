@@ -142,7 +142,8 @@ def track_click(event):
 
         # Get target URL from query string
         query_params = event.get('queryStringParameters', {}) or {}
-        target_url = query_params.get('url', 'https://yallabalagan.org')
+        default_redirect = os.environ.get('DEFAULT_REDIRECT_URL', 'https://example.com')
+        target_url = query_params.get('url', default_redirect)
         target_url = unquote(target_url)
 
         print(f"Tracking click: campaign={campaign_id}, email_hash={email_hash}, url={target_url}")
@@ -171,7 +172,7 @@ def track_click(event):
         # Redirect to homepage on error
         return {
             'statusCode': 302,
-            'headers': {'Location': 'https://yallabalagan.org'},
+            'headers': {'Location': os.environ.get('DEFAULT_REDIRECT_URL', 'https://example.com')},
             'body': ''
         }
 
