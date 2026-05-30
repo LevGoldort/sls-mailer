@@ -191,7 +191,7 @@ function WeeklyEvent({ ctx }) {
     return (
       <div className={'slide acc-' + ctx.accent} style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
         <div style={{ position: 'absolute', inset: 0 }}>
-          <ImageSlot value={img('photo')} onChange={(v) => setImg('photo', v)} label={'АФИША · ' + ev.venue}
+          <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'АФИША · ' + ev.venue}
             style={{ width: '100%', height: '100%', border: 'none' }} />
         </div>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.15) 0%, rgba(26,20,16,.05) 45%, rgba(26,20,16,.85) 100%)' }} aria-hidden="true" />

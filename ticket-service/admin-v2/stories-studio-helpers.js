@@ -105,7 +105,7 @@ function ImageSlot({ value, onChange, label = 'ФОТО', className, style, roun
       onDrop={(e) => { e.preventDefault(); read(e.dataTransfer.files[0]); }}
     >
       {value
-        ? <img src={value} alt={label} />
+        ? <img src={value} alt={label} crossOrigin="anonymous" />
         : (
           <div className="s-img__ph">
             <div className="s-img__ph-icon" aria-hidden="true">✦</div>
