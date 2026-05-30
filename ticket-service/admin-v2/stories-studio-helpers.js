@@ -87,34 +87,56 @@ function RisoText({ value, onCommit, shadowColor = 'var(--magenta)', className, 
   );
 }
 
-/* ── Image slot (click / drop to fill; value is a data URL) ── */
-function ImageSlot({ value, onChange, label = 'ФОТО', className, style, round = false }) {
+/* ── Image slot (click / drop to fill; supports crop modal) ── */
+function ImageSlot({ value, onChange, label = 'ФОТО', className, style, round = false, cropW, cropH }) {
   const inputRef = useRef(null);
-  const read = (file) => {
+  const [hovered, setHovered] = useState(false);
+
+  const applyFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
-    const r = new FileReader();
-    r.onload = () => onChange(r.result);
-    r.readAsDataURL(file);
+    if (cropW && cropH && window.showCropModal) {
+      new Promise(resolve => window.showCropModal(file, cropW, cropH, 0.9, resolve))
+        .then(blob => {
+          const r = new FileReader();
+          r.onload = () => onChange(r.result);
+          r.readAsDataURL(blob);
+        });
+    } else {
+      const r = new FileReader();
+      r.onload = () => onChange(r.result);
+      r.readAsDataURL(file);
+    }
   };
+
   return (
     <div
       className={'s-img ' + (className || '')}
-      style={{ borderRadius: round ? '50%' : 0, ...style }}
+      style={{ position: 'relative', overflow: 'hidden', borderRadius: round ? '50%' : 0, cursor: 'pointer', ...style }}
       onClick={() => inputRef.current && inputRef.current.click()}
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); read(e.dataTransfer.files[0]); }}
+      onDrop={(e) => { e.preventDefault(); applyFile(e.dataTransfer.files[0]); }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {value
-        ? <img src={value} alt={label} crossOrigin="anonymous" />
-        : (
-          <div className="s-img__ph">
-            <div className="s-img__ph-icon" aria-hidden="true">✦</div>
-            <div className="s-img__ph-label">{label}</div>
-            <div className="s-img__ph-hint">КЛИК / ПЕРЕТАЩИ ФОТО</div>
-          </div>
-        )}
+      {value ? (
+        <>
+          <img src={value} alt={label} crossOrigin="anonymous"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+          {hovered && (
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,20,16,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+              <span style={{ fontFamily: 'var(--f-mono)', color: 'var(--paper)', fontSize: 18, letterSpacing: '.14em' }}>✏ ЗАМЕНИТЬ</span>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="s-img__ph">
+          <div className="s-img__ph-icon" aria-hidden="true">✦</div>
+          <div className="s-img__ph-label">{label}</div>
+          <div className="s-img__ph-hint">КЛИК / ПЕРЕТАЩИ ФОТО</div>
+        </div>
+      )}
       <input ref={inputRef} type="file" accept="image/*" hidden
-        onChange={(e) => read(e.target.files[0])} />
+        onChange={(e) => applyFile(e.target.files[0])} />
     </div>
   );
 }

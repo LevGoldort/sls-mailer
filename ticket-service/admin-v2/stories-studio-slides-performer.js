@@ -43,7 +43,8 @@ function PerfIntro({ ctx }) {
           <EditableText className="s-eyebrow" value={T('role', p.role)} onCommit={(v) => set('role', v)} single style={{ fontSize: 24 }} />
           <NameBlock size={132} />
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-            <ImageSlot value={img('photo')} onChange={(v) => setImg('photo', v)} label={'ПОРТРЕТ'} style={{ position: 'absolute', inset: 0, boxShadow: '12px 12px 0 var(--ink)' }} />
+            <ImageSlot value={img('photo') || p.photo} onChange={(v) => setImg('photo', v)} label={'ПОРТРЕТ'}
+              cropW={800} cropH={1000} style={{ position: 'absolute', inset: 0, boxShadow: '12px 12px 0 var(--ink)' }} />
             <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
             <div style={{ position: 'absolute', bottom: 24, left: 24, zIndex: 3 }}>
               <span className="s-stamp s-stamp--lg" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
@@ -63,8 +64,8 @@ function PerfIntro({ ctx }) {
     <div className="slide acc-magenta" style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
       <Grain on={layers.grain} />
       <div style={{ position: 'relative', height: '56%', minHeight: 0 }}>
-        <ImageSlot value={img('photo')} onChange={(v) => setImg('photo', v)} label="ПОРТРЕТ ИСПОЛНИТЕЛЯ"
-          style={{ width: '100%', height: '100%', border: 'none', borderBottom: '5px solid var(--ink)' }} />
+        <ImageSlot value={img('photo') || p.photo} onChange={(v) => setImg('photo', v)} label="ПОРТРЕТ ИСПОЛНИТЕЛЯ"
+          cropW={1080} cropH={1080} style={{ width: '100%', height: '100%', border: 'none', borderBottom: '5px solid var(--ink)' }} />
         <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,0) 55%, rgba(26,20,16,.55) 100%)' }} aria-hidden="true" />
         {layers.stamps && (
@@ -180,7 +181,8 @@ function PerfContent({ ctx }) {
     <div className="slide acc-cyan" style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
       <Grain on={layers.grain} />
       <div style={{ position: 'relative', height: '50%' }}>
-        <ImageSlot value={img('thumb')} onChange={(v) => setImg('thumb', v)} label={'ОБЛОЖКА · ' + ep.show}
+        <ImageSlot value={img('thumb') || ep.thumbnail} onChange={(v) => setImg('thumb', v)} label={'ОБЛОЖКА · ' + ep.show}
+          cropW={1280} cropH={720}
           style={{ width: '100%', height: '100%', border: 'none', borderBottom: '5px solid var(--ink)' }} />
         <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>

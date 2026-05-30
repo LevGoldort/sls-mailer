@@ -192,7 +192,7 @@ function WeeklyEvent({ ctx }) {
       <div className={'slide acc-' + ctx.accent} style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
         <div style={{ position: 'absolute', inset: 0 }}>
           <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'АФИША · ' + ev.venue}
-            style={{ width: '100%', height: '100%', border: 'none' }} />
+            cropW={1080} cropH={1920} style={{ width: '100%', height: '100%', border: 'none' }} />
         </div>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.15) 0%, rgba(26,20,16,.05) 45%, rgba(26,20,16,.85) 100%)' }} aria-hidden="true" />
         <Halftone on={layers.halftone} corner />
@@ -242,7 +242,7 @@ function WeeklyEvent({ ctx }) {
             {/* inset photo */}
             <div style={{ position: 'relative', height: 360, border: '5px solid var(--ink)', boxShadow: '8px 8px 0 ' + accentVar, transform: 'rotate(0.5deg)' }}>
               <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
-                style={{ width: '100%', height: '100%', border: 'none' }} />
+                cropW={1080} cropH={360} style={{ width: '100%', height: '100%', border: 'none' }} />
               <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
             </div>
             <div className="s-meta-row" style={{ fontSize: 22, gap: 10 }}>
@@ -274,7 +274,7 @@ function WeeklyEvent({ ctx }) {
       {/* event photo */}
       <div style={{ position: 'relative', zIndex: 4, margin: '32px 72px 0', flexShrink: 0, height: 480, border: '5px solid var(--ink)', boxShadow: '8px 8px 0 ' + accentVar }}>
         <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
-          style={{ width: '100%', height: '100%', border: 'none' }} />
+          cropW={1080} cropH={480} style={{ width: '100%', height: '100%', border: 'none' }} />
         <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
       </div>
 

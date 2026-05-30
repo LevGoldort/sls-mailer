@@ -63,8 +63,8 @@ function EventSolo({ ctx }) {
   return (
     <div className={'slide acc-' + ctx.accent} style={{ ...ctx.rootStyle, position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'absolute', inset: 0 }}>
-        <ImageSlot value={img('photo')} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
-          style={{ width: '100%', height: '100%', border: 'none' }} />
+        <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
+          cropW={1080} cropH={1920} style={{ width: '100%', height: '100%', border: 'none' }} />
       </div>
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.55) 0%, rgba(26,20,16,.05) 32%, rgba(26,20,16,.18) 52%, rgba(26,20,16,.92) 100%)', zIndex: 2 }} aria-hidden="true" />
       <Halftone on={layers.halftone} corner />
@@ -124,7 +124,8 @@ function ContentDrop({ ctx }) {
           {layers.stamps && <span className="s-stamp s-stamp--lg s-stamp--red s-stamp--fill" style={{ transform: 'rotate(3deg)' }}><span>★ НОВЫЙ ВЫПУСК ★</span></span>}
         </div>
         <div style={{ position: 'relative', aspectRatio: '16/9', minHeight: 0, boxShadow: '12px 12px 0 var(--ink)', border: '5px solid var(--ink)' }}>
-          <ImageSlot value={img('thumb')} onChange={(v) => setImg('thumb', v)} label="ОБЛОЖКА ВЫПУСКА" style={{ position: 'absolute', inset: 0, border: 'none' }} />
+          <ImageSlot value={img('thumb') || ep.thumbnail} onChange={(v) => setImg('thumb', v)} label="ОБЛОЖКА ВЫПУСКА"
+            cropW={1280} cropH={720} style={{ position: 'absolute', inset: 0, border: 'none' }} />
           <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
           <Tape on={layers.tape} color="yellow" style={{ top: -16, left: 40, width: 180, height: 36, transform: 'rotate(-4deg)', zIndex: 5 }} />
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}><div className="s-playbtn">▶</div></div>
@@ -155,8 +156,8 @@ function MerchDrop({ ctx }) {
   return (
     <div className={'slide ' + (sold ? 'acc-magenta' : 'acc-cyan')} style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'relative', height: '58%' }}>
-        <ImageSlot value={img('photo')} onChange={(v) => setImg('photo', v)} label="ФОТО ТОВАРА"
-          style={{ width: '100%', height: '100%', border: 'none', borderBottom: '5px solid var(--ink)' }} />
+        <ImageSlot value={img('photo') || m.photo} onChange={(v) => setImg('photo', v)} label="ФОТО ТОВАРА"
+          cropW={900} cropH={900} style={{ width: '100%', height: '100%', border: 'none', borderBottom: '5px solid var(--ink)' }} />
         <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
         {sold && <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,20,16,.5)', zIndex: 2 }} aria-hidden="true" />}
         {sold
