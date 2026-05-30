@@ -10,6 +10,7 @@ from decimal import Decimal
 import boto3
 import base64
 import re
+import hmac
 from difflib import SequenceMatcher
 
 # Add parent directory to path для импорта models и utils
@@ -119,7 +120,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # Routing
     try:
-        if path.startswith('/api/events'):
+        if path == '/api/events/quick' and http_method == 'POST':
+            return handle_quick_post(event)
+        elif path == '/api/locations/quick' and http_method == 'POST':
+            return handle_quick_location(event)
+        elif path == '/api/url-preview' and http_method == 'POST':
+            return handle_url_preview(event)
+        elif path.startswith('/api/events'):
             return handle_events(event, http_method, path)
         elif path.startswith('/api/locations'):
             return handle_locations(event, http_method, path)
@@ -141,6 +148,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_influencers(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
+        elif path == '/api/upload-image/quick' and http_method == 'POST':
+            return handle_quick_image_upload(event)
         elif path == '/api/admin/regenerate-site' and http_method == 'POST':
             return handle_regenerate_site(event)
         elif path == '/api/webhooks/allpay' and http_method == 'POST':
@@ -897,6 +906,10 @@ def handle_locations(event: Dict, method: str, path: str) -> Dict:
     if method == 'GET' and path.startswith('/api/locations/'):
         location_id = path.split('/')[-1]
         return get_location(location_id)
+
+    # POST /api/locations/quick - создать локацию без JWT (по секрету)
+    if method == 'POST' and path == '/api/locations/quick':
+        return handle_quick_location_create(event)
 
     # POST /api/locations - создать локацию (admin)
     if method == 'POST' and path == '/api/locations':
@@ -2913,6 +2926,301 @@ def handle_image_upload(event: Dict) -> Dict:
         import traceback
         traceback.print_exc()
         return error_response(500, f"Failed to upload image: {str(e)}")
+
+
+def handle_quick_image_upload(event: Dict) -> Dict:
+    """Quick-post image upload — authenticated by shared secret, no admin JWT required"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        if body.get('secret') != 'yallafriend':
+            return error_response(401, 'Invalid secret')
+
+        base64_data = body.get('data')
+        content_type = body.get('contentType', 'image/jpeg')
+
+        if not base64_data:
+            return error_response(400, 'Missing data')
+        if content_type not in {'image/jpeg', 'image/png', 'image/webp'}:
+            return error_response(400, 'Invalid content type')
+
+        image_data = base64.b64decode(base64_data)
+        if len(image_data) > 5 * 1024 * 1024:
+            return error_response(400, 'Image too large (max 5MB)')
+
+        import uuid
+        s3_client = boto3.client('s3', region_name='eu-north-1')
+        bucket_name = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
+        key = f"events/{uuid.uuid4().hex[:8]}_quick.jpg"
+
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=key,
+            Body=image_data,
+            ContentType='image/jpeg',
+            CacheControl='max-age=31536000',
+        )
+
+        url = f"https://{bucket_name}.s3.eu-north-1.amazonaws.com/{key}"
+        return success_response({'url': url})
+
+    except Exception as e:
+        print(f"Error in quick image upload: {str(e)}")
+        return error_response(500, f"Failed to upload image: {str(e)}")
+
+
+def _extract_maps_coords(url: str):
+    """Extract lat/lng from a Google Maps URL. Follows short links. Returns dict or None."""
+    def _parse(u):
+        m = re.search(r'/@(-?\d+\.\d+),(-?\d+\.\d+)', u)
+        if m:
+            return {'lat': float(m.group(1)), 'lng': float(m.group(2))}
+        m = re.search(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)', u)
+        if m:
+            return {'lat': float(m.group(1)), 'lng': float(m.group(2))}
+        m = re.search(r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)', u)
+        if m:
+            return {'lat': float(m.group(1)), 'lng': float(m.group(2))}
+        return None
+
+    coords = _parse(url)
+    if coords:
+        return coords
+
+    if 'goo.gl' in url or 'maps.app' in url:
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                coords = _parse(resp.url)
+                if coords:
+                    return coords
+        except Exception as e:
+            print(f"Maps short link resolve failed: {e}")
+
+    return None
+
+
+# ===== Quick-Post Handler =====
+def handle_quick_post(request_event: Dict) -> Dict:
+    """POST /api/events/quick — no JWT; validates QUICK_POST_SECRET from env"""
+    quick_secret = os.environ.get('QUICK_POST_SECRET', '')
+    if not quick_secret:
+        return error_response(503, "Quick-post not configured")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    provided_secret = body.get('secret', '')
+    if not provided_secret or not hmac.compare_digest(provided_secret, quick_secret):
+        log_security_event('unauthorized_quick_post', {'ip': get_client_identifier(request_event)})
+        return error_response(401, "Invalid secret")
+
+    required = ['title', 'date', 'external_url']
+    for f in required:
+        if not body.get(f):
+            return error_response(400, f"Missing required field: {f}")
+
+    slug_value = None
+    if body.get('slug'):
+        try:
+            slug_value = validate_event_slug(body['slug'])
+        except ValueError as exc:
+            return error_response(400, str(exc))
+
+    evt = Event(
+        event_id=Event.generate_id(),
+        title=body['title'],
+        description=body.get('description', ''),
+        date=body['date'],
+        location_id=body.get('location_id') or 'unknown',
+        ticket_types=[],
+        images=body.get('images', []),
+        slug=slug_value,
+        event_type='external',
+        external_url=body['external_url'],
+        performer_ids=body.get('performer_ids', []),
+        tenant_id='yallabalagan',
+    )
+    item = evt.to_dynamodb_item()
+    maps_url = body.get('maps_url', '').strip() if body.get('maps_url') else ''
+    if maps_url:
+        item['maps_url'] = maps_url
+        coords = _extract_maps_coords(maps_url)
+        if coords:
+            item['coordinates'] = coords
+            print(f"Extracted coordinates {coords} from {maps_url}")
+    db.put_event(item)
+
+    try:
+        lambda_client = boto3.client('lambda')
+        lambda_client.invoke(
+            FunctionName=os.environ.get('SITE_REGENERATOR_LAMBDA', 'yallabalagan-site-regenerator'),
+            InvocationType='Event',
+            Payload=json.dumps({'source': 'quick-post', 'event_id': evt.event_id}),
+        )
+    except Exception as e:
+        print(f"Site regeneration trigger failed: {e}")
+
+    return success_response({'event_id': evt.event_id, 'message': 'Event created'}, 201)
+
+
+def handle_url_preview(request_event: Dict) -> Dict:
+    """POST /api/url-preview — public, fetches OG tags and uploads image to S3"""
+    import urllib.request
+    import uuid
+    from html.parser import HTMLParser
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    url = body.get('url', '').strip()
+    if not url or not url.startswith(('http://', 'https://')):
+        return error_response(400, "Valid URL required")
+
+    class OGParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.og = {}
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'meta':
+                d = dict(attrs)
+                prop = d.get('property', '') or d.get('name', '')
+                if prop in ('og:title', 'og:description', 'og:image') and 'content' in d:
+                    self.og[prop] = d['content']
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html = resp.read(100_000).decode('utf-8', errors='ignore')
+    except Exception as e:
+        return error_response(502, f"Could not fetch URL: {e}")
+
+    parser = OGParser()
+    parser.feed(html)
+    og = parser.og
+
+    s3_image_url = ''
+    og_image = og.get('og:image', '')
+    if og_image and og_image.startswith(('http://', 'https://')):
+        try:
+            img_req = urllib.request.Request(og_image, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(img_req, timeout=5) as img_resp:
+                ct = img_resp.headers.get('Content-Type', 'image/jpeg').split(';')[0].strip()
+                allowed_ct = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+                if ct not in allowed_ct:
+                    ct = 'image/jpeg'
+                image_data = img_resp.read(3 * 1024 * 1024)
+            ext = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'}.get(ct, 'jpg')
+            key = f"og_{uuid.uuid4().hex[:8]}.{ext}"
+            bucket = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
+            boto3.client('s3', region_name='eu-north-1').put_object(
+                Bucket=bucket, Key=key, Body=image_data,
+                ContentType=ct, CacheControl='max-age=31536000',
+            )
+            s3_image_url = f"https://{bucket}.s3.eu-north-1.amazonaws.com/{key}"
+        except Exception as img_err:
+            print(f"OG image upload failed: {img_err}")
+
+    return success_response({
+        'title':       og.get('og:title', ''),
+        'description': og.get('og:description', ''),
+        'image':       s3_image_url,
+    })
+
+
+def handle_quick_location(request_event: Dict) -> Dict:
+    """POST /api/locations/quick — creates a minimal location, auth via QUICK_POST_SECRET"""
+    quick_secret = os.environ.get('QUICK_POST_SECRET', '')
+    if not quick_secret:
+        return error_response(503, "Quick-post not configured")
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON body")
+
+    provided_secret = body.get('secret', '')
+    if not provided_secret or not hmac.compare_digest(provided_secret, quick_secret):
+        log_security_event('unauthorized_quick_location', {'ip': get_client_identifier(request_event)})
+        return error_response(401, "Invalid secret")
+
+    name = body.get('name', '').strip()
+    city = body.get('city', '').strip()
+    address_text = body.get('address', '').strip()
+    maps_url = body.get('maps_url', '').strip() if body.get('maps_url') else ''
+    if not name or not city or not address_text:
+        return error_response(400, "name, city and address are required")
+
+    coords = Coordinates(lat=0, lng=0)
+    if maps_url:
+        extracted = _extract_maps_coords(maps_url)
+        if extracted:
+            coords = Coordinates(lat=extracted['lat'], lng=extracted['lng'])
+
+    slug = re.sub(r'[^\w-]', '', re.sub(r'[\s]+', '-', name.lower()))[:80]
+
+    loc = Location(
+        location_id=Location.generate_id(),
+        name=name,
+        slug=slug,
+        address=Address(
+            street=address_text,
+            city=city,
+            coordinates=coords,
+        ),
+        description='',
+        short_description='',
+        capacity=0,
+    )
+    db.put_location(loc.to_dynamodb_item())
+    return success_response({'location': {'location_id': loc.location_id, 'name': loc.name}}, 201)
+
+
+def handle_quick_location_create(event: Dict) -> Dict:
+    """POST /api/locations/quick — authenticated by shared secret, no JWT required"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        if body.get('secret') != 'yallafriend':
+            return error_response(401, 'Invalid secret')
+
+        name = body.get('name', '').strip()
+        city = body.get('city', '').strip()
+        address_str = body.get('address', '').strip()
+
+        if not name or not city or not address_str:
+            return error_response(400, 'Missing required fields: name, city, address')
+
+        lat = float(body.get('lat', 0) or 0)
+        lng = float(body.get('lng', 0) or 0)
+
+        location_id = Location.generate_id()
+        slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') + '-' + location_id[:6]
+
+        loc = Location(
+            location_id=location_id,
+            name=name,
+            slug=slug,
+            address=Address(
+                street=address_str,
+                city=city,
+                coordinates=Coordinates(lat=lat, lng=lng),
+            ),
+            description='',
+            short_description='',
+            capacity=0,
+        )
+
+        db.put_location(loc.to_dynamodb_item())
+        return success_response({'location': {'location_id': location_id, 'name': name}}, status_code=201)
+
+    except Exception as e:
+        print(f"Error in quick location create: {str(e)}")
+        return error_response(500, f"Failed to create location: {str(e)}")
 
 
 def handle_regenerate_site(event: Dict) -> Dict:
