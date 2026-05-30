@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stories Studio — Yalla Balagan Admin</title>
+
+  <!-- Fonts (crossorigin required for html-to-image canvas export) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Suez+One&display=swap" rel="stylesheet" crossorigin="anonymous">
+
+  <!-- Slide canvas styles -->
+  <link rel="stylesheet" href="stories-studio-slides.css">
+  <!-- Editor chrome styles -->
+  <link rel="stylesheet" href="stories-studio-chrome.css">
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- Auth + shared API helpers (provides apiCall, API_BASE_URL, Auth) -->
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+
+<!-- CDN: React 18, Babel, html-to-image, JSZip -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<!-- YB_DATA loader: fetches real API data and normalises into the shape the studio expects -->
+<script>
+window.YB_DATA = {
+  site: {
+    name: 'ЯЛЛА БАЛАГАН',
+    short: 'ЯБ',
+    handle: '@yallabalagan',
+    url: 'yallabalagan.org',
+    cities: 'TEL AVIV · YAFFO · BAT YAM',
+  },
+  events: [], performers: [], episodes: [], merch: [],
+  eventById: () => null, performerById: () => null,
+  episodeById: () => null, merchById: () => null,
+};
+
+function _extractTime(dateStr) {
+  if (!dateStr) return '20:00';
+  const m = dateStr.match(/T(\d{2}:\d{2})/);
+  return m ? m[1] : '20:00';
+}
+
+function _platformFromUrl(url) {
+  if (!url) return 'YouTube';
+  if (url.includes('youtube') || url.includes('youtu.be')) return 'YOUTUBE';
+  if (url.includes('spotify')) return 'SPOTIFY';
+  if (url.includes('vimeo')) return 'VIMEO';
+  return 'ONLINE';
+}
+
+window.loadYBData = async function () {
+  const [evRes, locRes, perfRes, prodRes, epRes, showsRes] = await Promise.all([
+    apiCall('/api/events'),
+    apiCall('/api/locations'),
+    apiCall('/api/performers'),
+    apiCall('/api/products'),
+    apiCall('/api/episodes'),
+    apiCall('/api/shows'),
+  ]);
+
+  /* location map: id → { name, address } */
+  const locMap = {};
+  for (const loc of (locRes.locations || [])) {
+    const addr = loc.address || {};
+    locMap[loc.location_id] = {
+      name: loc.name || '',
+      address: [addr.street, addr.city].filter(Boolean).join(', '),
+    };
+  }
+
+  /* show map: id → name */
+  const showMap = {};
+  for (const s of (showsRes.shows || [])) {
+    showMap[s.show_id] = s.name || s.show_id;
+  }
+
+  /* normalise events */
+  const events = (evRes.events || []).map(ev => {
+    const loc = locMap[ev.location_id] || {};
+    const minPrice = (ev.ticket_types || [])
+      .map(tt => Number(tt.price || 0))
+      .filter(p => p > 0)
+      .sort((a, b) => a - b)[0] || null;
+    return {
+      id: ev.event_id,
+      date: (ev.date || '').slice(0, 10),
+      time: _extractTime(ev.date),
+      title: ev.title || '',
+      short: ev.description || '',
+      description: ev.description || '',
+      type: ev.event_type || 'internal',
+      venue: loc.name || '',
+      address: loc.address || '',
+      tags: ev.tags || [],
+      price: minPrice,
+      ctaLabel: ev.event_type === 'external' ? 'БИЛЕТЫ У ПАРТНЁРА' : 'БИЛЕТЫ НА САЙТЕ',
+      performerIds: ev.performer_ids || [],
+      slug: ev.slug || '',
+      images: ev.images || [],
+      photo: (ev.images || [])[0] || null,
+    };
+  });
+
+  /* normalise performers */
+  const performers = (perfRes.performers || []).map(p => {
+    const soc = p.social || {};
+    return {
+      id: p.performer_id,
+      name: p.name || '',
+      role: p.role || '',
+      bio: p.bio || '',
+      tagline: p.tagline || '',
+      photo: p.photo_url || null,
+      city: '',
+      socials: { ig: soc.instagram || '', tg: soc.telegram || '', yt: soc.youtube || '', fb: soc.facebook || '' },
+      eventIds: [],
+      episodeIds: [],
+      productIds: [],
+    };
+  });
+
+  /* normalise episodes */
+  const episodes = (epRes.episodes || []).map(ep => ({
+    id: ep.episode_id,
+    show: showMap[ep.show_id] || ep.show_id || '',
+    number: ep.number || 1,
+    title: ep.title || '',
+    description: ep.description || '',
+    url: ep.url || '',
+    platform: _platformFromUrl(ep.url),
+    thumbnail: ep.thumbnail_url || null,
+    performerIds: ep.performer_ids || [],
+  }));
+
+  /* normalise merch */
+  const merch = (prodRes.products || []).map(m => ({
+    id: m.product_id,
+    name: m.name || '',
+    price: Number(m.price_ils || 0),
+    short: m.short_description || '',
+    photo: m.photo_url || null,
+    soldOut: m.status === 'sold_out' || (m.total_slots != null && m.sold_slots >= m.total_slots),
+    performerId: m.performer_id || null,
+  }));
+
+  /* build cross-references */
+  const perfById = {};
+  performers.forEach(p => { perfById[p.id] = p; });
+
+  events.forEach(ev => {
+    ev.performerIds.forEach(pid => {
+      if (perfById[pid]) perfById[pid].eventIds.push(ev.id);
+    });
+  });
+  episodes.forEach(ep => {
+    ep.performerIds.forEach(pid => {
+      if (perfById[pid]) perfById[pid].episodeIds.push(ep.id);
+    });
+  });
+  merch.forEach(m => {
+    if (m.performerId && perfById[m.performerId]) {
+      perfById[m.performerId].productIds.push(m.id);
+    }
+  });
+
+  /* index helpers */
+  const evById    = {};  events.forEach(e => { evById[e.id] = e; });
+  const epById    = {};  episodes.forEach(e => { epById[e.id] = e; });
+  const mById     = {};  merch.forEach(m => { mById[m.id] = m; });
+
+  return {
+    site: window.YB_DATA.site,
+    events,
+    performers,
+    episodes,
+    merch,
+    eventById:     (id) => evById[id]    || null,
+    performerById: (id) => perfById[id]  || null,
+    episodeById:   (id) => epById[id]    || null,
+    merchById:     (id) => mById[id]     || null,
+  };
+};
+</script>
+
+<!-- Slide components (Babel JSX — order matters: helpers first) -->
+<script type="text/babel" src="stories-studio-helpers.js"></script>
+<script type="text/babel" src="stories-studio-slides-weekly.js"></script>
+<script type="text/babel" src="stories-studio-slides-performer.js"></script>
+<script type="text/babel" src="stories-studio-slides-misc.js"></script>
+<script type="text/babel" src="stories-studio-recipes.js"></script>
+<script type="text/babel" src="stories-studio-app.js"></script>
+
+<!-- Mount -->
+<script type="text/babel">
+  const container = document.getElementById('root');
+  const root = ReactDOM.createRoot(container);
+  root.render(<Studio />);
+</script>
+
+</body>
+</html>

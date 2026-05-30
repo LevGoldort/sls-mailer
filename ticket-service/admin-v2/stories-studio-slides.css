@@ -1,0 +1,340 @@
+/* ============================================================
+   Yalla Balagan — STORY / POST GRAPHICS
+   Zine × Riso aesthetic, pushed harder for social.
+   All slide visuals live here. Class prefix: .s-
+   ============================================================ */
+
+:root {
+  --paper:       #f3eee1;
+  --paper-dark:  #e8e1cc;
+  --ink:         #1a1410;
+  --magenta:     #e535ab;
+  --magenta-deep:#c01d8b;
+  --cyan:        #00b5d8;
+  --cyan-deep:   #0090b0;
+  --yellow:      #ffd400;
+  --red:         #ee1a1f;
+
+  --f-display: 'Archivo Black', sans-serif;
+  --f-body:    'Heebo', system-ui, sans-serif;
+  --f-mono:    'Space Mono', ui-monospace, monospace;
+  --f-serif:   'Frank Ruhl Libre', serif;
+}
+
+/* ── Slide canvas ── */
+.slide {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  -webkit-font-smoothing: antialiased;
+  flex-shrink: 0;
+  isolation: isolate;
+}
+.slide * { box-sizing: border-box; }
+
+/* Accent driver — set per slide via --accent / --accent-2 */
+.slide { --accent: var(--magenta); --accent-2: var(--cyan); }
+.acc-magenta { --accent: var(--magenta); --accent-2: var(--cyan); }
+.acc-cyan    { --accent: var(--cyan);    --accent-2: var(--magenta); }
+.acc-yellow  { --accent: var(--yellow);  --accent-2: var(--magenta); }
+
+/* ── Layer: paper grain ── */
+.s-grain {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(26,20,16,.07) 1px, transparent 0),
+    radial-gradient(circle at 13px 19px, rgba(26,20,16,.05) 1px, transparent 0);
+  background-size: 26px 26px, 26px 26px;
+}
+/* ── Layer: halftone dots ── */
+.s-halftone {
+  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  mix-blend-mode: multiply;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 55%, transparent) 2px, transparent 2.4px);
+  background-size: 16px 16px;
+  opacity: .5;
+}
+.s-halftone--corner {
+  inset: auto -120px -120px auto; width: 620px; height: 620px;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 70%, transparent) 3px, transparent 3.6px);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(circle at bottom right, #000 30%, transparent 72%);
+          mask-image: radial-gradient(circle at bottom right, #000 30%, transparent 72%);
+}
+
+/* ── Layer: tape ── */
+.s-tape {
+  position: absolute; z-index: 6; pointer-events: none;
+  border: 1px solid rgba(0,0,0,.25);
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
+}
+.s-tape--cyan    { background: rgba(0,181,216,.55); }
+.s-tape--magenta { background: rgba(229,53,171,.5); }
+.s-tape--yellow  { background: rgba(255,212,0,.72); }
+.s-tape--paper   { background: rgba(243,238,225,.85); }
+
+/* ── Stamp / chip ── */
+.s-stamp {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 3px solid currentColor;
+  font-family: var(--f-mono);
+  font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  padding: 7px 14px; font-size: 20px; line-height: 1;
+}
+.s-stamp--lg { padding: 10px 18px; font-size: 26px; border-width: 3.5px; }
+.s-stamp--fill { background: currentColor; }
+.s-stamp--fill > * { color: var(--paper); }
+.s-stamp--magenta { color: var(--magenta); }
+.s-stamp--cyan    { color: var(--cyan-deep); }
+.s-stamp--red     { color: var(--red); }
+.s-stamp--ink     { color: var(--ink); }
+.s-stamp--yellow-bg { color: var(--ink); background: var(--yellow); border-color: var(--ink); }
+
+/* ── Riso offset text ── */
+.s-riso { position: relative; display: inline-block; }
+.s-riso__shadow {
+  position: absolute; inset: 0; mix-blend-mode: multiply;
+  pointer-events: none; transform: translate(6px, 5px); z-index: -1;
+}
+
+/* ── Brand chrome ── */
+.s-brand { display: inline-flex; align-items: center; gap: 14px; }
+.s-brand__box {
+  background: var(--ink); color: var(--yellow);
+  font-family: var(--f-display); text-transform: uppercase;
+  padding: 10px 14px 8px; font-size: 30px; line-height: 1;
+  border: 4px solid var(--ink); box-shadow: 5px 5px 0 var(--magenta);
+  transform: rotate(-2deg);
+}
+.s-brand__name { font-family: var(--f-display); font-size: 26px; letter-spacing: -.01em; text-transform: uppercase; }
+.s-brand__cities { font-family: var(--f-mono); font-size: 15px; letter-spacing: .12em; opacity: .65; margin-top: 4px; }
+
+.s-ticker {
+  background: var(--ink); color: var(--paper);
+  font-family: var(--f-mono); font-size: 17px; letter-spacing: .16em;
+  text-transform: uppercase; padding: 12px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.s-ticker__c { color: var(--yellow); }
+.s-ticker__r { color: var(--cyan); direction: rtl; }
+
+.s-swipe {
+  display: inline-flex; align-items: center; gap: 12px;
+  font-family: var(--f-display); text-transform: uppercase;
+  font-size: 26px; letter-spacing: .04em;
+  border: 3px dashed var(--ink); padding: 12px 22px;
+  background: var(--paper);
+}
+.s-handle {
+  font-family: var(--f-mono); font-size: 20px; letter-spacing: .08em;
+  text-transform: lowercase; font-weight: 700;
+}
+
+/* ── Big display heading ── */
+.s-display {
+  font-family: var(--f-display); text-transform: uppercase;
+  line-height: .82; letter-spacing: -.045em; margin: 0;
+}
+
+/* ── Date stamp block (event) ── */
+.s-datestamp {
+  background: var(--ink); color: var(--yellow);
+  border: 5px solid var(--ink);
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 18px 22px 16px; position: relative; overflow: hidden;
+  box-shadow: 9px 9px 0 var(--accent);
+}
+.s-datestamp__num   { font-family: var(--f-display); font-size: 150px; line-height: .82; letter-spacing: -.05em; }
+.s-datestamp__month { font-family: var(--f-display); font-size: 46px; line-height: 1; color: var(--paper); margin-top: 2px; }
+.s-datestamp__dow   { font-family: var(--f-mono); font-size: 19px; letter-spacing: .2em; color: var(--cyan); margin-top: 8px; }
+
+/* ── Ticket stub ── */
+.s-stub {
+  position: relative; border: 4px solid var(--ink);
+  background: var(--accent); color: var(--ink);
+  padding: 26px 30px 26px 44px; overflow: hidden;
+}
+.s-stub--cyan   { background: var(--cyan); }
+.s-stub--yellow { background: var(--yellow); }
+.s-stub__perf {
+  position: absolute; top: 0; bottom: 0; left: 22px;
+  border-left: 4px dashed var(--ink);
+}
+.s-stub__dot {
+  position: absolute; left: 12px; width: 22px; height: 22px;
+  background: var(--paper); border: 4px solid var(--ink); border-radius: 50%;
+}
+.s-stub__dot--t { top: -11px; }
+.s-stub__dot--b { bottom: -11px; }
+.s-stub__meta {
+  display: flex; justify-content: space-between;
+  font-family: var(--f-mono); font-size: 17px; letter-spacing: .1em;
+  text-transform: uppercase; opacity: .8;
+}
+.s-stub__price { font-family: var(--f-display); font-size: 96px; line-height: .9; letter-spacing: -.04em; }
+.s-stub__price sup { font-size: 40px; }
+.s-stub__label { font-family: var(--f-mono); font-size: 18px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+
+/* ── Generic CTA button ── */
+.s-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--f-display); letter-spacing: .06em; text-transform: uppercase;
+  border: 4px solid var(--ink); padding: 20px 28px; font-size: 28px;
+}
+.s-btn--primary { background: var(--ink); color: var(--yellow); box-shadow: 7px 7px 0 var(--accent); }
+.s-btn--yellow  { background: var(--yellow); color: var(--ink); box-shadow: 7px 7px 0 var(--ink); }
+.s-btn--full    { width: 100%; }
+
+/* ── Image slot ── */
+.s-img {
+  position: relative; overflow: hidden; background: var(--ink);
+  border: 4px solid var(--ink);
+}
+.s-img img { width: 100%; height: 100%; object-fit: cover; display: block; filter: contrast(1.08) saturate(1.08); }
+.s-img__ph {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; text-align: center;
+  background:
+    repeating-linear-gradient(45deg, var(--paper-dark) 0 14px, var(--paper) 14px 28px);
+  color: var(--ink); cursor: pointer;
+}
+.s-img__ph-label { font-family: var(--f-mono); font-size: 18px; letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
+.s-img__ph-hint  { font-family: var(--f-mono); font-size: 13px; letter-spacing: .1em; opacity: .5; }
+.s-img__ph-icon  { font-family: var(--f-display); font-size: 40px; opacity: .35; }
+
+/* ── Editable text affordance (studio only) ── */
+.editing [data-edit] { cursor: text; }
+.editing [data-edit]:hover { outline: 2px dashed color-mix(in srgb, var(--magenta) 70%, transparent); outline-offset: 3px; }
+[data-edit]:focus { outline: 2px solid var(--magenta); outline-offset: 3px; }
+
+/* ============================================================
+   WEEKLY LINEUP
+   ============================================================ */
+.s-weekly-cover { display: flex; flex-direction: column; }
+.s-weekly-cover__body { position: relative; z-index: 4; flex: 1; display: flex; flex-direction: column; }
+
+.s-eyebrow {
+  font-family: var(--f-mono); letter-spacing: .2em; text-transform: uppercase;
+  font-size: 20px; opacity: .7;
+}
+
+/* hero image on cover */
+.s-cover-hero {
+  position: relative; border: 5px solid var(--ink);
+  box-shadow: 10px 10px 0 var(--ink); overflow: hidden;
+}
+
+/* ── Weekly BOARD (all events on one screen) ── */
+.s-board {
+  display: flex; flex-direction: column; gap: 22px;
+}
+.s-board-row {
+  position: relative;
+  display: grid; grid-template-columns: auto 1fr; gap: 30px; align-items: center;
+  border: 5px solid var(--ink); background: var(--paper);
+  padding: 28px 34px;
+}
+.s-board-row__date {
+  font-family: var(--f-display); text-align: center; line-height: .8;
+  background: var(--ink); color: var(--yellow); border: 4px solid var(--ink);
+  padding: 18px 20px 16px; min-width: 148px;
+}
+.s-board-row__num { display: block; font-size: 96px; letter-spacing: -.05em; }
+.s-board-row__mon { display: block; font-size: 30px; color: var(--paper); letter-spacing: .02em; margin-top: 2px; }
+.s-board-row__dow { font-family: var(--f-mono); font-size: 16px; color: var(--cyan); letter-spacing: .2em; margin-top: 10px; }
+.s-board-row__title {
+  font-family: var(--f-display); text-transform: uppercase;
+  font-size: 46px; line-height: .98; letter-spacing: -.015em;
+  overflow-wrap: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.s-board-row__meta {
+  font-family: var(--f-mono); font-size: 21px; letter-spacing: .05em;
+  text-transform: uppercase; opacity: .72; margin-top: 12px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.s-board-row__tags { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+/* full-bleed announcement overlay panel */
+.s-overlay-panel {
+  background: color-mix(in srgb, var(--ink) 82%, transparent);
+  border: 4px solid var(--paper);
+  backdrop-filter: blur(2px);
+}
+
+/* event slide */
+.s-event { display: flex; flex-direction: column; }
+.s-event__title {
+  font-family: var(--f-display); text-transform: uppercase;
+  line-height: .94; letter-spacing: -.02em; margin: 0;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.s-event__desc { font-family: var(--f-serif); font-weight: 700; line-height: 1.32; }
+.s-meta-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  font-family: var(--f-mono); letter-spacing: .06em; text-transform: uppercase;
+}
+
+/* index counter (corner) */
+.s-counter {
+  font-family: var(--f-display); line-height: .9; letter-spacing: -.04em;
+}
+.s-counter sup { font-size: .5em; opacity: .55; }
+
+/* ============================================================
+   PERFORMER
+   ============================================================ */
+.s-perf-portrait { position: relative; }
+.s-list-row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: center;
+  border: 4px solid var(--ink); background: var(--paper);
+  padding: 22px 26px; box-shadow: 7px 7px 0 var(--ink);
+}
+.s-list-row__date {
+  font-family: var(--f-display); font-size: 40px; line-height: .9; text-align: center;
+  background: var(--ink); color: var(--yellow); padding: 12px 14px; border: 3px solid var(--ink);
+}
+.s-list-row__date small { display: block; font-size: 17px; color: var(--paper); }
+.s-list-row__title { font-family: var(--f-display); font-size: 30px; text-transform: uppercase; line-height: 1.02; letter-spacing: -.01em; }
+.s-list-row__sub { font-family: var(--f-mono); font-size: 16px; letter-spacing: .06em; opacity: .65; margin-top: 6px; text-transform: uppercase; }
+
+.s-social-chip {
+  font-family: var(--f-display); font-size: 26px; text-transform: uppercase;
+  border: 4px solid var(--ink); background: var(--paper);
+  padding: 12px 18px; box-shadow: 4px 4px 0 var(--ink);
+}
+
+/* ============================================================
+   MERCH
+   ============================================================ */
+.s-price-sticker {
+  background: var(--yellow); color: var(--ink); border: 5px solid var(--ink);
+  font-family: var(--f-display); line-height: .9; letter-spacing: -.03em;
+  padding: 14px 22px 12px; box-shadow: 7px 7px 0 var(--ink);
+}
+.s-soldout {
+  background: var(--red); color: var(--paper); border: 5px solid var(--ink);
+  font-family: var(--f-display); text-transform: uppercase; letter-spacing: .04em;
+  padding: 14px 30px 12px; box-shadow: 8px 8px 0 var(--ink);
+}
+.s-merch-mini {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px;
+  border-bottom: 3px dashed var(--ink); padding: 18px 0;
+}
+.s-merch-mini__name { font-family: var(--f-display); font-size: 30px; text-transform: uppercase; line-height: 1.02; }
+.s-merch-mini__price { font-family: var(--f-display); font-size: 44px; letter-spacing: -.03em; }
+
+/* ============================================================
+   CONTENT / EPISODE
+   ============================================================ */
+.s-ep-badge {
+  font-family: var(--f-mono); font-size: 18px; letter-spacing: .14em; text-transform: uppercase;
+  display: inline-flex; gap: 10px; align-items: center;
+}
+.s-playbtn {
+  width: 96px; height: 96px; border-radius: 50%; border: 5px solid var(--paper);
+  background: var(--red); color: var(--paper); display: flex; align-items: center; justify-content: center;
+  font-size: 42px; box-shadow: 5px 5px 0 var(--ink);
+}
