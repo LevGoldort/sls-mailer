@@ -66,10 +66,10 @@ function EventSolo({ ctx }) {
         <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
           cropW={1080} cropH={1920} style={{ width: '100%', height: '100%', border: 'none' }} />
       </div>
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.55) 0%, rgba(26,20,16,.05) 32%, rgba(26,20,16,.18) 52%, rgba(26,20,16,.92) 100%)', zIndex: 2 }} aria-hidden="true" />
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.55) 0%, rgba(26,20,16,.05) 32%, rgba(26,20,16,.18) 52%, rgba(26,20,16,.92) 100%)', zIndex: 2, pointerEvents: 'none' }} aria-hidden="true" />
       <Halftone on={layers.halftone} corner />
 
-      <div style={{ position: 'relative', zIndex: 4, padding: 60, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div style={{ position: 'relative', zIndex: 4, padding: 60, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
         {/* top — date stamp + tags */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 18 }}>
           <div style={{ transform: 'rotate(-4deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
@@ -84,7 +84,7 @@ function EventSolo({ ctx }) {
         <Tape on={layers.tape} color="yellow" style={{ position: 'static', alignSelf: 'flex-start', width: 230, height: 42, transform: 'rotate(-3deg)', marginBottom: -6, marginLeft: 16 }} />
 
         {/* bottom — everything overlaid on the photo */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 26, pointerEvents: 'all' }}>
           <h1 className="s-event__title" style={{ fontSize: 90, color: 'var(--paper)', textShadow: '5px 5px 0 var(--ink)' }}>
             <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />
           </h1>

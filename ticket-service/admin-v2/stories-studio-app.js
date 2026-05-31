@@ -398,8 +398,126 @@ function Studio() {
           <div className="st-busy__bar"><div className="st-busy__fill" style={{ width: (busy.total ? busy.done / busy.total * 100 : 0) + '%' }} /></div>
         </div>
       )}
+      <CropModal />
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Studio />);
+/* ── Crop Modal ── */
+function CropInner({ url, cropW, cropH, quality, cb, onClose }) {
+  const ASPECT = cropW / cropH;
+  const FW = Math.min(360, Math.round(560 * ASPECT));
+  const FH = Math.round(FW / ASPECT);
+
+  const [nat, setNat] = useState({ w: 0, h: 0 });
+  const [tr, setTr]   = useState({ x: 0, y: 0, s: 1 });
+  const drag = useRef(null);
+  const viewRef = useRef(null);
+
+  const minScale = nat.w > 0 ? Math.min(FW / nat.w, FH / nat.h) * 0.9 : 0.05;
+  const maxScale = nat.w > 0 ? Math.max(FW / nat.w, FH / nat.h) * 3 : 20;
+
+  const onLoad = (e) => {
+    const nw = e.target.naturalWidth, nh = e.target.naturalHeight;
+    const s = Math.max(FW / nw, FH / nh);
+    setNat({ w: nw, h: nh });
+    setTr({ x: (FW - nw * s) / 2, y: (FH - nh * s) / 2, s });
+  };
+
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const handler = (e) => {
+      e.preventDefault();
+      const f = e.deltaY > 0 ? 0.92 : 1.08;
+      setTr(t => {
+        const s = Math.max(minScale, Math.min(maxScale, t.s * f));
+        const cx = FW / 2, cy = FH / 2;
+        return { s, x: cx - (cx - t.x) * (s / t.s), y: cy - (cy - t.y) * (s / t.s) };
+      });
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [minScale, maxScale]);
+
+  const onMouseDown = (e) => {
+    drag.current = { lx: e.clientX, ly: e.clientY };
+    e.preventDefault();
+  };
+  const onMouseMove = (e) => {
+    if (!drag.current) return;
+    const dx = e.clientX - drag.current.lx, dy = e.clientY - drag.current.ly;
+    drag.current = { lx: e.clientX, ly: e.clientY };
+    setTr(t => ({ ...t, x: t.x + dx, y: t.y + dy }));
+  };
+  const onMouseUp = () => { drag.current = null; };
+
+  const sliderVal = nat.w > 0
+    ? Math.max(0, Math.min(100, Math.round((tr.s - minScale) / (maxScale - minScale) * 100)))
+    : 50;
+  const onSlider = (e) => {
+    const newS = minScale + (Number(e.target.value) / 100) * (maxScale - minScale);
+    setTr(t => {
+      const s = Math.max(minScale, Math.min(maxScale, newS));
+      const cx = FW / 2, cy = FH / 2;
+      return { s, x: cx - (cx - t.x) * (s / t.s), y: cy - (cy - t.y) * (s / t.s) };
+    });
+  };
+
+  const apply = () => {
+    if (!nat.w) return;
+    const ratio = cropW / FW;
+    const canvas = document.createElement('canvas');
+    canvas.width = cropW; canvas.height = cropH;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, tr.x * ratio, tr.y * ratio, nat.w * tr.s * ratio, nat.h * tr.s * ratio);
+      canvas.toBlob(b => { cb(b); onClose(); }, 'image/jpeg', quality);
+    };
+    img.src = url;
+  };
+
+  const BTN = { fontFamily: 'var(--f-mono)', fontSize: 13, letterSpacing: '.12em', padding: '10px 24px', cursor: 'pointer', border: '2px solid rgba(255,255,255,.5)', borderRadius: 0 };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ fontFamily: 'var(--f-mono)', color: 'rgba(255,255,255,.5)', fontSize: 11, letterSpacing: '.16em', marginBottom: 14 }}>
+        КАДРИРОВАТЬ · {cropW}×{cropH}px · ПЕРЕТАЩИ / ПРОКРУТИ
+      </div>
+      <div ref={viewRef}
+        style={{ position: 'relative', width: FW, height: FH, overflow: 'hidden', cursor: 'grab', border: '2px solid rgba(255,255,255,.45)', background: '#111', userSelect: 'none' }}
+        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+        <img src={url} alt="" style={{ display: 'none' }} onLoad={onLoad} />
+        {nat.w > 0 && (
+          <img src={url} alt="кроп"
+            style={{ position: 'absolute', left: tr.x, top: tr.y, width: nat.w * tr.s, height: nat.h * tr.s, pointerEvents: 'none', userSelect: 'none', display: 'block' }} />
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, width: FW }}>
+        <span style={{ fontFamily: 'var(--f-mono)', fontSize: 12, color: 'rgba(255,255,255,.4)', userSelect: 'none' }}>−</span>
+        <input type="range" min="0" max="100" value={sliderVal} onChange={onSlider}
+          style={{ flex: 1, cursor: 'pointer', accentColor: 'var(--paper)' }} />
+        <span style={{ fontFamily: 'var(--f-mono)', fontSize: 12, color: 'rgba(255,255,255,.4)', userSelect: 'none' }}>+</span>
+      </div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+        <button style={{ ...BTN, background: 'transparent', color: 'rgba(255,255,255,.6)' }} onClick={onClose}>ОТМЕНА</button>
+        <button style={{ ...BTN, background: 'var(--paper)', color: 'var(--ink)', border: '2px solid var(--paper)' }} onClick={apply}>✓ ПРИМЕНИТЬ</button>
+      </div>
+    </div>
+  );
+}
+
+function CropModal() {
+  const [sess, setSess] = useState(null);
+  useEffect(() => {
+    window.showCropModal = (file, w, h, q, cb) => {
+      setSess({ url: URL.createObjectURL(file), cropW: w, cropH: h, quality: q, cb });
+    };
+    return () => { delete window.showCropModal; };
+  }, []);
+  const close = () => { if (sess) URL.revokeObjectURL(sess.url); setSess(null); };
+  if (!sess) return null;
+  return <CropInner key={sess.url} {...sess} onClose={close} />;
+}

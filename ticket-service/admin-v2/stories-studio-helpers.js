@@ -34,15 +34,15 @@ function dateRangeLabel(isoList) {
 /* ── Layer helpers ── */
 function Grain({ on = true }) {
   if (!on) return null;
-  return <div className="s-grain" aria-hidden="true" />;
+  return <div className="s-grain" style={{ pointerEvents: 'none' }} aria-hidden="true" />;
 }
 function Halftone({ on = true, corner = false, style }) {
   if (!on) return null;
-  return <div className={'s-halftone' + (corner ? ' s-halftone--corner' : '')} style={style} aria-hidden="true" />;
+  return <div className={'s-halftone' + (corner ? ' s-halftone--corner' : '')} style={{ pointerEvents: 'none', ...style }} aria-hidden="true" />;
 }
 function Tape({ on = true, color = 'cyan', style }) {
   if (!on) return null;
-  return <div className={'s-tape s-tape--' + color} style={style} aria-hidden="true" />;
+  return <div className={'s-tape s-tape--' + color} style={{ pointerEvents: 'none', ...style }} aria-hidden="true" />;
 }
 
 /* ── Editable text ── */
@@ -91,22 +91,54 @@ function RisoText({ value, onCommit, shadowColor = 'var(--magenta)', className, 
 function ImageSlot({ value, onChange, label = 'ФОТО', className, style, round = false, cropW, cropH }) {
   const inputRef = useRef(null);
   const [hovered, setHovered] = useState(false);
+  const originalRef = useRef(null); // исходный файл/URL до кропа, не перезаписывается после кропа
+
+  useEffect(() => {
+    if (value && value.startsWith('http')) {
+      originalRef.current = { type: 'url', src: value };
+    }
+  }, [value]);
+
+  const _openCropModal = (file) => {
+    new Promise(resolve => window.showCropModal(file, cropW, cropH, 0.9, resolve))
+      .then(blob => {
+        const r = new FileReader();
+        r.onload = () => onChange(r.result);
+        r.readAsDataURL(blob);
+      });
+  };
 
   const applyFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
+    originalRef.current = { type: 'file', file }; // новая загрузка = новый оригинал
     if (cropW && cropH && window.showCropModal) {
-      new Promise(resolve => window.showCropModal(file, cropW, cropH, 0.9, resolve))
-        .then(blob => {
-          const r = new FileReader();
-          r.onload = () => onChange(r.result);
-          r.readAsDataURL(blob);
-        });
+      _openCropModal(file);
     } else {
       const r = new FileReader();
       r.onload = () => onChange(r.result);
       r.readAsDataURL(file);
     }
   };
+
+  const doCrop = () => {
+    if (!cropW || !cropH || !window.showCropModal) return;
+    const orig = originalRef.current;
+    if (orig?.type === 'file' && orig.file) {
+      _openCropModal(orig.file);
+      return;
+    }
+    const src = orig?.src || value;
+    if (!src) return;
+    const opts = src.startsWith('http') ? { mode: 'cors' } : {};
+    fetch(src, opts)
+      .then(r => r.blob())
+      .then(blob => _openCropModal(new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })))
+      .catch(() => inputRef.current && inputRef.current.click());
+  };
+
+  const BTN = { fontFamily: 'var(--f-mono)', color: 'var(--paper)', fontSize: 15, letterSpacing: '.1em',
+    background: 'rgba(255,255,255,.18)', border: '2px solid rgba(255,255,255,.6)',
+    padding: '8px 16px', cursor: 'pointer', pointerEvents: 'all' };
 
   return (
     <div
@@ -120,11 +152,16 @@ function ImageSlot({ value, onChange, label = 'ФОТО', className, style, roun
     >
       {value ? (
         <>
-          <img src={value} alt={label} crossOrigin="anonymous"
+          <img src={value} alt={label}
+            crossOrigin={value && value.includes('amazonaws.com') ? 'anonymous' : undefined}
+            onError={() => { if (value && value.startsWith('data:')) onChange(null); }}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
           {hovered && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,20,16,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-              <span style={{ fontFamily: 'var(--f-mono)', color: 'var(--paper)', fontSize: 18, letterSpacing: '.14em' }}>✏ ЗАМЕНИТЬ</span>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,20,16,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 10 }}>
+              {cropW && cropH && (
+                <button style={BTN} onClick={(e) => { e.stopPropagation(); doCrop(); }}>✂ КРОП</button>
+              )}
+              <button style={BTN} onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>✏ ЗАМЕНИТЬ</button>
             </div>
           )}
         </>

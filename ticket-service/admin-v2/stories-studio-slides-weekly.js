@@ -42,7 +42,7 @@ function WeeklyCover({ ctx }) {
         <ImageSlot value={img('hero')} onChange={(v) => setImg('hero', v)} label="ГЛАВНОЕ ФОТО НЕДЕЛИ"
           style={{ width: '100%', height: '100%', border: 'none', borderBottom: '5px solid var(--ink)' }} />
         <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.35) 0%, rgba(26,20,16,0) 38%, rgba(26,20,16,.5) 100%)' }} aria-hidden="true" />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.35) 0%, rgba(26,20,16,0) 38%, rgba(26,20,16,.5) 100%)', pointerEvents: 'none' }} aria-hidden="true" />
         {layers.stamps && (
           <div style={{ position: 'absolute', top: 28, left: 32, zIndex: 4 }}><BrandLockup on={layers.stamps} /></div>
         )}
@@ -194,9 +194,9 @@ function WeeklyEvent({ ctx }) {
           <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'АФИША · ' + ev.venue}
             cropW={1080} cropH={1920} style={{ width: '100%', height: '100%', border: 'none' }} />
         </div>
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.15) 0%, rgba(26,20,16,.05) 45%, rgba(26,20,16,.85) 100%)' }} aria-hidden="true" />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.15) 0%, rgba(26,20,16,.05) 45%, rgba(26,20,16,.85) 100%)', pointerEvents: 'none' }} aria-hidden="true" />
         <Halftone on={layers.halftone} corner />
-        <div style={{ position: 'relative', zIndex: 4, padding: 64, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ position: 'relative', zIndex: 4, padding: 64, display: 'flex', flexDirection: 'column', height: '100%', pointerEvents: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ transform: 'rotate(-4deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
             <span className="s-counter" style={{ fontSize: 86, color: 'var(--paper)', textShadow: '4px 4px 0 var(--ink)' }}>
@@ -205,7 +205,7 @@ function WeeklyEvent({ ctx }) {
           </div>
           <div style={{ flex: 1 }} />
           <Tape on={layers.tape} color="yellow" style={{ position: 'static', alignSelf: 'flex-start', width: 220, height: 40, transform: 'rotate(-3deg)', marginBottom: -14, marginLeft: 30 }} />
-          <div style={{ background: 'var(--paper)', border: '5px solid var(--ink)', boxShadow: '10px 10px 0 ' + accentVar, padding: '30px 34px', transform: 'rotate(-0.6deg)' }}>
+          <div style={{ background: 'var(--paper)', border: '5px solid var(--ink)', boxShadow: '10px 10px 0 ' + accentVar, padding: '30px 34px', transform: 'rotate(-0.6deg)', pointerEvents: 'all' }}>
             {layers.stamps && <div style={{ marginBottom: 16 }}><Tags /></div>}
             <h1 className="s-event__title" style={{ fontSize: 76 }}>
               <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />

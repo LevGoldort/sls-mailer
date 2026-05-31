@@ -166,7 +166,8 @@ cat > /tmp/ticket-api-env.json <<EOF
     "COUPONS_TABLE": "yallabalagan-coupons",
     "SEAT_RESERVATIONS_TABLE": "yallabalagan-seat-reservations",
     "MEDIA_BUCKET": "yallabalagan-ticket-media",
-    "FRONTEND_BUCKET": "yallabalagan-tickets-frontend"
+    "FRONTEND_BUCKET": "yallabalagan-tickets-frontend",
+    "JWT_SECRET": "${JWT_SECRET}"
   }
 }
 EOF
