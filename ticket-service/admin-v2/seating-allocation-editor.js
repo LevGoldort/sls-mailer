@@ -116,15 +116,15 @@ class SeatingAllocationEditor {
      * Fetch purchased seats from API
      */
     async fetchPurchasedSeats(eventId) {
-        const apiKey = localStorage.getItem('admin_api_key');
+        const token = Auth.getAccessToken();
         // Auto-detect environment
         const isDev = window.location.hostname.includes('-dev');
         const API_URL = isDev
             ? 'https://d4xhvmdzbg.execute-api.eu-north-1.amazonaws.com/dev'
             : 'https://ovajavet67.execute-api.eu-north-1.amazonaws.com';
 
-        if (!apiKey) {
-            console.warn('No API key - cannot fetch purchased seats');
+        if (!token) {
+            console.warn('Not authenticated - cannot fetch purchased seats');
             return;
         }
 
@@ -132,7 +132,7 @@ class SeatingAllocationEditor {
             const response = await fetch(
                 `${API_URL}/api/events/${eventId}/purchased-seats`,
                 {
-                    headers: {'X-API-Key': apiKey}
+                    headers: {'Authorization': `Bearer ${token}`}
                 }
             );
 

@@ -1739,8 +1739,24 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 }
 
 @media (max-width: 900px) {
-  .yb-header__main { grid-template-columns: 1fr auto; }
-  .yb-header__nav { display: none; }
+  .yb-header__main { display: flex; flex-wrap: wrap; align-items: center; padding: 14px 24px; gap: 0; }
+  .yb-header__logo { flex: 1; }
+  .yb-header__nav {
+    order: 10;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    gap: 20px;
+    padding: 10px 0 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    border-top: var(--yb-border-thin);
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .yb-header__nav::-webkit-scrollbar { display: none; }
   .yb-event-card { grid-template-columns: 80px 1fr; grid-template-rows: auto auto; }
   .yb-event-card__img { display: none; }
   .yb-event-card__stub { grid-column: 1 / -1; }
@@ -1765,17 +1781,16 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-event-hero__title-card { margin: -60px 16px 0; }
   .yb-event-meta { padding: 24px 24px 8px; }
   .yb-venue { padding: 16px 24px 24px; }
-  .yb-performers-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 600px) {
+  .yb-performer-grid { grid-template-columns: 1fr; }
   .yb-pad, .yb-pad-x { padding-left: 16px; padding-right: 16px; }
   .yb-home-hero { padding: 32px 16px 20px; }
   .yb-home-hero__h1 { font-size: 56px; }
   .yb-page-hero__h1 { font-size: 56px; }
   .yb-page-hero { padding: 32px 16px 16px; }
   .yb-footer__grid { grid-template-columns: 1fr; }
-  .yb-performers-grid { grid-template-columns: 1fr; }
   .yb-products-grid { grid-template-columns: 1fr; }
   .yb-event-meta__grid { grid-template-columns: 1fr; }
   .yb-header__ticker { padding: 6px 16px; flex-direction: column; gap: 2px; }

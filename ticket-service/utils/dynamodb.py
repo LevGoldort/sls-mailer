@@ -35,6 +35,8 @@ class DynamoDBClient:
         self.episodes_table = self.dynamodb.Table(self.episodes_table_name)
         self.influencers_table_name = os.environ.get('INFLUENCERS_TABLE', 'yallabalagan-influencers')
         self.influencers_table = self.dynamodb.Table(self.influencers_table_name)
+        self.instagram_table_name = os.environ.get('INSTAGRAM_CONNECTIONS_TABLE', 'yallabalagan-instagram')
+        self.instagram_table = self.dynamodb.Table(self.instagram_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -837,3 +839,45 @@ class DynamoDBClient:
                 break
             scan_params['ExclusiveStartKey'] = last_key
         return items
+
+    # ===== Instagram Connections =====
+
+    def put_instagram_connection(self, item: dict):
+        """Store or overwrite an Instagram connection record."""
+        self.instagram_table.put_item(Item=item)
+
+    def get_instagram_connection(self, ig_user_id: str) -> Optional[dict]:
+        resp = self.instagram_table.get_item(Key={'PK': 'CONNECTION', 'SK': ig_user_id})
+        return resp.get('Item')
+
+    def list_instagram_connections(self) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey
+        resp = self.instagram_table.query(
+            KeyConditionExpression=DKey('PK').eq('CONNECTION'),
+        )
+        return resp.get('Items', [])
+
+    def delete_instagram_connection(self, ig_user_id: str):
+        self.instagram_table.delete_item(Key={'PK': 'CONNECTION', 'SK': ig_user_id})
+
+    def update_instagram_token(self, ig_user_id: str, access_token_enc: str, expires_at: str):
+        self.instagram_table.update_item(
+            Key={'PK': 'CONNECTION', 'SK': ig_user_id},
+            UpdateExpression='SET access_token = :t, token_expires_at = :e',
+            ExpressionAttributeValues={':t': access_token_enc, ':e': expires_at},
+        )
+
+    # ===== Instagram Post History =====
+
+    def put_instagram_log(self, item: dict):
+        """Append a post-history log entry."""
+        self.instagram_table.put_item(Item=item)
+
+    def list_instagram_logs(self, month: str) -> List[dict]:
+        """Query log entries for a given YYYY-MM month."""
+        from boto3.dynamodb.conditions import Key as DKey
+        resp = self.instagram_table.query(
+            KeyConditionExpression=DKey('PK').eq(f'LOG#{month}'),
+            ScanIndexForward=False,
+        )
+        return resp.get('Items', [])

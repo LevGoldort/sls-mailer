@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .ig-accounts { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+    .ig-card {
+      display: flex; align-items: center; gap: 16px;
+      border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px;
+      background: #fff;
+    }
+    .ig-avatar {
+      width: 48px; height: 48px; border-radius: 50%; background: var(--gray-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .ig-info { flex: 1; min-width: 0; }
+    .ig-handle { font-weight: 600; font-size: 15px; color: var(--dark); }
+    .ig-name { font-size: 13px; color: var(--gray-mid); margin-top: 2px; }
+    .ig-meta { font-size: 12px; color: var(--gray-mid); margin-top: 4px; }
+    .ig-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+    .ig-status.active { color: #16a34a; }
+    .ig-status.expiring { color: #d97706; }
+    .ig-connect-box {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 32px;
+      text-align: center; background: var(--gray-bg);
+    }
+    .ig-connect-box p { color: var(--gray-mid); margin-bottom: 20px; }
+    .token-warning { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #92400e; margin-bottom: 16px; }
+    .section-title { font-size: 16px; font-weight: 600; color: var(--dark); margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Instagram</h1>
+        <p class="page-subtitle">Подключённые аккаунты для публикации Stories</p>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" style="display:none"></div>
+
+    <!-- Connected accounts -->
+    <p class="section-title">Подключённые аккаунты</p>
+    <div id="accounts-container">
+      <div class="loading">Загрузка...</div>
+    </div>
+
+    <!-- Connect new -->
+    <p class="section-title" style="margin-top:32px">Добавить аккаунт</p>
+    <div class="ig-connect-box">
+      <p>Нажмите кнопку ниже, чтобы авторизоваться через Facebook и подключить Instagram Business аккаунт.</p>
+      <button class="btn btn-primary" id="connect-btn" onclick="startOAuth()">Подключить Instagram</button>
+    </div>
+
+    <div style="margin-top:32px">
+      <p class="section-title">Важно</p>
+      <ul style="font-size:13px;color:var(--gray-mid);line-height:1.8;padding-left:20px">
+        <li>Нужен Instagram <strong>Business</strong> или <strong>Creator</strong> аккаунт (личные не поддерживаются)</li>
+        <li>Токен действует ~60 дней и обновляется автоматически</li>
+        <li>Публикация возможна только в Stories (Reels и Feed — в планах)</li>
+      </ul>
+    </div>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    await initAdmin();
+    checkUrlParams();
+    loadAccounts();
+  });
+
+  function checkUrlParams() {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('success') === 'connected') {
+      showToast('Instagram аккаунт подключён!', 'success');
+      history.replaceState({}, '', 'instagram-settings.html');
+    } else if (p.get('error')) {
+      const msgs = {
+        oauth_denied: 'Авторизация отменена',
+        no_ig_business: 'Не найден Business/Creator Instagram аккаунт. Убедитесь, что аккаунт переключён в Business режим.',
+        config_error: 'Ошибка конфигурации сервера. Обратитесь к администратору.',
+        callback_failed: 'Ошибка при подключении. Попробуйте ещё раз.',
+      };
+      showToast(msgs[p.get('error')] || 'Ошибка подключения', 'error');
+      history.replaceState({}, '', 'instagram-settings.html');
+    }
+  }
+
+  async function loadAccounts() {
+    const container = document.getElementById('accounts-container');
+    try {
+      const data = await apiCall('/api/instagram/accounts');
+      renderAccounts(data.accounts || []);
+    } catch (e) {
+      container.innerHTML = `<div class="error-msg">Ошибка загрузки: ${e.message}</div>`;
+    }
+  }
+
+  function renderAccounts(accounts) {
+    const container = document.getElementById('accounts-container');
+    if (!accounts.length) {
+      container.innerHTML = '<p style="color:var(--gray-mid);font-size:14px">Нет подключённых аккаунтов.</p>';
+      return;
+    }
+    const now = new Date();
+    const warnThreshold = new Date(now.getTime() + 10 * 86400 * 1000);
+
+    container.innerHTML = `<div class="ig-accounts">${accounts.map(acc => {
+      const expiresAt = acc.token_expires_at ? new Date(acc.token_expires_at) : null;
+      const expiring = expiresAt && expiresAt < warnThreshold;
+      const statusLabel = expiring ? '⚠ Токен скоро истекает' : '● Активен';
+      const statusClass = expiring ? 'expiring' : 'active';
+      const expiryText = expiresAt
+        ? `Токен до ${expiresAt.toLocaleDateString('ru-RU')}`
+        : 'Срок не известен';
+      const connectedAt = acc.connected_at
+        ? new Date(acc.connected_at).toLocaleDateString('ru-RU')
+        : '—';
+
+      return `
+        <div class="ig-card">
+          <div class="ig-avatar">📷</div>
+          <div class="ig-info">
+            <div class="ig-handle">@${acc.ig_username || acc.ig_user_id}</div>
+            <div class="ig-name">${acc.ig_name || ''}</div>
+            <div class="ig-meta">${expiryText} · Подключён ${connectedAt}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <span class="ig-status ${statusClass}">${statusLabel}</span>
+            <button class="btn btn-secondary btn-sm" onclick="disconnect('${acc.ig_user_id}', '@${acc.ig_username}')">Отключить</button>
+          </div>
+        </div>
+      `;
+    }).join('')}</div>`;
+  }
+
+  async function startOAuth() {
+    const btn = document.getElementById('connect-btn');
+    btn.disabled = true;
+    btn.textContent = 'Перенаправляем...';
+    try {
+      const data = await apiCall('/api/instagram/oauth/start');
+      window.location.href = data.url;
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Подключить Instagram';
+    }
+  }
+
+  async function disconnect(igUserId, handle) {
+    if (!confirm(`Отключить ${handle}? Публикация через этот аккаунт станет недоступна.`)) return;
+    try {
+      await apiCall(`/api/instagram/accounts/${igUserId}`, 'DELETE');
+      showToast(`${handle} отключён`, 'success');
+      loadAccounts();
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+    }
+  }
+
+  function showToast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast toast-${type}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+</script>
+</body>
+</html>

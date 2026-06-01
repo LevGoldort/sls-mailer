@@ -275,7 +275,7 @@ const RESIZE_PRESETS = {
     'performers': { width: 800,  height: 800 },
     'products':   { width: 1000, height: 1000 },
     'locations':  { width: 1200, height: 675 },
-    'shows':      { width: 1200, height: 675 },
+    'shows':      { width: 800,  height: 800  },
     'episodes':   { width: 1280, height: 720 },
 };
 
@@ -445,14 +445,14 @@ function _cropClamp() {
     const totalScale = c.baseScale * c.zoom;
     const scaledW = c.naturalW * totalScale;
     const scaledH = c.naturalH * totalScale;
-    // horizontal: center in display if smaller, otherwise keep within display bounds
-    c.x = scaledW <= c.displayW
-        ? (c.displayW - scaledW) / 2
-        : Math.min(0, Math.max(c.displayW - scaledW, c.x));
-    // vertical: same
-    c.y = scaledH <= c.displayH
-        ? (c.displayH - scaledH) / 2
-        : Math.min(0, Math.max(c.displayH - scaledH, c.y));
+    // Clamp based on crop rect, not display bounds.
+    // Range allows positioning image so any part of it can appear in the crop area.
+    const minX = Math.min(c.cropLeft, c.cropLeft + c.cropW - scaledW);
+    const maxX = Math.max(c.cropLeft, c.cropLeft + c.cropW - scaledW);
+    c.x = Math.min(maxX, Math.max(minX, c.x));
+    const minY = Math.min(c.cropTop, c.cropTop + c.cropH - scaledH);
+    const maxY = Math.max(c.cropTop, c.cropTop + c.cropH - scaledH);
+    c.y = Math.min(maxY, Math.max(minY, c.y));
 }
 
 function _cropApply() {
@@ -546,27 +546,23 @@ async function uploadToS3(file, filename) {
 
         reader.onload = async function(e) {
             try {
-                // Get admin API key from localStorage
-                const adminKey = localStorage.getItem('admin_api_key');
-                if (!adminKey) {
-                    throw new Error('Admin API key not found. Please refresh the page.');
+                const token = Auth.getAccessToken();
+                if (!token) {
+                    throw new Error('Not authenticated. Please log in again.');
                 }
 
-                // For now, we'll use a Lambda endpoint to handle S3 upload
-                // You could also use pre-signed URLs like in newsletter admin
                 const arrayBuffer = e.target.result;
                 const base64 = btoa(
                     new Uint8Array(arrayBuffer)
                         .reduce((data, byte) => data + String.fromCharCode(byte), '')
                 );
 
-                // Upload via API (use API_BASE_URL from shared.js)
                 const apiBaseUrl = window.API_BASE_URL || API_BASE_URL;
                 const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': adminKey
+                        'Authorization': `Bearer ${token}`,
                     },
                     body: JSON.stringify({
                         filename: filename,
