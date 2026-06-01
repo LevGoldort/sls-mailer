@@ -274,7 +274,6 @@ function Studio() {
         const slideSt = edits[slides[slideIdx]?.key] || {};
         const imageUrl = await uploadSlide(slideIdx);
         const body = { ig_user_id: account.ig_user_id, image_url: imageUrl, caption: '', is_story: true };
-        if (slideSt.linkEnabled && slideSt.link) body.link = slideSt.link;
         await apiCall('/api/instagram/post', 'POST', body);
         posted++;
         setIgPosting({ done: posted, total: indices.length, account });
@@ -432,16 +431,9 @@ function Studio() {
 
           <div className="st-section">
             <div className="st-section__h">Instagram</div>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--st-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Ссылка для этого слайда</div>
-              <input type="url" className="st-text-input" placeholder="https://..."
-                value={activeSt.link || ''}
-                onChange={e => setStoryLink(activeSlide.key, e.target.value)} />
-              <div className="st-toggle" style={{ marginTop: 4 }}
-                onClick={() => setLinkEnabled(activeSlide.key, !activeSt.linkEnabled)}>
-                <span>Прикрепить ссылку</span>
-                <span className={'st-switch' + (activeSt.linkEnabled ? ' on' : '')} />
-              </div>
+            <div style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--st-dim)', marginBottom: 12, lineHeight: 1.5 }}>
+              Ссылки в сторис через API не поддерживаются Meta.<br/>
+              Текст «Подробности на Yallabalagan.org» уже добавлен на все слайды.
             </div>
             {igResult && (
               <div style={{ fontSize: 11, marginBottom: 8, color: igResult.ok ? '#16a34a' : '#dc2626', letterSpacing: '.05em' }}>

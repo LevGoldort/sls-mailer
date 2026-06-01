@@ -275,7 +275,7 @@ const RESIZE_PRESETS = {
     'performers': { width: 800,  height: 800 },
     'products':   { width: 1000, height: 1000 },
     'locations':  { width: 1200, height: 675 },
-    'shows':      { width: 1200, height: 675 },
+    'shows':      { width: 800,  height: 800  },
     'episodes':   { width: 1280, height: 720 },
 };
 
@@ -546,27 +546,23 @@ async function uploadToS3(file, filename) {
 
         reader.onload = async function(e) {
             try {
-                // Get admin API key from localStorage
-                const adminKey = localStorage.getItem('admin_api_key');
-                if (!adminKey) {
-                    throw new Error('Admin API key not found. Please refresh the page.');
+                const token = Auth.getAccessToken();
+                if (!token) {
+                    throw new Error('Not authenticated. Please log in again.');
                 }
 
-                // For now, we'll use a Lambda endpoint to handle S3 upload
-                // You could also use pre-signed URLs like in newsletter admin
                 const arrayBuffer = e.target.result;
                 const base64 = btoa(
                     new Uint8Array(arrayBuffer)
                         .reduce((data, byte) => data + String.fromCharCode(byte), '')
                 );
 
-                // Upload via API (use API_BASE_URL from shared.js)
                 const apiBaseUrl = window.API_BASE_URL || API_BASE_URL;
                 const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': adminKey
+                        'Authorization': `Bearer ${token}`,
                     },
                     body: JSON.stringify({
                         filename: filename,

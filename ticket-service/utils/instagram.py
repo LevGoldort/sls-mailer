@@ -154,9 +154,6 @@ def post_story(ig_user_id: str, image_url: str, access_token: str, link: str = '
         'media_type': 'STORIES',
         'access_token': access_token,
     }
-    if link:
-        container_data['link_url'] = link
-        print(f"Instagram post_story: link_url will be sent: {link}")
 
     container_resp = requests.post(
         f"{GRAPH_URL}/{ig_user_id}/media",

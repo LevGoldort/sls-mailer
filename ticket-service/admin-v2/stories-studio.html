@@ -86,8 +86,10 @@ window.loadYBData = async function () {
     showMap[s.show_id] = s.name || s.show_id;
   }
 
-  /* normalise events */
-  const events = (evRes.events || []).map(ev => {
+  /* normalise events — skip cancelled */
+  const events = (evRes.events || [])
+    .filter(ev => ev.status !== 'cancelled')
+    .map(ev => {
     const loc = locMap[ev.location_id] || {};
     const minPrice = (ev.ticket_types || [])
       .map(tt => Number(tt.price || 0))

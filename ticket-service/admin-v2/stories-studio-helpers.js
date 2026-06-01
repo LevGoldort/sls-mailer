@@ -91,9 +91,11 @@ function RisoText({ value, onCommit, shadowColor = 'var(--magenta)', className, 
 function ImageSlot({ value, onChange, label = 'ФОТО', className, style, round = false, cropW, cropH }) {
   const inputRef = useRef(null);
   const [hovered, setHovered] = useState(false);
-  const originalRef = useRef(null); // исходный файл/URL до кропа, не перезаписывается после кропа
+  const [imgFailed, setImgFailed] = useState(false);
+  const originalRef = useRef(null);
 
   useEffect(() => {
+    setImgFailed(false); // сброс ошибки при смене значения
     if (value && value.startsWith('http')) {
       originalRef.current = { type: 'url', src: value };
     }
@@ -110,7 +112,7 @@ function ImageSlot({ value, onChange, label = 'ФОТО', className, style, roun
 
   const applyFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
-    originalRef.current = { type: 'file', file }; // новая загрузка = новый оригинал
+    originalRef.current = { type: 'file', file };
     if (cropW && cropH && window.showCropModal) {
       _openCropModal(file);
     } else {
@@ -129,8 +131,12 @@ function ImageSlot({ value, onChange, label = 'ФОТО', className, style, roun
     }
     const src = orig?.src || value;
     if (!src) return;
-    const opts = src.startsWith('http') ? { mode: 'cors' } : {};
-    fetch(src, opts)
+    // cache-busting query param обходит закэшированный non-CORS ответ
+    const fetchUrl = src.startsWith('http')
+      ? `${src}${src.includes('?') ? '&' : '?'}_cb=${Date.now()}`
+      : src;
+    const opts = fetchUrl.startsWith('http') ? { mode: 'cors' } : {};
+    fetch(fetchUrl, opts)
       .then(r => r.blob())
       .then(blob => _openCropModal(new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })))
       .catch(() => inputRef.current && inputRef.current.click());
@@ -139,6 +145,8 @@ function ImageSlot({ value, onChange, label = 'ФОТО', className, style, roun
   const BTN = { fontFamily: 'var(--f-mono)', color: 'var(--paper)', fontSize: 15, letterSpacing: '.1em',
     background: 'rgba(255,255,255,.18)', border: '2px solid rgba(255,255,255,.6)',
     padding: '8px 16px', cursor: 'pointer', pointerEvents: 'all' };
+
+  const showImg = value && !imgFailed;
 
   return (
     <div
@@ -150,11 +158,10 @@ function ImageSlot({ value, onChange, label = 'ФОТО', className, style, roun
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {value ? (
+      {showImg ? (
         <>
           <img src={value} alt={label}
-            crossOrigin={value && value.includes('amazonaws.com') ? 'anonymous' : undefined}
-            onError={() => { if (value && value.startsWith('data:')) onChange(null); }}
+            onError={() => setImgFailed(true)}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
           {hovered && (
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,20,16,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 10 }}>
