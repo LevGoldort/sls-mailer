@@ -272,6 +272,11 @@
   overflow-wrap: break-word; word-break: break-word;
 }
 .s-event__desc { font-family: var(--f-serif); font-weight: 700; line-height: 1.32; }
+.s-city {
+  font-family: var(--f-display); text-transform: uppercase;
+  line-height: .84; letter-spacing: -.04em;
+  overflow-wrap: break-word; word-break: break-word;
+}
 .s-meta-row {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   font-family: var(--f-mono); letter-spacing: .06em; text-transform: uppercase;
@@ -288,22 +293,40 @@
    ============================================================ */
 .s-perf-portrait { position: relative; }
 .s-list-row {
-  display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: center;
-  border: 4px solid var(--ink); background: var(--paper);
-  padding: 22px 26px; box-shadow: 7px 7px 0 var(--ink);
+  display: grid; grid-template-columns: auto 1fr auto; gap: 28px; align-items: center;
+  border: 5px solid var(--ink); background: var(--paper);
+  padding: 28px 32px; box-shadow: 8px 8px 0 var(--ink);
 }
 .s-list-row__date {
-  font-family: var(--f-display); font-size: 40px; line-height: .9; text-align: center;
-  background: var(--ink); color: var(--yellow); padding: 12px 14px; border: 3px solid var(--ink);
+  font-family: var(--f-display); font-size: 60px; line-height: .9; text-align: center;
+  background: var(--ink); color: var(--yellow); padding: 16px 18px; border: 3px solid var(--ink);
 }
-.s-list-row__date small { display: block; font-size: 17px; color: var(--paper); }
-.s-list-row__title { font-family: var(--f-display); font-size: 30px; text-transform: uppercase; line-height: 1.02; letter-spacing: -.01em; }
-.s-list-row__sub { font-family: var(--f-mono); font-size: 16px; letter-spacing: .06em; opacity: .65; margin-top: 6px; text-transform: uppercase; }
+.s-list-row__date small { display: block; font-size: 24px; color: var(--paper); }
+.s-list-row__title {
+  font-family: var(--f-display); font-size: 42px; text-transform: uppercase; line-height: 1.0; letter-spacing: -.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.s-list-row__sub { font-family: var(--f-mono); font-size: 23px; letter-spacing: .05em; opacity: .68; margin-top: 12px; text-transform: uppercase; }
 
 .s-social-chip {
   font-family: var(--f-display); font-size: 26px; text-transform: uppercase;
   border: 4px solid var(--ink); background: var(--paper);
   padding: 12px 18px; box-shadow: 4px 4px 0 var(--ink);
+}
+
+/* bio: full bio as a toast overlaid on the photo */
+.s-bio-toast {
+  position: absolute; left: 24px; right: 24px; bottom: 24px; z-index: 5;
+  background: color-mix(in srgb, var(--ink) 90%, transparent);
+  border: 4px solid var(--paper); color: var(--paper);
+  padding: 24px 28px; box-shadow: 8px 8px 0 rgba(0,0,0,.35);
+}
+.s-bio-toast__tag { font-family: var(--f-mono); font-size: 19px; letter-spacing: .18em; color: var(--cyan); text-transform: uppercase; }
+.s-bio-toast__txt { font-family: var(--f-serif); font-weight: 700; font-size: 31px; line-height: 1.3; margin: 10px 0 0; text-wrap: pretty; }
+/* bio: short bio / slogan statement */
+.s-bio-short {
+  font-family: var(--f-serif); font-weight: 900; font-size: 50px; line-height: 1.16;
+  margin: 0; letter-spacing: -.01em; text-wrap: balance;
 }
 
 /* ============================================================
@@ -319,12 +342,31 @@
   font-family: var(--f-display); text-transform: uppercase; letter-spacing: .04em;
   padding: 14px 30px 12px; box-shadow: 8px 8px 0 var(--ink);
 }
-.s-merch-mini {
-  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px;
-  border-bottom: 3px dashed var(--ink); padding: 18px 0;
+/* merch photo grid (performer merch) */
+.s-merch-grid { display: grid; gap: 26px; flex: 1; min-height: 0; }
+.s-merch-grid--1 { grid-template-columns: 1fr; }
+.s-merch-grid--2 { grid-template-columns: 1fr 1fr; }
+.s-merch-grid--4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.s-merch-card {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  border: 5px solid var(--ink); background: var(--paper); box-shadow: 8px 8px 0 var(--ink);
 }
-.s-merch-mini__name { font-family: var(--f-display); font-size: 30px; text-transform: uppercase; line-height: 1.02; }
-.s-merch-mini__price { font-family: var(--f-display); font-size: 44px; letter-spacing: -.03em; }
+.s-merch-card__img { position: relative; flex: 1; min-height: 0; background: var(--ink); border-bottom: 5px solid var(--ink); }
+.s-merch-card__price {
+  position: absolute; bottom: 14px; right: 14px; z-index: 4;
+  background: var(--yellow); color: var(--ink); border: 4px solid var(--ink);
+  font-family: var(--f-display); line-height: .9; letter-spacing: -.03em;
+  padding: 8px 14px 6px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(4deg);
+}
+.s-merch-card__body { padding: 18px 22px; }
+.s-merch-card__name {
+  font-family: var(--f-display); text-transform: uppercase; line-height: 1.02; letter-spacing: -.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.s-merch-card__desc {
+  font-family: var(--f-serif); font-weight: 700; line-height: 1.28; margin-top: 12px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
 
 /* ============================================================
    CONTENT / EPISODE

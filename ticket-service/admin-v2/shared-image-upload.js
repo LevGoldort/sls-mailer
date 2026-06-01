@@ -445,14 +445,14 @@ function _cropClamp() {
     const totalScale = c.baseScale * c.zoom;
     const scaledW = c.naturalW * totalScale;
     const scaledH = c.naturalH * totalScale;
-    // horizontal: center in display if smaller, otherwise keep within display bounds
-    c.x = scaledW <= c.displayW
-        ? (c.displayW - scaledW) / 2
-        : Math.min(0, Math.max(c.displayW - scaledW, c.x));
-    // vertical: same
-    c.y = scaledH <= c.displayH
-        ? (c.displayH - scaledH) / 2
-        : Math.min(0, Math.max(c.displayH - scaledH, c.y));
+    // Clamp based on crop rect, not display bounds.
+    // Range allows positioning image so any part of it can appear in the crop area.
+    const minX = Math.min(c.cropLeft, c.cropLeft + c.cropW - scaledW);
+    const maxX = Math.max(c.cropLeft, c.cropLeft + c.cropW - scaledW);
+    c.x = Math.min(maxX, Math.max(minX, c.x));
+    const minY = Math.min(c.cropTop, c.cropTop + c.cropH - scaledH);
+    const maxY = Math.max(c.cropTop, c.cropTop + c.cropH - scaledH);
+    c.y = Math.min(maxY, Math.max(minY, c.y));
 }
 
 function _cropApply() {

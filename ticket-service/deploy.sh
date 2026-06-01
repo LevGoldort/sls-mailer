@@ -59,7 +59,12 @@ if [[ "$MODE" == "admin" ]]; then
     --profile "$PROFILE" --region "$REGION" \
     --exclude "*.md" --exclude ".DS_Store" \
     --delete --no-cli-pager
-  echo "Done: http://$ADMIN_BUCKET.s3-website.$REGION.amazonaws.com"
+  if [[ "$ENV" == "prod" ]]; then
+    aws cloudfront create-invalidation --distribution-id E1QVQ0JRE575WR --paths "/*" \
+      --profile "$PROFILE" --no-cli-pager > /dev/null
+    echo "CloudFront invalidated"
+  fi
+  echo "Done: https://admin.yallabalagan.org"
   exit 0
 fi
 
@@ -166,6 +171,12 @@ cat > /tmp/ticket-api-env.json <<EOF
     "SHOWS_TABLE": "yallabalagan-shows",
     "EPISODES_TABLE": "yallabalagan-episodes",
     "INFLUENCERS_TABLE": "yallabalagan-influencers",
+    "INSTAGRAM_CONNECTIONS_TABLE": "yallabalagan-instagram",
+    "META_APP_ID": "${META_APP_ID}",
+    "META_APP_SECRET": "${META_APP_SECRET}",
+    "INSTAGRAM_TOKEN_KEY": "${INSTAGRAM_TOKEN_KEY}",
+    "API_BASE_URL": "${API_URL}",
+    "ADMIN_BASE_URL": "${ADMIN_BASE_URL}",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
     "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
   }
@@ -503,6 +514,44 @@ ensure_table "yallabalagan-influencers" \
   --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE
 
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-influencers"
+
+ensure_table "yallabalagan-instagram" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-instagram"
+
+# Deploy instagram-token-refresher Lambda
+echo ""
+echo "Deploying instagram-token-refresher..."
+update_lambda "yallabalagan-instagram-token-refresher" \
+  ".aws-sam/build/InstagramTokenRefresherFunction" \
+  "lambdas/instagram-token-refresher.lambda_handler"
+
+cat > /tmp/ig-refresher-env.json <<EOF
+{
+  "Variables": {
+    "INSTAGRAM_CONNECTIONS_TABLE": "yallabalagan-instagram",
+    "META_APP_ID": "${META_APP_ID}",
+    "META_APP_SECRET": "${META_APP_SECRET}",
+    "INSTAGRAM_TOKEN_KEY": "${INSTAGRAM_TOKEN_KEY}"
+  }
+}
+EOF
+aws lambda wait function-updated \
+  --function-name yallabalagan-instagram-token-refresher \
+  --region "$REGION" --profile "$PROFILE"
+aws lambda update-function-configuration \
+  --function-name yallabalagan-instagram-token-refresher \
+  --environment file:///tmp/ig-refresher-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/ig-refresher-env.json
+
+IG_REFRESHER_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-instagram-token-refresher --region "$REGION" --profile "$PROFILE" --query 'Role' --output text 2>/dev/null | sed 's|.*/||' || echo "")
+if [ -n "$IG_REFRESHER_ROLE" ]; then
+  ensure_dynamodb_policy "$IG_REFRESHER_ROLE" "yallabalagan-instagram"
+fi
+echo "  instagram-token-refresher deployed"
 
 # Allow site-regenerator to invalidate CloudFront
 echo "  Ensuring CloudFront invalidation policy for site-regenerator..."

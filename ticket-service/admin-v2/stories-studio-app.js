@@ -70,6 +70,12 @@ function Studio() {
   const [busy,      setBusy]      = useState(null);
   const [scale,     setScale]     = useState(0.3);
 
+  /* Instagram state */
+  const [igAccounts,   setIgAccounts]   = useState(null);   // null=not loaded, []=loaded
+  const [igModal,      setIgModal]      = useState(null);    // null | 'one' | 'all'
+  const [igPosting,    setIgPosting]    = useState(null);    // null | {done,total,account}
+  const [igResult,     setIgResult]     = useState(null);    // null | {ok, count, error}
+
   /* weekly recipe filters */
   const today     = new Date().toISOString().slice(0, 10);
   const twoWeeks  = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -162,12 +168,16 @@ function Studio() {
   const updateImage = (key, f, v) => patch(key, c => ({ ...c, images:  { ...(c.images  || {}), [f]: v } }));
   const setVariant  = (key, v)    => patch(key, c => ({ ...c, variant: v }));
   const setLayer    = (key, l, on)=> patch(key, c => ({ ...c, layers:  { ...(c.layers  || {}), [l]: on } }));
-  const resetSlide  = (key)       => setEdits(p => { const n = { ...p }; delete n[key]; return n; });
+  const resetSlide     = (key)       => setEdits(p => { const n = { ...p }; delete n[key]; return n; });
+  const setStoryLink   = (key, url)  => patch(key, c => ({ ...c, link: url }));
+  const setLinkEnabled = (key, on)   => patch(key, c => ({ ...c, linkEnabled: on }));
 
   const makeCtx = useCallback((slide) => {
     const st = edits[slide.key] || {};
+    const safeBottom = format === 'story' ? 168 : 48;
     return {
       f: format, dims, accent: slide.accent,
+      safeBottom,
       variant: st.variant || 0,
       layers: { grain: true, halftone: true, tape: true, stamps: true, ...(st.layers || {}) },
       data: slide.data,
@@ -229,6 +239,53 @@ function Studio() {
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       setBusy(null); flash(slides.length + ' слайдов в архиве');
     } catch (e) { setBusy(null); flash('Ошибка экспорта'); console.error(e); }
+  };
+
+  /* Instagram: load accounts, upload slide, post */
+  const loadIgAccounts = async () => {
+    try {
+      const data = await apiCall('/api/instagram/accounts');
+      setIgAccounts(data.accounts || []);
+    } catch (e) { flash('Ошибка загрузки аккаунтов Instagram'); }
+  };
+
+  const openIgModal = async (target) => {
+    if (!igAccounts) await loadIgAccounts();
+    setIgModal(target);
+    setIgResult(null);
+  };
+
+  const uploadSlide = async (i) => {
+    const dataUri = await captureSlide(i);
+    const base64 = dataUri.split(',')[1];
+    const filename = `stories/${Date.now()}_${recipeId}_${String(i+1).padStart(2,'0')}.jpg`;
+    const result = await apiCall('/api/upload-image', 'POST', { filename, contentType: 'image/jpeg', data: base64 });
+    return result.url;
+  };
+
+  const postToInstagram = async (account, indices) => {
+    setIgModal(null);
+    setIgPosting({ done: 0, total: indices.length, account });
+    setIgResult(null);
+    let posted = 0;
+    try {
+      for (let i = 0; i < indices.length; i++) {
+        const slideIdx = indices[i];
+        const slideSt = edits[slides[slideIdx]?.key] || {};
+        const imageUrl = await uploadSlide(slideIdx);
+        const body = { ig_user_id: account.ig_user_id, image_url: imageUrl, caption: '', is_story: true };
+        if (slideSt.linkEnabled && slideSt.link) body.link = slideSt.link;
+        await apiCall('/api/instagram/post', 'POST', body);
+        posted++;
+        setIgPosting({ done: posted, total: indices.length, account });
+        if (i < indices.length - 1) await new Promise(r => setTimeout(r, 1500));
+      }
+      setIgResult({ ok: true, count: posted });
+    } catch (e) {
+      setIgResult({ ok: false, error: e.message, count: posted });
+    } finally {
+      setIgPosting(null);
+    }
   };
 
   /* event exclusion toggle */
@@ -374,6 +431,37 @@ function Studio() {
           </div>
 
           <div className="st-section">
+            <div className="st-section__h">Instagram</div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--st-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Ссылка для этого слайда</div>
+              <input type="url" className="st-text-input" placeholder="https://..."
+                value={activeSt.link || ''}
+                onChange={e => setStoryLink(activeSlide.key, e.target.value)} />
+              <div className="st-toggle" style={{ marginTop: 4 }}
+                onClick={() => setLinkEnabled(activeSlide.key, !activeSt.linkEnabled)}>
+                <span>Прикрепить ссылку</span>
+                <span className={'st-switch' + (activeSt.linkEnabled ? ' on' : '')} />
+              </div>
+            </div>
+            {igResult && (
+              <div style={{ fontSize: 11, marginBottom: 8, color: igResult.ok ? '#16a34a' : '#dc2626', letterSpacing: '.05em' }}>
+                {igResult.ok ? `✓ Опубликовано ${igResult.count} слайд(ов)` : `✗ Ошибка: ${igResult.error}`}
+              </div>
+            )}
+            <div className="st-dl-row">
+              <button className="st-btn" onClick={() => openIgModal('one')} disabled={!!busy || !!igPosting}>
+                📸 ЭТОТ СЛАЙД
+              </button>
+              <button className="st-btn st-btn--ghost" onClick={() => openIgModal('all')} disabled={!!busy || !!igPosting}>
+                📸 ВСЯ СЕРИЯ
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--st-dim)', marginTop: 6, letterSpacing: '.08em' }}>
+              ПУБЛИКУЕТСЯ КАК STORIES · <a href="instagram-history.html" style={{ color: 'var(--st-dim)' }}>ИСТОРИЯ</a>
+            </div>
+          </div>
+
+          <div className="st-section">
             <div className="st-section__h">Подсказка</div>
             <div className="st-note">
               <b>Текст</b> — кликни и печатай. <b>Фото</b> — перетащи на плейсхолдер. Раскладку и слои меняй выше. Экспорт — ровно <b>{dims.w}×{dims.h}</b>px.
@@ -398,6 +486,54 @@ function Studio() {
           <div className="st-busy__bar"><div className="st-busy__fill" style={{ width: (busy.total ? busy.done / busy.total * 100 : 0) + '%' }} /></div>
         </div>
       )}
+
+      {/* Instagram posting progress overlay */}
+      {igPosting && (
+        <div className="st-modal-overlay">
+          <div className="st-modal">
+            <div className="st-modal__title">📸 Публикация в Instagram</div>
+            <div className="st-modal__sub">@{igPosting.account.ig_username} — слайд {igPosting.done} / {igPosting.total}</div>
+            <div className="st-busy__bar" style={{ width: '100%' }}>
+              <div className="st-busy__fill" style={{ width: (igPosting.total ? igPosting.done / igPosting.total * 100 : 0) + '%' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instagram account picker modal */}
+      {igModal && (
+        <div className="st-modal-overlay" onClick={() => setIgModal(null)}>
+          <div className="st-modal" onClick={e => e.stopPropagation()}>
+            <div className="st-modal__title">Опубликовать в Instagram</div>
+            <div className="st-modal__sub">
+              {igModal === 'one'
+                ? `Слайд ${active + 1} — «${slides[active]?.label || ''}» будет опубликован как Story`
+                : `${slides.length} слайдов будут опубликованы как Stories по очереди`}
+            </div>
+            {!igAccounts
+              ? <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12 }}>Загрузка...</div>
+              : igAccounts.length === 0
+                ? <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12 }}>
+                    Нет подключённых аккаунтов.{' '}
+                    <a href="instagram-settings.html" style={{ color: 'var(--paper)' }}>Подключить →</a>
+                  </div>
+                : igAccounts.map(acc => (
+                    <button key={acc.ig_user_id} className="st-ig-account-btn"
+                      onClick={() => postToInstagram(acc, igModal === 'one' ? [active] : slides.map((_, i) => i))}>
+                      <span style={{ fontSize: 20 }}>📷</span>
+                      <span>
+                        <b>@{acc.ig_username}</b>
+                        <small style={{ display: 'block', opacity: .6 }}>{acc.ig_name}</small>
+                      </span>
+                    </button>
+                  ))
+            }
+            <button style={{ marginTop: 12, background: 'transparent', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', fontSize: 12 }}
+              onClick={() => setIgModal(null)}>ОТМЕНА</button>
+          </div>
+        </div>
+      )}
+
       <CropModal />
     </div>
   );

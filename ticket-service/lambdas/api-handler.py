@@ -146,6 +146,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_episodes(event, http_method, path)
         elif path.startswith('/api/influencers'):
             return handle_influencers(event, http_method, path)
+        elif path.startswith('/api/instagram'):
+            return handle_instagram(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
         elif path == '/api/upload-image/quick' and http_method == 'POST':
@@ -4695,6 +4697,268 @@ def list_influencers_admin(request_event: Dict) -> Dict:
         except Exception as e:
             print(f"Error parsing influencer: {e}")
     return success_response({'influencers': influencers})
+
+
+##############################################################################
+# Instagram OAuth + Connection handlers
+##############################################################################
+
+def _ig_env() -> tuple[str, str, str, str]:
+    """Return (app_id, app_secret, token_key, api_base_url) or raise."""
+    app_id = os.environ.get('META_APP_ID', '')
+    app_secret = os.environ.get('META_APP_SECRET', '')
+    token_key = os.environ.get('INSTAGRAM_TOKEN_KEY', '')
+    api_base_url = os.environ.get('API_BASE_URL', '')
+    if not all([app_id, app_secret, token_key, api_base_url]):
+        raise ValueError("Instagram env vars not configured (META_APP_ID, META_APP_SECRET, INSTAGRAM_TOKEN_KEY, API_BASE_URL)")
+    return app_id, app_secret, token_key, api_base_url
+
+
+def handle_instagram(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET' and path == '/api/instagram/accounts':
+        return ig_list_accounts(event)
+    if method == 'GET' and path == '/api/instagram/oauth/start':
+        return ig_oauth_start(event)
+    if method == 'GET' and path == '/api/instagram/oauth/callback':
+        return ig_oauth_callback(event)
+    if method == 'DELETE' and path.startswith('/api/instagram/accounts/'):
+        ig_user_id = path.split('/')[-1]
+        return ig_disconnect(event, ig_user_id)
+    if method == 'POST' and path == '/api/instagram/post':
+        return ig_post_story(event)
+    if method == 'GET' and path == '/api/instagram/history':
+        return ig_list_history(event)
+    return error_response(404, 'Not found')
+
+
+def ig_list_accounts(request_event: Dict) -> Dict:
+    """GET /api/instagram/accounts — list connected IG accounts."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    items = db.list_instagram_connections()
+    accounts = []
+    for item in items:
+        accounts.append({
+            'ig_user_id': item.get('SK'),
+            'ig_username': item.get('ig_username'),
+            'ig_name': item.get('ig_name'),
+            'token_expires_at': item.get('token_expires_at'),
+            'connected_at': item.get('connected_at'),
+            'connected_by': item.get('connected_by'),
+            'status': item.get('status', 'active'),
+        })
+    return success_response({'accounts': accounts})
+
+
+def ig_oauth_start(request_event: Dict) -> Dict:
+    """GET /api/instagram/oauth/start — redirect to Meta OAuth page."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    try:
+        app_id, _, _, api_base_url = _ig_env()
+    except ValueError as e:
+        return error_response(500, str(e))
+
+    import secrets as _secrets
+    from utils.instagram import get_oauth_url
+    state = _secrets.token_urlsafe(16)
+    redirect_uri = f"{api_base_url}/api/instagram/oauth/callback"
+    oauth_url = get_oauth_url(app_id, redirect_uri, state)
+    return success_response({'url': oauth_url})
+
+
+def ig_oauth_callback(request_event: Dict) -> Dict:
+    """GET /api/instagram/oauth/callback — exchange code, store token, redirect."""
+    qs = request_event.get('queryStringParameters') or {}
+    code = qs.get('code')
+    error = qs.get('error')
+    admin_url = os.environ.get('ADMIN_BASE_URL', '')
+
+    if error or not code:
+        return _ig_redirect(admin_url, 'instagram-settings.html', error='oauth_denied')
+
+    try:
+        app_id, app_secret, token_key, api_base_url = _ig_env()
+    except ValueError:
+        return _ig_redirect(admin_url, 'instagram-settings.html', error='config_error')
+
+    try:
+        from utils.instagram import (
+            exchange_code, get_long_lived_token, get_user_pages,
+            get_business_pages, get_ig_user_info, encrypt_token, token_expires_at,
+        )
+        redirect_uri = f"{api_base_url}/api/instagram/oauth/callback"
+
+        # Exchange code → short-lived token
+        short = exchange_code(app_id, app_secret, redirect_uri, code)
+        short_token = short['access_token']
+
+        # Short → long-lived (~60 days)
+        long = get_long_lived_token(app_id, app_secret, short_token)
+        long_token = long['access_token']
+        expires_in = long.get('expires_in', 5183944)  # ~60 days default
+
+        # Find Instagram Business account via FB Pages
+        from utils.instagram import get_me
+        me = get_me(long_token)
+        print(f"Instagram OAuth: token belongs to: {me}")
+        pages = get_user_pages(long_token)
+        print(f"Instagram OAuth: {len(pages)} direct pages found")
+        # Fallback: Business Suite managed pages
+        if not pages:
+            print("Instagram OAuth: trying Business API fallback")
+            pages = get_business_pages(long_token)
+            print(f"Instagram OAuth: {len(pages)} business pages found")
+        for p in pages:
+            print(f"  Page {p.get('id')} '{p.get('name')}': ig_business={p.get('instagram_business_account')}")
+        ig_account = None
+        page_id = None
+        for page in pages:
+            ib = page.get('instagram_business_account')
+            if ib:
+                ig_account = ib
+                page_id = page['id']
+                break
+
+        if not ig_account:
+            print("Instagram OAuth: no IG Business account linked to any FB page")
+            return _ig_redirect(admin_url, 'instagram-settings.html', error='no_ig_business')
+
+        ig_user_id = ig_account['id']
+        ig_info = get_ig_user_info(ig_user_id, long_token)
+
+        now = datetime.now(timezone.utc).isoformat()
+        connection = {
+            'PK': 'CONNECTION',
+            'SK': ig_user_id,
+            'ig_user_id': ig_user_id,
+            'ig_username': ig_info.get('username', ''),
+            'ig_name': ig_info.get('name', ''),
+            'access_token': encrypt_token(long_token, token_key),
+            'token_expires_at': token_expires_at(expires_in),
+            'page_id': page_id,
+            'connected_at': now,
+            'status': 'active',
+        }
+        db.put_instagram_connection(connection)
+        return _ig_redirect(admin_url, 'instagram-settings.html', success='connected')
+
+    except Exception as e:
+        print(f"Instagram OAuth callback error: {e}")
+        import traceback; traceback.print_exc()
+        return _ig_redirect(admin_url, 'instagram-settings.html', error='callback_failed')
+
+
+def _ig_redirect(admin_url: str, page: str, **params) -> Dict:
+    from urllib.parse import urlencode
+    qs = urlencode(params)
+    location = f"{admin_url}/{page}?{qs}" if admin_url else f"/{page}?{qs}"
+    return {
+        'statusCode': 302,
+        'headers': {'Location': location, 'Access-Control-Allow-Origin': '*'},
+        'body': '',
+    }
+
+
+def ig_disconnect(request_event: Dict, ig_user_id: str) -> Dict:
+    """DELETE /api/instagram/accounts/{ig_user_id} — remove connection."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    if not db.get_instagram_connection(ig_user_id):
+        return error_response(404, 'Account not found')
+
+    db.delete_instagram_connection(ig_user_id)
+    return success_response({'message': 'Disconnected'})
+
+
+def ig_post_story(request_event: Dict) -> Dict:
+    """POST /api/instagram/post — publish image URL to IG as a Story."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+        ig_user_id = body.get('ig_user_id')
+        image_url = body.get('image_url')
+        caption = body.get('caption', '')
+        link = body.get('link', '')
+        if not ig_user_id or not image_url:
+            return error_response(400, 'ig_user_id and image_url are required')
+    except json.JSONDecodeError:
+        return error_response(400, 'Invalid JSON')
+
+    try:
+        _, _, token_key, _ = _ig_env()
+    except ValueError as e:
+        return error_response(500, str(e))
+
+    connection = db.get_instagram_connection(ig_user_id)
+    if not connection:
+        return error_response(404, 'Instagram account not connected')
+
+    try:
+        from utils.instagram import decrypt_token, post_story
+        access_token = decrypt_token(connection['access_token'], token_key)
+        media_id = post_story(ig_user_id, image_url, access_token, link=link)
+    except Exception as e:
+        print(f"Instagram post error: {e}")
+        import traceback; traceback.print_exc()
+        return error_response(500, f"Failed to post: {e}")
+
+    # Write history log separately — don't let a log failure mask a successful post
+    try:
+        now = datetime.now(timezone.utc)
+        month = now.strftime('%Y-%m')
+        log = {
+            'PK': f'LOG#{month}',
+            'SK': f"{now.isoformat()}#{ig_user_id}",
+            'ig_user_id': ig_user_id,
+            'ig_username': connection.get('ig_username', ''),
+            'image_url': image_url,
+            'thumbnail_url': image_url,
+            'media_id': media_id,
+            'posted_at': now.isoformat(),
+            'posted_by': ctx.get('user_id', '') if isinstance(ctx, dict) else getattr(ctx, 'user_id', ''),
+        }
+        db.put_instagram_log(log)
+    except Exception as log_err:
+        print(f"Warning: failed to write Instagram history log: {log_err}")
+
+    return success_response({'media_id': media_id})
+
+
+def ig_list_history(request_event: Dict) -> Dict:
+    """GET /api/instagram/history?month=YYYY-MM — post history log."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    qs = request_event.get('queryStringParameters') or {}
+    month = qs.get('month', datetime.now(timezone.utc).strftime('%Y-%m'))
+    items = db.list_instagram_logs(month)
+    return success_response({'history': items, 'month': month})
 
 
 # For local testing

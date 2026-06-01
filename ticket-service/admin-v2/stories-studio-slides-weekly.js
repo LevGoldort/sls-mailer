@@ -149,12 +149,22 @@ WeeklyBoard.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── EVENT (3 variants) ── */
 function WeeklyEvent({ ctx }) {
-  const { T, set, img, setImg, layers, data, variant } = ctx;
+  const { T, set, img, setImg, layers, data, variant, safeBottom } = ctx;
   const ev = data.event;
   const d = window.parseDate(ev.date);
   const isExternal = ev.type === 'external';
   const accentVar = { magenta: 'var(--magenta)', cyan: 'var(--cyan)', yellow: 'var(--yellow)' }[ctx.accent] || 'var(--magenta)';
   const stubClass = ctx.accent === 'cyan' ? 's-stub--cyan' : ctx.accent === 'yellow' ? 's-stub--yellow' : '';
+
+  const city = ev.city || '';
+  const CityBlock = ({ size = 92, light = false }) => (
+    <div>
+      <div style={{ fontFamily: 'var(--f-mono)', fontSize: 19, letterSpacing: '.2em', opacity: light ? .8 : .55, color: light ? 'var(--paper)' : 'inherit' }}>★ ГОРОД</div>
+      <div className="s-city" style={{ fontSize: size, marginTop: 6, color: light ? 'var(--paper)' : 'var(--ink)', textShadow: light ? '4px 4px 0 var(--ink)' : 'none' }}>
+        <EditableText value={T('city', city)} onCommit={(v) => set('city', v)} single />
+      </div>
+    </div>
+  );
 
   const Tags = () => (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -196,7 +206,7 @@ function WeeklyEvent({ ctx }) {
         </div>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(26,20,16,.15) 0%, rgba(26,20,16,.05) 45%, rgba(26,20,16,.85) 100%)', pointerEvents: 'none' }} aria-hidden="true" />
         <Halftone on={layers.halftone} corner />
-        <div style={{ position: 'relative', zIndex: 4, padding: 64, display: 'flex', flexDirection: 'column', height: '100%', pointerEvents: 'none' }}>
+        <div style={{ position: 'relative', zIndex: 4, padding: '64px 64px ' + safeBottom + 'px', display: 'flex', flexDirection: 'column', height: '100%', pointerEvents: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ transform: 'rotate(-4deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
             <span className="s-counter" style={{ fontSize: 86, color: 'var(--paper)', textShadow: '4px 4px 0 var(--ink)' }}>
@@ -205,23 +215,24 @@ function WeeklyEvent({ ctx }) {
           </div>
           <div style={{ flex: 1 }} />
           <Tape on={layers.tape} color="yellow" style={{ position: 'static', alignSelf: 'flex-start', width: 220, height: 40, transform: 'rotate(-3deg)', marginBottom: -14, marginLeft: 30 }} />
-          <div style={{ background: 'var(--paper)', border: '5px solid var(--ink)', boxShadow: '10px 10px 0 ' + accentVar, padding: '30px 34px', transform: 'rotate(-0.6deg)', pointerEvents: 'all' }}>
+          <div style={{ background: 'var(--paper)', border: '5px solid var(--ink)', boxShadow: '10px 10px 0 ' + accentVar, padding: '32px 36px', transform: 'rotate(-0.6deg)', pointerEvents: 'all' }}>
             {layers.stamps && <div style={{ marginBottom: 16 }}><Tags /></div>}
-            <h1 className="s-event__title" style={{ fontSize: 76 }}>
+            <h1 className="s-event__title" style={{ fontSize: 60 }}>
               <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />
             </h1>
-            <div className="s-meta-row" style={{ fontSize: 22, marginTop: 22 }}>
+            <div style={{ marginTop: 24 }}><CityBlock size={104} /></div>
+            <div className="s-meta-row" style={{ fontSize: 24, marginTop: 16 }}>
               <span>► <b>{ev.venue}</b></span><span style={{ opacity: .4 }}>·</span>
-              <span>{d.num}.{d.monthAbbr} · {ev.time}</span>
+              <span>{d.day} {d.monthGen} · {ev.time}</span>
             </div>
-            <div style={{ marginTop: 18 }}><Stub /></div>
+            <div style={{ marginTop: 20 }}><Stub /></div>
           </div>
         </div>
       </div>
     );
   }
 
-  /* VARIANT 2 — INDEX (type-forward, huge number, inset photo) */
+  /* VARIANT 2 — INDEX (type-forward, huge number) */
   if (variant === 2) {
     return (
       <div className={'slide acc-' + ctx.accent} style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
@@ -229,25 +240,23 @@ function WeeklyEvent({ ctx }) {
         <Halftone on={layers.halftone} corner />
         <div style={{ position: 'absolute', top: -60, right: -30, fontFamily: 'var(--f-display)', fontSize: 560, lineHeight: .8, color: accentVar, opacity: .16, letterSpacing: '-.05em' }} aria-hidden="true">{String(data.index).padStart(2, '0')}</div>
         <Tape on={layers.tape} color="magenta" style={{ top: 180, left: -30, width: 240, height: 44, transform: 'rotate(-6deg)' }} />
-        <div style={{ position: 'relative', zIndex: 4, padding: 72, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ position: 'relative', zIndex: 4, padding: '72px 72px ' + safeBottom + 'px', display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="s-eyebrow" style={{ fontSize: 24 }}>{d.dow} · {d.num} {d.monthFull}</span>
             <BrandBox />
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 26 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 30 }}>
             {layers.stamps && <Tags />}
-            <h1 className="s-event__title" style={{ fontSize: 100 }}>
+            <h1 className="s-event__title" style={{ fontSize: 92 }}>
               <RisoText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} shadowColor={accentVar} style={{ color: 'var(--ink)' }} />
             </h1>
-            {/* inset photo */}
-            <div style={{ position: 'relative', height: 360, border: '5px solid var(--ink)', boxShadow: '8px 8px 0 ' + accentVar, transform: 'rotate(0.5deg)' }}>
-              <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
-                cropW={1080} cropH={360} style={{ width: '100%', height: '100%', border: 'none' }} />
-              <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
-            </div>
-            <div className="s-meta-row" style={{ fontSize: 22, gap: 10 }}>
-              <span className="s-stamp s-stamp--ink" style={{ fontSize: 20 }}>► {ev.venue}</span>
-              <span style={{ opacity: .7 }}>{ev.address}</span>
+            <p className="s-event__desc" style={{ fontSize: 30, maxWidth: 820, margin: 0 }}>
+              <EditableText value={T('short', ev.short || ev.description)} onCommit={(v) => set('short', v)} />
+            </p>
+            <CityBlock size={116} />
+            <div className="s-meta-row" style={{ fontSize: 24, marginTop: 2 }}>
+              <span className="s-stamp s-stamp--ink" style={{ fontSize: 22 }}>► {ev.venue}</span>
+              <span style={{ opacity: .7 }}>СТАРТ {ev.time}</span>
             </div>
           </div>
           <Stub />
@@ -256,38 +265,38 @@ function WeeklyEvent({ ctx }) {
     );
   }
 
-  /* VARIANT 1 — TICKET (default) */
+  /* VARIANT 1 — TICKET */
   return (
     <div className={'slide acc-' + ctx.accent} style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
       <Grain on={layers.grain} />
       <Halftone on={layers.halftone} corner />
       <Tape on={layers.tape} color={ctx.accent === 'cyan' ? 'magenta' : 'cyan'} style={{ top: 40, left: '40%', width: 240, height: 44, transform: 'rotate(-4deg)' }} />
 
-      <div style={{ position: 'relative', zIndex: 4, padding: '64px 72px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ transform: 'rotate(-3deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
-        <div style={{ textAlign: 'right' }}>
-          <BrandBox />
-          <div className="s-counter" style={{ fontSize: 64, marginTop: 14 }}><sup>№</sup>{String(data.index).padStart(2, '0')}<span style={{ fontFamily: 'var(--f-mono)', fontSize: 18, opacity: .5, marginLeft: 8 }}>/ {data.total}</span></div>
+      <div style={{ position: 'relative', zIndex: 4, padding: '72px 72px ' + safeBottom + 'px', display: 'flex', flexDirection: 'column', height: '100%', gap: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ transform: 'rotate(-3deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
+          <div style={{ textAlign: 'right' }}>
+            <BrandBox />
+            <div className="s-counter" style={{ fontSize: 64, marginTop: 14 }}><sup>№</sup>{String(data.index).padStart(2, '0')}<span style={{ fontFamily: 'var(--f-mono)', fontSize: 18, opacity: .5, marginLeft: 8 }}>/ {data.total}</span></div>
+          </div>
         </div>
-      </div>
 
-      {/* event photo */}
-      <div style={{ position: 'relative', zIndex: 4, margin: '32px 72px 0', flexShrink: 0, height: 480, border: '5px solid var(--ink)', boxShadow: '8px 8px 0 ' + accentVar }}>
-        <ImageSlot value={img('photo') || ev.photo} onChange={(v) => setImg('photo', v)} label={'ФОТО · ' + ev.venue}
-          cropW={1080} cropH={480} style={{ width: '100%', height: '100%', border: 'none' }} />
-        <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
-      </div>
-
-      <div style={{ position: 'relative', zIndex: 4, padding: '28px 72px 64px', flex: 1, display: 'flex', flexDirection: 'column', gap: 22 }}>
-        {layers.stamps && <Tags />}
-        <h1 className="s-event__title" style={{ fontSize: 80 }}>
-          <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />
-        </h1>
-        <div className="s-meta-row" style={{ fontSize: 22, gap: 10 }}>
-          <span className="s-stamp s-stamp--ink" style={{ fontSize: 20 }}>► {ev.venue}</span>
-          <span style={{ opacity: .7 }}>{ev.time}</span>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24 }}>
+          {layers.stamps && <Tags />}
+          <h1 className="s-event__title" style={{ fontSize: 76 }}>
+            <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />
+          </h1>
+          <p className="s-event__desc" style={{ fontSize: 30, margin: 0, maxWidth: 880 }}>
+            <EditableText value={T('short', ev.short || ev.description)} onCommit={(v) => set('short', v)} />
+          </p>
+          <CityBlock size={120} />
+          <div className="s-meta-row" style={{ fontSize: 24, marginTop: 2, gap: 12 }}>
+            <span className="s-stamp s-stamp--ink" style={{ fontSize: 22 }}>► {ev.venue}</span>
+            <span style={{ opacity: .7 }}>СТАРТ {ev.time}</span>
+          </div>
         </div>
-        <div style={{ marginTop: 'auto' }}><Stub /></div>
+
+        <Stub />
       </div>
     </div>
   );

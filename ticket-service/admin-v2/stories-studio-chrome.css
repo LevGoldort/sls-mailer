@@ -223,6 +223,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .st-dl-row { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 
+.st-text-input {
+  width: 100%; background: var(--st-bg); border: 2px solid var(--st-line); color: var(--st-text);
+  padding: 7px 10px; font-family: var(--st-mono); font-size: 11px; letter-spacing: .04em; outline: none;
+}
+.st-text-input:focus { border-color: var(--st-cyan); }
+.st-text-input::placeholder { color: var(--st-dim); }
+
 /* toast */
 .st-toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
@@ -251,3 +258,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (max-width: 1100px) {
   .st-body { grid-template-columns: 180px 1fr 260px; }
 }
+
+/* Instagram modal */
+.st-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex;
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.st-modal {
+  background: var(--st-panel2); color: var(--st-text); border-radius: 12px;
+  border: 1px solid var(--st-line);
+  padding: 28px 32px; min-width: 300px; max-width: 400px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.st-modal__title { font-family: var(--st-disp); font-size: 16px; letter-spacing: .06em; }
+.st-modal__sub { font-size: 11px; color: var(--st-dim); letter-spacing: .05em; line-height: 1.5; }
+.st-ig-account-btn {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  background: rgba(255,255,255,.06); border: 1px solid var(--st-line);
+  border-radius: 8px; padding: 12px 16px; cursor: pointer; color: var(--st-text);
+  text-align: left; font-size: 13px; transition: background .15s;
+}
+.st-ig-account-btn:hover { background: rgba(255,255,255,.14); }

@@ -393,7 +393,9 @@ const NAV_ITEMS = [
     { href: 'scanner.html',        icon: '📷', label: 'Сканер' },
     { href: 'quick-post.html',     icon: '⚡', label: 'Быстрый пост',    adminOnly: true },
     { href: 'sms-blast.html',      icon: '💬', label: 'SMS рассылка',    adminOnly: true },
-    { href: 'stories-studio.html', icon: '✦',  label: 'Stories Studio',  adminOnly: true },
+    { href: 'stories-studio.html',    icon: '✦',  label: 'Stories Studio',  adminOnly: true },
+    { href: 'instagram-settings.html', icon: '📸', label: 'Instagram',        adminOnly: true },
+    { href: 'instagram-history.html',  icon: '🕓', label: 'История Instagram', adminOnly: true },
 ];
 
 // Pages whose active state rolls up to a parent item
