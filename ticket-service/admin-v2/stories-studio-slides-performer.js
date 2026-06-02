@@ -20,7 +20,7 @@ function PerfSocials({ socials, layers }) {
 
 /* ── INTRO ── */
 function PerfIntro({ ctx }) {
-  const { T, set, img, setImg, layers, data, variant } = ctx;
+  const { T, set, img, setImg, layers, data, variant, flags } = ctx;
   const p = data.performer;
   const NameBlock = ({ size }) => (
     <h1 className="s-event__title" style={{ fontSize: size, lineHeight: .86 }}>
@@ -45,9 +45,11 @@ function PerfIntro({ ctx }) {
             <ImageSlot value={img('photo') || p.photo} onChange={(v) => setImg('photo', v)} label={'ПОРТРЕТ'}
               cropW={800} cropH={1000} style={{ position: 'absolute', inset: 0, boxShadow: '12px 12px 0 var(--ink)' }} />
             <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
-            <div style={{ position: 'absolute', bottom: 24, left: 24, zIndex: 3 }}>
-              <span className="s-stamp s-stamp--lg" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
-            </div>
+            {flags.show_city && p.city && (
+              <div style={{ position: 'absolute', bottom: 24, left: 24, zIndex: 3 }}>
+                <span className="s-stamp s-stamp--lg" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
+              </div>
+            )}
           </div>
           <p className="s-event__desc" style={{ fontSize: 30, margin: 0 }}>
             <EditableText value={T('tagline', p.tagline)} onCommit={(v) => set('tagline', v)} />
@@ -73,9 +75,11 @@ function PerfIntro({ ctx }) {
           </div>
         )}
         <Tape on={layers.tape} color="cyan" style={{ top: 18, right: 60, width: 220, height: 42, transform: 'rotate(5deg)', zIndex: 5 }} />
-        <div style={{ position: 'absolute', bottom: 28, right: 32, zIndex: 4 }}>
-          <span className="s-stamp" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
-        </div>
+        {flags.show_city && p.city && (
+          <div style={{ position: 'absolute', bottom: 28, right: 32, zIndex: 4 }}>
+            <span className="s-stamp" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
+          </div>
+        )}
       </div>
       <Halftone on={layers.halftone} corner />
       <div style={{ position: 'relative', zIndex: 4, padding: '46px 64px 64px', flex: 1, display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -97,7 +101,7 @@ PerfIntro.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── BIO (photo + full bio as toast + short-bio statement) ── */
 function PerfBio({ ctx }) {
-  const { T, set, img, setImg, layers, data, safeBottom } = ctx;
+  const { T, set, img, setImg, layers, data, safeBottom, flags } = ctx;
   const p = data.performer;
   return (
     <div className="slide acc-cyan" style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
@@ -121,9 +125,11 @@ function PerfBio({ ctx }) {
           style={{ width: '100%', height: '100%', boxShadow: '12px 12px 0 var(--ink)' }} />
         <Halftone on={layers.halftone} style={{ inset: 0, zIndex: 2 }} />
         <Tape on={layers.tape} color="yellow" style={{ top: -16, left: 50, width: 200, height: 40, transform: 'rotate(-4deg)', zIndex: 5 }} />
-        <div style={{ position: 'absolute', top: 24, right: 24, zIndex: 5 }}>
-          <span className="s-stamp s-stamp--lg" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
-        </div>
+        {flags.show_city && p.city && (
+          <div style={{ position: 'absolute', top: 24, right: 24, zIndex: 5 }}>
+            <span className="s-stamp s-stamp--lg" style={{ background: 'rgba(26,20,16,.6)', color: 'var(--paper)', borderColor: 'var(--paper)' }}>{p.city}</span>
+          </div>
+        )}
         <div className="s-bio-toast">
           <div className="s-bio-toast__tag">★ КТО ЭТО</div>
           <p className="s-bio-toast__txt"><EditableText value={T('bio', p.bio)} onCommit={(v) => set('bio', v)} /></p>
@@ -144,7 +150,7 @@ PerfBio.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── UPCOMING SHOWS ── */
 function PerfShows({ ctx }) {
-  const { T, set, layers, data, safeBottom } = ctx;
+  const { T, set, layers, data, safeBottom, flags } = ctx;
   const evs = data.events;
   return (
     <div className="slide acc-magenta" style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
@@ -171,14 +177,14 @@ function PerfShows({ ctx }) {
                 <div className="s-list-row__date">{d.num}<small>{d.monthAbbr}</small></div>
                 <div style={{ minWidth: 0 }}>
                   <div className="s-list-row__title">{ev.title.toUpperCase()}</div>
-                  <div className="s-list-row__sub">► {ev.venue} · {ev.city || ''}</div>
+                  {flags.show_venue && <div className="s-list-row__sub">► {ev.venue} · {ev.city || ''}</div>}
                 </div>
                 <div style={{ fontFamily: 'var(--f-mono)', fontSize: 26, fontWeight: 700, opacity: .7, whiteSpace: 'nowrap' }}>{ev.time}</div>
               </div>
             );
           })}
         </div>
-        <FooterChrome layers={layers.stamps} />
+        {flags.show_footer_chrome && <FooterChrome layers={layers.stamps} />}
       </div>
     </div>
   );
@@ -188,7 +194,7 @@ PerfShows.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── CONTENT (latest episode) ── */
 function PerfContent({ ctx }) {
-  const { T, set, img, setImg, layers, data, safeBottom } = ctx;
+  const { T, set, img, setImg, layers, flags, data, safeBottom } = ctx;
   const ep = data.episodes[0];
   if (!ep) return <div className="slide acc-cyan" style={{ ...ctx.rootStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Grain on={layers.grain} /><span className="s-eyebrow" style={{ fontSize: 30 }}>НЕТ КОНТЕНТА</span></div>;
   return (
@@ -214,7 +220,7 @@ function PerfContent({ ctx }) {
         </p>
         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
           <span className="s-btn s-btn--primary" style={{ fontSize: 34 }}><EditableText value={T('cta', 'СМОТРЕТЬ НА ' + ep.platform)} onCommit={(v) => set('cta', v)} single /> →</span>
-          <span className="s-handle" style={{ fontSize: 24 }}>{window.YB_DATA.site.handle}</span>
+          {flags.show_footer_chrome && <span className="s-handle" style={{ fontSize: 24 }}>{window.YB_DATA.site.handle}</span>}
         </div>
       </div>
     </div>
@@ -225,7 +231,7 @@ PerfContent.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── MERCH (photo grid — 1 / 2 / 4 products) ── */
 function PerfMerch({ ctx }) {
-  const { T, set, img, setImg, layers, data, variant, safeBottom } = ctx;
+  const { T, set, img, setImg, layers, data, variant, safeBottom, flags } = ctx;
   const count = [1, 2, 4][variant] || 1;
   const items = data.merch.filter((m) => !m.soldOut).slice(0, count);
   const size = count === 1 ? { name: 50, price: 60, desc: 30 } : count === 2 ? { name: 34, price: 42, desc: 0 } : { name: 26, price: 32, desc: 0 };
@@ -265,7 +271,7 @@ function PerfMerch({ ctx }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
           <span className="s-btn s-btn--primary" style={{ fontSize: 32 }}><EditableText value={T('cta', 'ВСЁ В МАГАЗИНЕ')} onCommit={(v) => set('cta', v)} single /> →</span>
-          <FooterChrome layers={layers.stamps} />
+          {flags.show_footer_chrome && <FooterChrome layers={layers.stamps} />}
         </div>
       </div>
     </div>

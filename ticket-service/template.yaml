@@ -159,6 +159,7 @@ Globals:
         EPISODES_TABLE: !Ref EpisodesTable
         INFLUENCERS_TABLE: !Ref InfluencersTable
         INSTAGRAM_CONNECTIONS_TABLE: !Ref InstagramConnectionsTable
+        CONFIG_TABLE: !Ref ConfigTable
         META_APP_ID: !Ref MetaAppId
         META_APP_SECRET: !Ref MetaAppSecret
         INSTAGRAM_TOKEN_KEY: !Ref InstagramTokenKey
@@ -660,6 +661,27 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !If [IsProd, yallabalagan-config, yallabalagan-config-dev]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   EpisodesTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -865,6 +887,8 @@ Resources:
             TableName: !Ref InfluencersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref InstagramConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConfigTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
         - Version: '2012-10-17'

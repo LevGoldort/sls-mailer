@@ -148,6 +148,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_influencers(event, http_method, path)
         elif path.startswith('/api/instagram'):
             return handle_instagram(event, http_method, path)
+        elif path.startswith('/api/studio'):
+            return handle_studio(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
         elif path == '/api/upload-image/quick' and http_method == 'POST':
@@ -4712,6 +4714,124 @@ def _ig_env() -> tuple[str, str, str, str]:
     if not all([app_id, app_secret, token_key, api_base_url]):
         raise ValueError("Instagram env vars not configured (META_APP_ID, META_APP_SECRET, INSTAGRAM_TOKEN_KEY, API_BASE_URL)")
     return app_id, app_secret, token_key, api_base_url
+
+
+def handle_studio(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET' and path == '/api/studio/styles':
+        return studio_list_styles(event)
+    if method == 'POST' and path == '/api/studio/styles':
+        return studio_create_style(event)
+    if method == 'DELETE' and path.startswith('/api/studio/styles/') and not path.endswith('/activate'):
+        style_id = path.split('/')[-1]
+        return studio_delete_style(event, style_id)
+    if method == 'POST' and path.startswith('/api/studio/styles/') and path.endswith('/activate'):
+        style_id = path.split('/')[-2]
+        return studio_activate_style(event, style_id)
+    return error_response(404, 'Not found')
+
+
+def studio_list_styles(request_event: Dict) -> Dict:
+    """GET /api/studio/styles — list all style presets and active id."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    presets = db.list_style_presets()
+    active_id = db.get_active_style_id()
+    serialized = []
+    for p in presets:
+        serialized.append({
+            'id': p.get('SK'),
+            'name': p.get('name'),
+            'colors': p.get('colors', {}),
+            'layers': p.get('layers', {}),
+            'flags': p.get('flags', {}),
+            'variants': p.get('variants', {}),
+            'created_at': p.get('created_at'),
+        })
+    return success_response({'styles': serialized, 'active_id': active_id})
+
+
+def studio_create_style(request_event: Dict) -> Dict:
+    """POST /api/studio/styles — save a new style preset."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    body = json.loads(request_event.get('body') or '{}')
+    name = (body.get('name') or '').strip()
+    colors = body.get('colors')
+    layers = body.get('layers')
+    flags = body.get('flags')
+    variants = body.get('variants')
+
+    if not name:
+        return error_response(400, 'name is required')
+    if not isinstance(colors, dict) or not colors:
+        return error_response(400, 'colors must be a non-empty object')
+    if layers is not None and not isinstance(layers, dict):
+        return error_response(400, 'layers must be an object')
+    if flags is not None and not isinstance(flags, dict):
+        return error_response(400, 'flags must be an object')
+    if variants is not None and not isinstance(variants, dict):
+        return error_response(400, 'variants must be an object')
+
+    import uuid
+    style_id = str(uuid.uuid4())[:8]
+    preset = {
+        'id': style_id,
+        'name': name,
+        'colors': colors,
+        'layers': layers or {},
+        'flags': flags or {},
+        'variants': variants or {},
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    }
+    db.put_style_preset(preset)
+    return success_response({'style': preset}, 201)
+
+
+def studio_delete_style(request_event: Dict, style_id: str) -> Dict:
+    """DELETE /api/studio/styles/{id}."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    existing = db.get_style_preset(style_id)
+    if not existing:
+        return error_response(404, 'Style not found')
+
+    db.delete_style_preset(style_id)
+    active_id = db.get_active_style_id()
+    if active_id == style_id:
+        db.clear_active_style_id()
+    return success_response({'deleted': style_id})
+
+
+def studio_activate_style(request_event: Dict, style_id: str) -> Dict:
+    """POST /api/studio/styles/{id}/activate."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    existing = db.get_style_preset(style_id)
+    if not existing:
+        return error_response(404, 'Style not found')
+
+    db.set_active_style_id(style_id)
+    return success_response({'active_id': style_id})
 
 
 def handle_instagram(event: Dict, method: str, path: str) -> Dict:

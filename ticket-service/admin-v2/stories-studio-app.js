@@ -4,11 +4,99 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const LAYER_LABELS = { grain: 'Зерно', halftone: 'Полутон', tape: 'Скотч', stamps: 'Штампы / лого' };
 const STORE_KEY = 'yb-studio-edits-v2';
 
+const DEFAULT_LAYERS = { grain: true, halftone: true, tape: true, stamps: true };
+const DEFAULT_FLAGS = {
+  show_footer_chrome: true, show_brand_lockup: true, show_swipe_hint: true,
+  show_ticker: true, show_tags: true, show_date_stamp: true,
+  show_price: true, show_venue: true, show_bottom_bar: true, show_city: true,
+};
+
+function applyStyleCss(preset) {
+  if (!preset) return;
+  const vars = Object.entries(preset.colors || {})
+    .map(([k, v]) => `--${k.replace(/_/g, '-')}: ${v};`)
+    .join(' ');
+  document.getElementById('ybStyleOverride').textContent = `:root { ${vars} }`;
+}
+
 function loadEdits() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
 }
 function sanitize(s) {
   return (s || '').toString().toLowerCase().replace(/[^a-zа-я0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+}
+
+/* ── Styles Panel ── */
+function StylesPanel({ presets, activeId, onActivate, onDelete, onImport }) {
+  const [showImport, setShowImport] = React.useState(false);
+  const [importText, setImportText] = React.useState('');
+  const [importError, setImportError] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
+  const handleImport = async () => {
+    setImportError('');
+    let parsed;
+    try { parsed = JSON.parse(importText); } catch { setImportError('Невалидный JSON'); return; }
+    if (!parsed.name) { setImportError('Поле name обязательно'); return; }
+    if (!parsed.colors || typeof parsed.colors !== 'object') { setImportError('Поле colors обязательно'); return; }
+    setBusy(true);
+    try {
+      await onImport(parsed);
+      setImportText('');
+      setShowImport(false);
+    } catch (e) {
+      setImportError(e.message || 'Ошибка сохранения');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="st-section">
+      <div className="st-section__h">Стили</div>
+      {presets.length === 0 && (
+        <div style={{ fontSize: 10, color: 'var(--st-dim)', letterSpacing: '.1em', marginBottom: 8 }}>НЕТ ПРЕСЕТОВ</div>
+      )}
+      {presets.map(p => {
+        const offFlags = Object.entries(p.flags || {}).filter(([, v]) => v === false).map(([k]) => k.replace('show_', ''));
+        return (
+          <div key={p.id} style={{ marginBottom: 8, borderLeft: '2px solid ' + (p.id === activeId ? 'var(--st-yellow)' : 'var(--st-line)'), paddingLeft: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, fontSize: 11, letterSpacing: '.08em', color: p.id === activeId ? 'var(--st-yellow)' : 'var(--st-text)', fontFamily: 'var(--f-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.id === activeId ? '✓ ' : ''}{p.name}
+              </div>
+              {p.id !== activeId && (
+                <button className="st-chip" style={{ padding: '2px 8px', fontSize: 9 }} onClick={() => onActivate(p)}>ON</button>
+              )}
+              <button className="st-chip" style={{ padding: '2px 8px', fontSize: 9, opacity: .5 }} onClick={() => onDelete(p)}>✕</button>
+            </div>
+            {offFlags.length > 0 && (
+              <div style={{ fontSize: 9, color: 'var(--st-dim)', marginTop: 3, fontFamily: 'var(--f-mono)', letterSpacing: '.06em' }}>
+                OFF: {offFlags.join(', ')}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {showImport ? (
+        <div style={{ marginTop: 8 }}>
+          <textarea
+            value={importText}
+            onChange={e => setImportText(e.target.value)}
+            placeholder={'{\n  "name": "Dark Mode",\n  "colors": { "paper": "#1a1410", ... },\n  "layers": { "grain": true, ... }\n}'}
+            style={{ width: '100%', height: 140, background: 'var(--st-panel2)', border: '1px solid var(--st-line)', color: 'var(--st-text)', fontFamily: 'var(--f-mono)', fontSize: 10, padding: 8, boxSizing: 'border-box', resize: 'vertical' }}
+          />
+          {importError && <div style={{ color: '#f87171', fontSize: 10, marginTop: 4 }}>{importError}</div>}
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button className="st-btn" style={{ flex: 1 }} onClick={handleImport} disabled={busy}>СОХРАНИТЬ</button>
+            <button className="st-btn st-btn--ghost" onClick={() => { setShowImport(false); setImportError(''); }}>ОТМЕНА</button>
+          </div>
+        </div>
+      ) : (
+        <button className="st-btn st-btn--ghost" style={{ width: '100%', marginTop: 4 }} onClick={() => setShowImport(true)}>+ ИМПОРТ JSON</button>
+      )}
+    </div>
+  );
 }
 
 /* ── Loading screen ── */
@@ -59,9 +147,11 @@ function EventFilterBar({ allEvents, dateFrom, dateTo, excludedIds, onDateFrom, 
 
 /* ── Main Studio ── */
 function Studio() {
-  const [ybData,    setYbData]    = useState(null);
-  const [loadError, setLoadError] = useState(null);
-  const [recipeId,  setRecipeId]  = useState('weekly');
+  const [ybData,       setYbData]       = useState(null);
+  const [loadError,    setLoadError]    = useState(null);
+  const [recipeId,     setRecipeId]     = useState('weekly');
+  const [stylePresets, setStylePresets] = useState([]);
+  const [activeStyleId, setActiveStyleId] = useState(null);
   const [subjects,  setSubjects]  = useState({ performer: null, event: null, episode: null, product: null });
   const [format,    setFormat]    = useState('story');
   const [active,    setActive]    = useState(0);
@@ -98,6 +188,14 @@ function Studio() {
         product:   data.merch[0]?.id      || null,
       });
     }).catch(e => setLoadError(e.message || String(e)));
+
+    apiCall('/api/studio/styles').then(data => {
+      const presets = data.styles || [];
+      setStylePresets(presets);
+      setActiveStyleId(data.active_id || null);
+      const active = presets.find(p => p.id === data.active_id);
+      if (active) applyStyleCss(active);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -172,14 +270,20 @@ function Studio() {
   const setStoryLink   = (key, url)  => patch(key, c => ({ ...c, link: url }));
   const setLinkEnabled = (key, on)   => patch(key, c => ({ ...c, linkEnabled: on }));
 
+  const activeStyle = stylePresets.find(p => p.id === activeStyleId) || null;
+  const styleLayerDefaults = activeStyle?.layers ? { ...DEFAULT_LAYERS, ...activeStyle.layers } : DEFAULT_LAYERS;
+  const styleFlags = activeStyle?.flags ? { ...DEFAULT_FLAGS, ...activeStyle.flags } : DEFAULT_FLAGS;
+  const styleVariants = activeStyle?.variants || {};
+
   const makeCtx = useCallback((slide) => {
     const st = edits[slide.key] || {};
     const safeBottom = format === 'story' ? 168 : 48;
     return {
       f: format, dims, accent: slide.accent,
       safeBottom,
-      variant: st.variant || 0,
-      layers: { grain: true, halftone: true, tape: true, stamps: true, ...(st.layers || {}) },
+      variant: st.variant != null ? st.variant : (styleVariants[slide.type] ?? 0),
+      layers: { ...styleLayerDefaults, ...(st.layers || {}) },
+      flags: styleFlags,
       data: slide.data,
       rootStyle: { width: dims.w, height: dims.h },
       T:      (k, def)  => (st.fields && st.fields[k] != null) ? st.fields[k] : def,
@@ -187,7 +291,7 @@ function Studio() {
       img:    (k)       => st.images && st.images[k],
       setImg: (k, v)    => updateImage(slide.key, k, v),
     };
-  }, [edits, format, dims]);
+  }, [edits, format, dims, styleLayerDefaults, styleFlags, styleVariants]);
 
   /* capture / export: toSvg → canvas → PNG */
   const captureSlide = async (i) => {
@@ -296,6 +400,28 @@ function Studio() {
     });
   }, []);
 
+  /* style preset ops */
+  const handleStyleImport = async (parsed) => {
+    const data = await apiCall('/api/studio/styles', 'POST', parsed);
+    setStylePresets(prev => [...prev, data.style]);
+  };
+
+  const handleStyleActivate = async (preset) => {
+    await apiCall(`/api/studio/styles/${preset.id}/activate`, 'POST', {});
+    setActiveStyleId(preset.id);
+    applyStyleCss(preset);
+  };
+
+  const handleStyleDelete = async (preset) => {
+    if (!confirm(`Удалить стиль «${preset.name}»?`)) return;
+    await apiCall(`/api/studio/styles/${preset.id}`, 'DELETE');
+    setStylePresets(prev => prev.filter(p => p.id !== preset.id));
+    if (activeStyleId === preset.id) {
+      setActiveStyleId(null);
+      document.getElementById('ybStyleOverride').textContent = '';
+    }
+  };
+
   /* loading / error states */
   if (!ybData) return <LoadingScreen error={loadError} />;
 
@@ -304,7 +430,7 @@ function Studio() {
 
   const activeComp   = window.SLIDE_TYPES[activeSlide.type].Comp;
   const activeSt     = edits[activeSlide.key] || {};
-  const activeLayers = { grain: true, halftone: true, tape: true, stamps: true, ...(activeSt.layers || {}) };
+  const activeLayers = { ...styleLayerDefaults, ...(activeSt.layers || {}) };
 
   const renderSlide = (slide) => {
     const { Comp } = window.SLIDE_TYPES[slide.type];
@@ -452,6 +578,14 @@ function Studio() {
               ПУБЛИКУЕТСЯ КАК STORIES · <a href="instagram-history.html" style={{ color: 'var(--st-dim)' }}>ИСТОРИЯ</a>
             </div>
           </div>
+
+          <StylesPanel
+            presets={stylePresets}
+            activeId={activeStyleId}
+            onActivate={handleStyleActivate}
+            onDelete={handleStyleDelete}
+            onImport={handleStyleImport}
+          />
 
           <div className="st-section">
             <div className="st-section__h">Подсказка</div>
