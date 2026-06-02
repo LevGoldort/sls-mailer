@@ -884,32 +884,21 @@ class DynamoDBClient:
         )
         return resp.get('Items', [])
 
-    # ===== Studio Style Presets =====
+    # ===== Studio HTML Templates =====
 
-    def put_style_preset(self, preset: dict):
-        self.config_table.put_item(Item={'PK': 'STYLE', 'SK': preset['id'], **preset})
+    def put_template(self, tpl: dict):
+        self.config_table.put_item(Item={'PK': 'TEMPLATE', 'SK': tpl['id'], **tpl})
 
-    def list_style_presets(self) -> List[dict]:
+    def list_templates(self) -> List[dict]:
         from boto3.dynamodb.conditions import Key as DKey
         resp = self.config_table.query(
-            KeyConditionExpression=DKey('PK').eq('STYLE'),
+            KeyConditionExpression=DKey('PK').eq('TEMPLATE'),
         )
         return resp.get('Items', [])
 
-    def get_style_preset(self, style_id: str) -> Optional[dict]:
-        resp = self.config_table.get_item(Key={'PK': 'STYLE', 'SK': style_id})
+    def get_template(self, tpl_id: str) -> Optional[dict]:
+        resp = self.config_table.get_item(Key={'PK': 'TEMPLATE', 'SK': tpl_id})
         return resp.get('Item')
 
-    def delete_style_preset(self, style_id: str):
-        self.config_table.delete_item(Key={'PK': 'STYLE', 'SK': style_id})
-
-    def get_active_style_id(self) -> Optional[str]:
-        resp = self.config_table.get_item(Key={'PK': 'SETTING', 'SK': 'active_style'})
-        item = resp.get('Item')
-        return item.get('style_id') if item else None
-
-    def set_active_style_id(self, style_id: str):
-        self.config_table.put_item(Item={'PK': 'SETTING', 'SK': 'active_style', 'style_id': style_id})
-
-    def clear_active_style_id(self):
-        self.config_table.delete_item(Key={'PK': 'SETTING', 'SK': 'active_style'})
+    def delete_template(self, tpl_id: str):
+        self.config_table.delete_item(Key={'PK': 'TEMPLATE', 'SK': tpl_id})

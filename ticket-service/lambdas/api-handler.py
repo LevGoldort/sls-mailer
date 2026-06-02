@@ -4717,21 +4717,18 @@ def _ig_env() -> tuple[str, str, str, str]:
 
 
 def handle_studio(event: Dict, method: str, path: str) -> Dict:
-    if method == 'GET' and path == '/api/studio/styles':
-        return studio_list_styles(event)
-    if method == 'POST' and path == '/api/studio/styles':
-        return studio_create_style(event)
-    if method == 'DELETE' and path.startswith('/api/studio/styles/') and not path.endswith('/activate'):
-        style_id = path.split('/')[-1]
-        return studio_delete_style(event, style_id)
-    if method == 'POST' and path.startswith('/api/studio/styles/') and path.endswith('/activate'):
-        style_id = path.split('/')[-2]
-        return studio_activate_style(event, style_id)
+    if method == 'GET' and path == '/api/studio/templates':
+        return studio_list_templates(event)
+    if method == 'POST' and path == '/api/studio/templates':
+        return studio_create_template(event)
+    if method == 'DELETE' and path.startswith('/api/studio/templates/'):
+        tpl_id = path.split('/')[-1]
+        return studio_delete_template(event, tpl_id)
     return error_response(404, 'Not found')
 
 
-def studio_list_styles(request_event: Dict) -> Dict:
-    """GET /api/studio/styles — list all style presets and active id."""
+def studio_list_templates(request_event: Dict) -> Dict:
+    """GET /api/studio/templates — list all HTML template presets."""
     try:
         ctx = authenticate(request_event)
     except AuthError as e:
@@ -4739,24 +4736,16 @@ def studio_list_styles(request_event: Dict) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    presets = db.list_style_presets()
-    active_id = db.get_active_style_id()
-    serialized = []
-    for p in presets:
-        serialized.append({
-            'id': p.get('SK'),
-            'name': p.get('name'),
-            'colors': p.get('colors', {}),
-            'layers': p.get('layers', {}),
-            'flags': p.get('flags', {}),
-            'variants': p.get('variants', {}),
-            'created_at': p.get('created_at'),
-        })
-    return success_response({'styles': serialized, 'active_id': active_id})
+    templates = db.list_templates()
+    serialized = [
+        {'id': t.get('SK'), 'name': t.get('name'), 'html': t.get('html', ''), 'created_at': t.get('created_at')}
+        for t in templates
+    ]
+    return success_response({'templates': serialized})
 
 
-def studio_create_style(request_event: Dict) -> Dict:
-    """POST /api/studio/styles — save a new style preset."""
+def studio_create_template(request_event: Dict) -> Dict:
+    """POST /api/studio/templates — save a new HTML template."""
     try:
         ctx = authenticate(request_event)
     except AuthError as e:
@@ -4766,39 +4755,29 @@ def studio_create_style(request_event: Dict) -> Dict:
 
     body = json.loads(request_event.get('body') or '{}')
     name = (body.get('name') or '').strip()
-    colors = body.get('colors')
-    layers = body.get('layers')
-    flags = body.get('flags')
-    variants = body.get('variants')
+    html = (body.get('html') or '').strip()
 
     if not name:
         return error_response(400, 'name is required')
-    if not isinstance(colors, dict) or not colors:
-        return error_response(400, 'colors must be a non-empty object')
-    if layers is not None and not isinstance(layers, dict):
-        return error_response(400, 'layers must be an object')
-    if flags is not None and not isinstance(flags, dict):
-        return error_response(400, 'flags must be an object')
-    if variants is not None and not isinstance(variants, dict):
-        return error_response(400, 'variants must be an object')
+    if not html:
+        return error_response(400, 'html is required')
+    if len(html.encode('utf-8')) > 380_000:
+        return error_response(400, 'HTML too large (max 380KB)')
 
     import uuid
-    style_id = str(uuid.uuid4())[:8]
-    preset = {
-        'id': style_id,
+    tpl_id = str(uuid.uuid4())[:8]
+    tpl = {
+        'id': tpl_id,
         'name': name,
-        'colors': colors,
-        'layers': layers or {},
-        'flags': flags or {},
-        'variants': variants or {},
+        'html': html,
         'created_at': datetime.now(timezone.utc).isoformat(),
     }
-    db.put_style_preset(preset)
-    return success_response({'style': preset}, 201)
+    db.put_template(tpl)
+    return success_response({'template': tpl}, 201)
 
 
-def studio_delete_style(request_event: Dict, style_id: str) -> Dict:
-    """DELETE /api/studio/styles/{id}."""
+def studio_delete_template(request_event: Dict, tpl_id: str) -> Dict:
+    """DELETE /api/studio/templates/{id}."""
     try:
         ctx = authenticate(request_event)
     except AuthError as e:
@@ -4806,32 +4785,12 @@ def studio_delete_style(request_event: Dict, style_id: str) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    existing = db.get_style_preset(style_id)
+    existing = db.get_template(tpl_id)
     if not existing:
-        return error_response(404, 'Style not found')
+        return error_response(404, 'Template not found')
 
-    db.delete_style_preset(style_id)
-    active_id = db.get_active_style_id()
-    if active_id == style_id:
-        db.clear_active_style_id()
-    return success_response({'deleted': style_id})
-
-
-def studio_activate_style(request_event: Dict, style_id: str) -> Dict:
-    """POST /api/studio/styles/{id}/activate."""
-    try:
-        ctx = authenticate(request_event)
-    except AuthError as e:
-        return error_response(e.status_code, str(e))
-    if not is_admin(ctx, ctx.get('tenant_id', '')):
-        return error_response(403, 'Access denied')
-
-    existing = db.get_style_preset(style_id)
-    if not existing:
-        return error_response(404, 'Style not found')
-
-    db.set_active_style_id(style_id)
-    return success_response({'active_id': style_id})
+    db.delete_template(tpl_id)
+    return success_response({'deleted': tpl_id})
 
 
 def handle_instagram(event: Dict, method: str, path: str) -> Dict:

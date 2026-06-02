@@ -14,6 +14,7 @@ const SLIDE_TYPES = {
   'event-solo':    { Comp: window.EventSolo,    label: 'Анонс' },
   'content-drop':  { Comp: window.ContentDrop,  label: 'Выпуск' },
   'merch-drop':    { Comp: window.MerchDrop,    label: 'Дроп' },
+  'html-template': { Comp: window.HtmlTemplateSlide, label: 'HTML-шаблон' },
 };
 
 const ACCENTS = ['cyan', 'yellow', 'magenta'];
@@ -96,6 +97,25 @@ const RECIPES = [
       return [{ key: 'merch:' + m.id + ':drop', type: 'merch-drop', label: m.name.slice(0, 16), accent: 'cyan', data: { product: m } }];
     },
   },
+  {
+    id: 'html',
+    label: 'Шаблон',
+    ico: 'H',
+    subjectKind: 'event',
+    build(eid) {
+      const D = window.YB_DATA;
+      const ev = D.eventById(eid) || D.events[0];
+      if (!ev) return [];
+      const tplId = window.__activeTemplateId || null;
+      return [{
+        key: 'html:' + (tplId || 'none') + ':' + ev.id,
+        type: 'html-template',
+        label: ev.title.slice(0, 20),
+        accent: 'cyan',
+        data: { event: ev, templateId: tplId },
+      }];
+    },
+  },
 ];
 
 /* subject option lists for the header dropdown */
@@ -103,7 +123,13 @@ function subjectOptions(kind) {
   const D = window.YB_DATA;
   switch (kind) {
     case 'performer': return D.performers.map((p) => ({ id: p.id, label: p.name }));
-    case 'event':     return D.events.map((e) => ({ id: e.id, label: window.parseDate(e.date).num + '.' + window.parseDate(e.date).monthAbbr + ' · ' + e.venue }));
+    case 'event': {
+      const today = new Date().toISOString().slice(0, 10);
+      return D.events
+        .filter(e => e.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(e => ({ id: e.id, label: window.parseDate(e.date).num + '.' + window.parseDate(e.date).monthAbbr + ' · ' + e.venue }));
+    }
     case 'episode':   return D.episodes.map((e) => ({ id: e.id, label: e.show + ' · ЭП.' + e.number }));
     case 'product':   return D.merch.map((m) => ({ id: m.id, label: m.name }));
     default:          return [];

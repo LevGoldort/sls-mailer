@@ -11,14 +11,6 @@ const DEFAULT_FLAGS = {
   show_price: true, show_venue: true, show_bottom_bar: true, show_city: true,
 };
 
-function applyStyleCss(preset) {
-  if (!preset) return;
-  const vars = Object.entries(preset.colors || {})
-    .map(([k, v]) => `--${k.replace(/_/g, '-')}: ${v};`)
-    .join(' ');
-  document.getElementById('ybStyleOverride').textContent = `:root { ${vars} }`;
-}
-
 function loadEdits() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
 }
@@ -26,26 +18,25 @@ function sanitize(s) {
   return (s || '').toString().toLowerCase().replace(/[^a-zа-я0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 24);
 }
 
-/* ── Styles Panel ── */
-function StylesPanel({ presets, activeId, onActivate, onDelete, onImport }) {
+/* ── Templates Panel ── */
+function TemplatesPanel({ templates, activeId, onActivate, onDelete, onImport }) {
   const [showImport, setShowImport] = React.useState(false);
-  const [importText, setImportText] = React.useState('');
-  const [importError, setImportError] = React.useState('');
+  const [name, setName] = React.useState('');
+  const [html, setHtml] = React.useState('');
+  const [err, setErr] = React.useState('');
   const [busy, setBusy] = React.useState(false);
 
   const handleImport = async () => {
-    setImportError('');
-    let parsed;
-    try { parsed = JSON.parse(importText); } catch { setImportError('Невалидный JSON'); return; }
-    if (!parsed.name) { setImportError('Поле name обязательно'); return; }
-    if (!parsed.colors || typeof parsed.colors !== 'object') { setImportError('Поле colors обязательно'); return; }
+    setErr('');
+    if (!name.trim()) { setErr('Введите название'); return; }
+    if (!html.trim()) { setErr('Вставьте HTML'); return; }
+    if (html.length > 380000) { setErr('HTML слишком большой (макс. 380KB)'); return; }
     setBusy(true);
     try {
-      await onImport(parsed);
-      setImportText('');
-      setShowImport(false);
+      await onImport({ name: name.trim(), html: html.trim() });
+      setName(''); setHtml(''); setShowImport(false);
     } catch (e) {
-      setImportError(e.message || 'Ошибка сохранения');
+      setErr(e.message || 'Ошибка сохранения');
     } finally {
       setBusy(false);
     }
@@ -53,47 +44,100 @@ function StylesPanel({ presets, activeId, onActivate, onDelete, onImport }) {
 
   return (
     <div className="st-section">
-      <div className="st-section__h">Стили</div>
-      {presets.length === 0 && (
-        <div style={{ fontSize: 10, color: 'var(--st-dim)', letterSpacing: '.1em', marginBottom: 8 }}>НЕТ ПРЕСЕТОВ</div>
+      <div className="st-section__h">HTML Шаблоны</div>
+      {templates.length === 0 && (
+        <div style={{ fontSize: 10, color: 'var(--st-dim)', letterSpacing: '.1em', marginBottom: 8 }}>НЕТ ШАБЛОНОВ</div>
       )}
-      {presets.map(p => {
-        const offFlags = Object.entries(p.flags || {}).filter(([, v]) => v === false).map(([k]) => k.replace('show_', ''));
-        return (
-          <div key={p.id} style={{ marginBottom: 8, borderLeft: '2px solid ' + (p.id === activeId ? 'var(--st-yellow)' : 'var(--st-line)'), paddingLeft: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ flex: 1, fontSize: 11, letterSpacing: '.08em', color: p.id === activeId ? 'var(--st-yellow)' : 'var(--st-text)', fontFamily: 'var(--f-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.id === activeId ? '✓ ' : ''}{p.name}
-              </div>
-              {p.id !== activeId && (
-                <button className="st-chip" style={{ padding: '2px 8px', fontSize: 9 }} onClick={() => onActivate(p)}>ON</button>
-              )}
-              <button className="st-chip" style={{ padding: '2px 8px', fontSize: 9, opacity: .5 }} onClick={() => onDelete(p)}>✕</button>
+      {templates.map(t => (
+        <div key={t.id} style={{ marginBottom: 8, borderLeft: '2px solid ' + (t.id === activeId ? 'var(--st-yellow)' : 'var(--st-line)'), paddingLeft: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ flex: 1, fontSize: 11, letterSpacing: '.08em', color: t.id === activeId ? 'var(--st-yellow)' : 'var(--st-text)', fontFamily: 'var(--f-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {t.id === activeId ? '✓ ' : ''}{t.name}
             </div>
-            {offFlags.length > 0 && (
-              <div style={{ fontSize: 9, color: 'var(--st-dim)', marginTop: 3, fontFamily: 'var(--f-mono)', letterSpacing: '.06em' }}>
-                OFF: {offFlags.join(', ')}
-              </div>
+            {t.id !== activeId && (
+              <button className="st-chip" style={{ padding: '2px 8px', fontSize: 9 }} onClick={() => onActivate(t)}>ON</button>
             )}
+            <button className="st-chip" style={{ padding: '2px 8px', fontSize: 9, opacity: .5 }} onClick={() => onDelete(t)}>✕</button>
           </div>
-        );
-      })}
+        </div>
+      ))}
       {showImport ? (
         <div style={{ marginTop: 8 }}>
-          <textarea
-            value={importText}
-            onChange={e => setImportText(e.target.value)}
-            placeholder={'{\n  "name": "Dark Mode",\n  "colors": { "paper": "#1a1410", ... },\n  "layers": { "grain": true, ... }\n}'}
-            style={{ width: '100%', height: 140, background: 'var(--st-panel2)', border: '1px solid var(--st-line)', color: 'var(--st-text)', fontFamily: 'var(--f-mono)', fontSize: 10, padding: 8, boxSizing: 'border-box', resize: 'vertical' }}
-          />
-          {importError && <div style={{ color: '#f87171', fontSize: 10, marginTop: 4 }}>{importError}</div>}
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Название шаблона"
+            style={{ width: '100%', marginBottom: 6, background: 'var(--st-panel2)', border: '1px solid var(--st-line)', color: 'var(--st-text)', fontFamily: 'var(--f-mono)', fontSize: 10, padding: '6px 8px', boxSizing: 'border-box' }} />
+          <textarea value={html} onChange={e => setHtml(e.target.value)}
+            placeholder={'<!DOCTYPE html>\n<html>...\n  {{event.name}}\n  <div data-yb-image="main">'}
+            style={{ width: '100%', height: 160, background: 'var(--st-panel2)', border: '1px solid var(--st-line)', color: 'var(--st-text)', fontFamily: 'var(--f-mono)', fontSize: 10, padding: 8, boxSizing: 'border-box', resize: 'vertical' }} />
+          {err && <div style={{ color: '#f87171', fontSize: 10, marginTop: 4 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
             <button className="st-btn" style={{ flex: 1 }} onClick={handleImport} disabled={busy}>СОХРАНИТЬ</button>
-            <button className="st-btn st-btn--ghost" onClick={() => { setShowImport(false); setImportError(''); }}>ОТМЕНА</button>
+            <button className="st-btn st-btn--ghost" onClick={() => { setShowImport(false); setErr(''); }}>ОТМЕНА</button>
           </div>
         </div>
       ) : (
-        <button className="st-btn st-btn--ghost" style={{ width: '100%', marginTop: 4 }} onClick={() => setShowImport(true)}>+ ИМПОРТ JSON</button>
+        <button className="st-btn st-btn--ghost" style={{ width: '100%', marginTop: 4 }} onClick={() => setShowImport(true)}>+ ИМПОРТ HTML</button>
+      )}
+    </div>
+  );
+}
+
+/* ── Template image slot (inspector crop control) ── */
+function TplImageSlot({ slotName, value, fallbackUrl, cropW, cropH, onChange }) {
+  const fileRef = useRef(null);
+  const [showActions, setShowActions] = useState(false);
+
+  const currentUrl = value || fallbackUrl || null;
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail.slotName !== slotName) return;
+      if (currentUrl) {
+        setShowActions(true);
+      } else {
+        fileRef.current?.click();
+      }
+    };
+    document.addEventListener('yb-crop-slot', handler);
+    return () => document.removeEventListener('yb-crop-slot', handler);
+  }, [slotName, currentUrl]);
+
+  const handleFile = (file) => {
+    if (!file || !window.showCropModal) return;
+    setShowActions(false);
+    window.showCropModal(file, cropW, cropH, 0.9, blob => {
+      const reader = new FileReader();
+      reader.onload = e => onChange(e.target.result);
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handleReplace = () => { setShowActions(false); fileRef.current?.click(); };
+
+  const handleReCrop = async () => {
+    if (!currentUrl) return;
+    setShowActions(false);
+    const blob = await fetch(currentUrl).then(r => r.blob());
+    handleFile(new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' }));
+  };
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 9, letterSpacing: '.12em', color: 'var(--st-dim)', marginBottom: 4, fontFamily: 'var(--f-mono)' }}>{slotName}</div>
+      <div
+        style={{ width: '100%', height: 60, background: currentUrl ? 'none' : 'var(--st-panel2)', backgroundImage: currentUrl ? `url(${currentUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px dashed ' + (showActions ? 'var(--st-yellow)' : 'var(--st-line)'), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+        onClick={() => currentUrl ? setShowActions(a => !a) : fileRef.current?.click()}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+      >
+        {!currentUrl && <span style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--st-dim)', fontFamily: 'var(--f-mono)', pointerEvents: 'none' }}>НАЖМИ ИЛИ ПЕРЕТАЩИ</span>}
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files[0]; if (f) handleFile(f); e.target.value = ''; }} />
+      </div>
+      {showActions && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+          <button className="st-btn" style={{ flex: 1, fontSize: 10 }} onClick={handleReCrop}>✂ КРОП</button>
+          <button className="st-btn st-btn--ghost" style={{ flex: 1, fontSize: 10 }} onClick={handleReplace}>↺ ЗАМЕНИТЬ</button>
+        </div>
       )}
     </div>
   );
@@ -150,8 +194,8 @@ function Studio() {
   const [ybData,       setYbData]       = useState(null);
   const [loadError,    setLoadError]    = useState(null);
   const [recipeId,     setRecipeId]     = useState('weekly');
-  const [stylePresets, setStylePresets] = useState([]);
-  const [activeStyleId, setActiveStyleId] = useState(null);
+  const [htmlTemplates,   setHtmlTemplates]   = useState([]);
+  const [activeTemplateId, setActiveTemplateId] = useState(null);
   const [subjects,  setSubjects]  = useState({ performer: null, event: null, episode: null, product: null });
   const [format,    setFormat]    = useState('story');
   const [active,    setActive]    = useState(0);
@@ -189,12 +233,16 @@ function Studio() {
       });
     }).catch(e => setLoadError(e.message || String(e)));
 
-    apiCall('/api/studio/styles').then(data => {
-      const presets = data.styles || [];
-      setStylePresets(presets);
-      setActiveStyleId(data.active_id || null);
-      const active = presets.find(p => p.id === data.active_id);
-      if (active) applyStyleCss(active);
+    apiCall('/api/studio/templates').then(data => {
+      const templates = data.templates || [];
+      window.__htmlTemplates = templates;
+      window.__htmlTemplateSlots = {};
+      setHtmlTemplates(templates);
+      templates.forEach(t => {
+        window.injectTemplateStyles(t);
+        window.__htmlTemplateSlots[t.id] = window.parseTemplateSlots(t.html);
+      });
+      if (templates.length > 0) setActiveTemplateId(templates[0].id);
     }).catch(() => {});
   }, []);
 
@@ -221,10 +269,11 @@ function Studio() {
     if (!ybData || !recipe || !window.YB_DATA) return [];
     const saved = window.YB_DATA.events;
     if (recipeId === 'weekly') window.YB_DATA.events = filteredEvents;
+    window.__activeTemplateId = activeTemplateId;
     const result = recipe.build(subjectId);
     window.YB_DATA.events = saved;
     return result;
-  }, [recipeId, subjectId, ybData, filteredEvents]);
+  }, [recipeId, subjectId, ybData, filteredEvents, activeTemplateId]);
 
   /* fit-to-stage scaling */
   useEffect(() => {
@@ -270,20 +319,15 @@ function Studio() {
   const setStoryLink   = (key, url)  => patch(key, c => ({ ...c, link: url }));
   const setLinkEnabled = (key, on)   => patch(key, c => ({ ...c, linkEnabled: on }));
 
-  const activeStyle = stylePresets.find(p => p.id === activeStyleId) || null;
-  const styleLayerDefaults = activeStyle?.layers ? { ...DEFAULT_LAYERS, ...activeStyle.layers } : DEFAULT_LAYERS;
-  const styleFlags = activeStyle?.flags ? { ...DEFAULT_FLAGS, ...activeStyle.flags } : DEFAULT_FLAGS;
-  const styleVariants = activeStyle?.variants || {};
-
   const makeCtx = useCallback((slide) => {
     const st = edits[slide.key] || {};
     const safeBottom = format === 'story' ? 168 : 48;
     return {
       f: format, dims, accent: slide.accent,
       safeBottom,
-      variant: st.variant != null ? st.variant : (styleVariants[slide.type] ?? 0),
-      layers: { ...styleLayerDefaults, ...(st.layers || {}) },
-      flags: styleFlags,
+      variant: st.variant ?? 0,
+      layers: { ...DEFAULT_LAYERS, ...(st.layers || {}) },
+      flags: DEFAULT_FLAGS,
       data: slide.data,
       rootStyle: { width: dims.w, height: dims.h },
       T:      (k, def)  => (st.fields && st.fields[k] != null) ? st.fields[k] : def,
@@ -291,13 +335,14 @@ function Studio() {
       img:    (k)       => st.images && st.images[k],
       setImg: (k, v)    => updateImage(slide.key, k, v),
     };
-  }, [edits, format, dims, styleLayerDefaults, styleFlags, styleVariants]);
+  }, [edits, format, dims]);
 
   /* capture / export: toSvg → canvas → PNG */
   const captureSlide = async (i) => {
     const node = captureRefs.current[i];
     if (!node) throw new Error('no capture node ' + i);
     await document.fonts.ready;
+    await new Promise(r => requestAnimationFrame(r));
     const dataUri = await window.htmlToImage.toSvg(node, { width: dims.w, height: dims.h, backgroundColor: '#f3eee1' });
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('svg load failed')); img.src = dataUri; });
@@ -400,26 +445,31 @@ function Studio() {
     });
   }, []);
 
-  /* style preset ops */
-  const handleStyleImport = async (parsed) => {
-    const data = await apiCall('/api/studio/styles', 'POST', parsed);
-    setStylePresets(prev => [...prev, data.style]);
+  /* template ops */
+  const handleTemplateImport = async (payload) => {
+    const data = await apiCall('/api/studio/templates', 'POST', payload);
+    const tpl = data.template;
+    window.__htmlTemplates = [...(window.__htmlTemplates || []), tpl];
+    window.__htmlTemplateSlots = window.__htmlTemplateSlots || {};
+    window.__htmlTemplateSlots[tpl.id] = window.parseTemplateSlots(tpl.html);
+    window.injectTemplateStyles(tpl);
+    setHtmlTemplates(prev => [...prev, tpl]);
+    setActiveTemplateId(tpl.id);
   };
 
-  const handleStyleActivate = async (preset) => {
-    await apiCall(`/api/studio/styles/${preset.id}/activate`, 'POST', {});
-    setActiveStyleId(preset.id);
-    applyStyleCss(preset);
+  const handleTemplateActivate = (tpl) => {
+    setActiveTemplateId(tpl.id);
   };
 
-  const handleStyleDelete = async (preset) => {
-    if (!confirm(`Удалить стиль «${preset.name}»?`)) return;
-    await apiCall(`/api/studio/styles/${preset.id}`, 'DELETE');
-    setStylePresets(prev => prev.filter(p => p.id !== preset.id));
-    if (activeStyleId === preset.id) {
-      setActiveStyleId(null);
-      document.getElementById('ybStyleOverride').textContent = '';
-    }
+  const handleTemplateDelete = async (tpl) => {
+    if (!confirm(`Удалить шаблон «${tpl.name}»?`)) return;
+    await apiCall(`/api/studio/templates/${tpl.id}`, 'DELETE');
+    setHtmlTemplates(prev => prev.filter(t => t.id !== tpl.id));
+    window.__htmlTemplates = (window.__htmlTemplates || []).filter(t => t.id !== tpl.id);
+    const remaining = htmlTemplates.filter(t => t.id !== tpl.id);
+    if (activeTemplateId === tpl.id) setActiveTemplateId(remaining[0]?.id || null);
+    const styleEl = document.getElementById('yb-tpl-css-' + tpl.id);
+    if (styleEl) styleEl.remove();
   };
 
   /* loading / error states */
@@ -430,7 +480,7 @@ function Studio() {
 
   const activeComp   = window.SLIDE_TYPES[activeSlide.type].Comp;
   const activeSt     = edits[activeSlide.key] || {};
-  const activeLayers = { ...styleLayerDefaults, ...(activeSt.layers || {}) };
+  const activeLayers = { ...DEFAULT_LAYERS, ...(activeSt.layers || {}) };
 
   const renderSlide = (slide) => {
     const { Comp } = window.SLIDE_TYPES[slide.type];
@@ -579,13 +629,36 @@ function Studio() {
             </div>
           </div>
 
-          <StylesPanel
-            presets={stylePresets}
-            activeId={activeStyleId}
-            onActivate={handleStyleActivate}
-            onDelete={handleStyleDelete}
-            onImport={handleStyleImport}
-          />
+          {recipeId === 'html' && (() => {
+            const slots = (window.__htmlTemplateSlots || {})[activeSlide.data?.templateId] || [];
+            return (
+              <>
+                {slots.length > 0 && (
+                  <div className="st-section">
+                    <div className="st-section__h">Изображения</div>
+                    {slots.map(slot => (
+                      <TplImageSlot
+                        key={slot.name}
+                        slotName={slot.name}
+                        value={(activeSt.images || {})[slot.name] || null}
+                        fallbackUrl={slot.name === 'main' ? activeSlide.data?.event?.photo || null : null}
+                        cropW={slot.cropW || dims.w}
+                        cropH={slot.cropH || dims.h}
+                        onChange={dataUrl => updateImage(activeSlide.key, slot.name, dataUrl)}
+                      />
+                    ))}
+                  </div>
+                )}
+                <TemplatesPanel
+                  templates={htmlTemplates}
+                  activeId={activeTemplateId}
+                  onActivate={handleTemplateActivate}
+                  onDelete={handleTemplateDelete}
+                  onImport={handleTemplateImport}
+                />
+              </>
+            );
+          })()}
 
           <div className="st-section">
             <div className="st-section__h">Подсказка</div>

@@ -506,6 +506,7 @@ REGEN_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-
 
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-shows"
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-episodes"
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-config"
 ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-shows"
 ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-episodes"
 
