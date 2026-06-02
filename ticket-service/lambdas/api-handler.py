@@ -148,6 +148,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_influencers(event, http_method, path)
         elif path.startswith('/api/instagram'):
             return handle_instagram(event, http_method, path)
+        elif path.startswith('/api/studio'):
+            return handle_studio(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
         elif path == '/api/upload-image/quick' and http_method == 'POST':
@@ -4712,6 +4714,83 @@ def _ig_env() -> tuple[str, str, str, str]:
     if not all([app_id, app_secret, token_key, api_base_url]):
         raise ValueError("Instagram env vars not configured (META_APP_ID, META_APP_SECRET, INSTAGRAM_TOKEN_KEY, API_BASE_URL)")
     return app_id, app_secret, token_key, api_base_url
+
+
+def handle_studio(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET' and path == '/api/studio/templates':
+        return studio_list_templates(event)
+    if method == 'POST' and path == '/api/studio/templates':
+        return studio_create_template(event)
+    if method == 'DELETE' and path.startswith('/api/studio/templates/'):
+        tpl_id = path.split('/')[-1]
+        return studio_delete_template(event, tpl_id)
+    return error_response(404, 'Not found')
+
+
+def studio_list_templates(request_event: Dict) -> Dict:
+    """GET /api/studio/templates — list all HTML template presets."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    templates = db.list_templates()
+    serialized = [
+        {'id': t.get('SK'), 'name': t.get('name'), 'html': t.get('html', ''), 'created_at': t.get('created_at')}
+        for t in templates
+    ]
+    return success_response({'templates': serialized})
+
+
+def studio_create_template(request_event: Dict) -> Dict:
+    """POST /api/studio/templates — save a new HTML template."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    body = json.loads(request_event.get('body') or '{}')
+    name = (body.get('name') or '').strip()
+    html = (body.get('html') or '').strip()
+
+    if not name:
+        return error_response(400, 'name is required')
+    if not html:
+        return error_response(400, 'html is required')
+    if len(html.encode('utf-8')) > 380_000:
+        return error_response(400, 'HTML too large (max 380KB)')
+
+    import uuid
+    tpl_id = str(uuid.uuid4())[:8]
+    tpl = {
+        'id': tpl_id,
+        'name': name,
+        'html': html,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    }
+    db.put_template(tpl)
+    return success_response({'template': tpl}, 201)
+
+
+def studio_delete_template(request_event: Dict, tpl_id: str) -> Dict:
+    """DELETE /api/studio/templates/{id}."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    existing = db.get_template(tpl_id)
+    if not existing:
+        return error_response(404, 'Template not found')
+
+    db.delete_template(tpl_id)
+    return success_response({'deleted': tpl_id})
 
 
 def handle_instagram(event: Dict, method: str, path: str) -> Dict:

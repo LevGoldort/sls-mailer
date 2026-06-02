@@ -37,6 +37,8 @@ class DynamoDBClient:
         self.influencers_table = self.dynamodb.Table(self.influencers_table_name)
         self.instagram_table_name = os.environ.get('INSTAGRAM_CONNECTIONS_TABLE', 'yallabalagan-instagram')
         self.instagram_table = self.dynamodb.Table(self.instagram_table_name)
+        self.config_table_name = os.environ.get('CONFIG_TABLE', 'yallabalagan-config')
+        self.config_table = self.dynamodb.Table(self.config_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -881,3 +883,22 @@ class DynamoDBClient:
             ScanIndexForward=False,
         )
         return resp.get('Items', [])
+
+    # ===== Studio HTML Templates =====
+
+    def put_template(self, tpl: dict):
+        self.config_table.put_item(Item={'PK': 'TEMPLATE', 'SK': tpl['id'], **tpl})
+
+    def list_templates(self) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey
+        resp = self.config_table.query(
+            KeyConditionExpression=DKey('PK').eq('TEMPLATE'),
+        )
+        return resp.get('Items', [])
+
+    def get_template(self, tpl_id: str) -> Optional[dict]:
+        resp = self.config_table.get_item(Key={'PK': 'TEMPLATE', 'SK': tpl_id})
+        return resp.get('Item')
+
+    def delete_template(self, tpl_id: str):
+        self.config_table.delete_item(Key={'PK': 'TEMPLATE', 'SK': tpl_id})

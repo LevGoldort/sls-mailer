@@ -5,7 +5,7 @@ const { Grain, Halftone, Tape, EditableText, RisoText, ImageSlot,
 
 /* ── SINGLE EVENT ANNOUNCEMENT ── */
 function EventSolo({ ctx }) {
-  const { T, set, img, setImg, layers, data, variant, safeBottom } = ctx;
+  const { T, set, img, setImg, layers, data, variant, safeBottom, flags } = ctx;
   const ev = data.event;
   const d = window.parseDate(ev.date);
   const isExternal = ev.type === 'external';
@@ -18,12 +18,12 @@ function EventSolo({ ctx }) {
       <div className={'slide acc-' + ctx.accent} style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
         <Grain on={layers.grain} />
         <Halftone on={layers.halftone} corner />
-        <TickerStrip />
+        {flags.show_ticker && <TickerStrip />}
         <Tape on={layers.tape} color="yellow" style={{ top: 150, left: -30, width: 250, height: 44, transform: 'rotate(-6deg)' }} />
         <div style={{ position: 'relative', zIndex: 4, padding: '72px 72px ' + safeBottom + 'px', flex: 1, display: 'flex', flexDirection: 'column', gap: 26 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ transform: 'rotate(-3deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
-            {layers.stamps && (
+            {flags.show_date_stamp && <div style={{ transform: 'rotate(-3deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>}
+            {layers.stamps && flags.show_tags && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                 {(ev.tags || []).map((tg, i) => <span key={i} className={'s-stamp ' + (i ? 's-stamp--cyan' : 's-stamp--magenta')} style={{ transform: `rotate(${i ? 2 : -2}deg)` }}>{tg}</span>)}
                 {isExternal && <span className="s-stamp s-stamp--red" style={{ transform: 'rotate(3deg)' }}>EXTERNAL</span>}
@@ -34,19 +34,23 @@ function EventSolo({ ctx }) {
             <h1 className="s-event__title" style={{ fontSize: 78 }}>
               <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />
             </h1>
-            <div>
-              <div style={{ fontFamily: 'var(--f-mono)', fontSize: 22, letterSpacing: '.2em', opacity: .6 }}>★ ГОРОД</div>
-              <div className="s-city" style={{ fontSize: 168, marginTop: 4 }}>
-                <RisoText value={T('city', city)} onCommit={(v) => set('city', v)} shadowColor={accentVar} style={{ color: 'var(--ink)' }} />
+            {flags.show_city && (
+              <div>
+                <div style={{ fontFamily: 'var(--f-mono)', fontSize: 22, letterSpacing: '.2em', opacity: .6 }}>★ ГОРОД</div>
+                <div className="s-city" style={{ fontSize: 168, marginTop: 4 }}>
+                  <RisoText value={T('city', city)} onCommit={(v) => set('city', v)} shadowColor={accentVar} style={{ color: 'var(--ink)' }} />
+                </div>
               </div>
-            </div>
-            <div className="s-meta-row" style={{ fontSize: 26, marginTop: 4, gap: 14 }}>
-              <span className="s-stamp s-stamp--ink" style={{ fontSize: 22 }}>► {ev.venue}</span>
-              <span style={{ opacity: .7 }}>СТАРТ {ev.time}</span>
-            </div>
+            )}
+            {flags.show_venue && (
+              <div className="s-meta-row" style={{ fontSize: 26, marginTop: 4, gap: 14 }}>
+                <span className="s-stamp s-stamp--ink" style={{ fontSize: 22 }}>► {ev.venue}</span>
+                <span style={{ opacity: .7 }}>СТАРТ {ev.time}</span>
+              </div>
+            )}
           </div>
-          <span className="s-btn s-btn--yellow s-btn--full" style={{ fontSize: 34 }}><EditableText value={T('cta', ev.ctaLabel || 'БИЛЕТЫ НА САЙТЕ')} onCommit={(v) => set('cta', v)} single /> →</span>
-          <FooterChrome layers={layers.stamps} />
+          {flags.show_price && <span className="s-btn s-btn--yellow s-btn--full" style={{ fontSize: 34 }}><EditableText value={T('cta', ev.ctaLabel || 'БИЛЕТЫ НА САЙТЕ')} onCommit={(v) => set('cta', v)} single /> →</span>}
+          {flags.show_footer_chrome && <FooterChrome layers={layers.stamps} />}
         </div>
       </div>
     );
@@ -70,8 +74,8 @@ function EventSolo({ ctx }) {
       <div style={{ position: 'relative', zIndex: 4, padding: '60px 60px ' + safeBottom + 'px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
         {/* top — date stamp + tags */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 18 }}>
-          <div style={{ transform: 'rotate(-4deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>
-          {layers.stamps && (
+          {flags.show_date_stamp && <div style={{ transform: 'rotate(-4deg)' }}><DateStamp iso={ev.date} accentVar={accentVar} /></div>}
+          {layers.stamps && flags.show_tags && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
               {(ev.tags || []).map((tg, i) => <span key={i} className={'s-stamp s-stamp--lg ' + (i ? 's-stamp--cyan' : 's-stamp--magenta')} style={{ background: 'var(--paper)', transform: `rotate(${i ? 2.5 : -2.5}deg)` }}>{tg}</span>)}
               {isExternal && <span className="s-stamp s-stamp--lg s-stamp--red" style={{ background: 'var(--paper)', transform: 'rotate(3deg)' }}>EXTERNAL</span>}
@@ -86,19 +90,23 @@ function EventSolo({ ctx }) {
           <h1 className="s-event__title" style={{ fontSize: 64, color: 'var(--paper)', textShadow: '4px 4px 0 var(--ink)' }}>
             <EditableText value={T('title', ev.title.toUpperCase())} onCommit={(v) => set('title', v)} />
           </h1>
-          <div>
-            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 22, letterSpacing: '.2em', color: 'var(--paper)', opacity: .85, textShadow: '0 2px 6px rgba(0,0,0,.6)' }}>★ ГОРОД</div>
-            <div className="s-city" style={{ fontSize: 150, marginTop: 4, color: 'var(--paper)', textShadow: '6px 6px 0 var(--ink)' }}>
-              <EditableText value={T('city', city)} onCommit={(v) => set('city', v)} single />
+          {flags.show_city && (
+            <div>
+              <div style={{ fontFamily: 'var(--f-mono)', fontSize: 22, letterSpacing: '.2em', color: 'var(--paper)', opacity: .85, textShadow: '0 2px 6px rgba(0,0,0,.6)' }}>★ ГОРОД</div>
+              <div className="s-city" style={{ fontSize: 150, marginTop: 4, color: 'var(--paper)', textShadow: '6px 6px 0 var(--ink)' }}>
+                <EditableText value={T('city', city)} onCommit={(v) => set('city', v)} single />
+              </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Pill accent>СТАРТ {ev.time}</Pill>
-            <Pill>► {ev.venue}</Pill>
-            {ev.price ? <Pill>ВХОД {ev.price}₪</Pill> : null}
-          </div>
-          <span className="s-btn s-btn--yellow s-btn--full" style={{ fontSize: 34 }}><EditableText value={T('cta', ev.ctaLabel || 'БИЛЕТЫ НА САЙТЕ')} onCommit={(v) => set('cta', v)} single /> →</span>
-          <FooterChrome layers={layers.stamps} />
+          )}
+          {(flags.show_venue || flags.show_price) && (
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Pill accent>СТАРТ {ev.time}</Pill>
+              {flags.show_venue && <Pill>► {ev.venue}</Pill>}
+              {flags.show_price && ev.price ? <Pill>ВХОД {ev.price}₪</Pill> : null}
+            </div>
+          )}
+          {flags.show_price && <span className="s-btn s-btn--yellow s-btn--full" style={{ fontSize: 34 }}><EditableText value={T('cta', ev.ctaLabel || 'БИЛЕТЫ НА САЙТЕ')} onCommit={(v) => set('cta', v)} single /> →</span>}
+          {flags.show_footer_chrome && <FooterChrome layers={layers.stamps} />}
         </div>
       </div>
     </div>
@@ -109,7 +117,7 @@ EventSolo.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── CONTENT DROP ── */
 function ContentDrop({ ctx }) {
-  const { T, set, img, setImg, layers, data, safeBottom } = ctx;
+  const { T, set, img, setImg, layers, flags, data, safeBottom } = ctx;
   const ep = data.episode;
   const perfs = data.performers || [];
   const vs = perfs.slice(0, 2).map((p) => p.name).join('  ✦  ');
@@ -117,7 +125,7 @@ function ContentDrop({ ctx }) {
     <div className="slide acc-magenta" style={{ ...ctx.rootStyle, display: 'flex', flexDirection: 'column' }}>
       <Grain on={layers.grain} />
       <Halftone on={layers.halftone} corner />
-      <TickerStrip />
+      {flags.show_ticker && <TickerStrip />}
       <div style={{ position: 'relative', zIndex: 4, padding: '64px 64px ' + safeBottom + 'px', flex: 1, display: 'flex', flexDirection: 'column', gap: 30 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="s-ep-badge" style={{ fontSize: 26 }}>{ep.show} · ЭП. {ep.number}</span>
@@ -138,7 +146,7 @@ function ContentDrop({ ctx }) {
         </div>
         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
           <span className="s-btn s-btn--primary" style={{ fontSize: 34 }}><EditableText value={T('cta', 'СМОТРЕТЬ НА ' + ep.platform)} onCommit={(v) => set('cta', v)} single /> →</span>
-          <span className="s-handle" style={{ fontSize: 24 }}>{window.YB_DATA.site.handle}</span>
+          {flags.show_footer_chrome && <span className="s-handle" style={{ fontSize: 24 }}>{window.YB_DATA.site.handle}</span>}
         </div>
       </div>
     </div>
@@ -149,7 +157,7 @@ ContentDrop.layers = ['grain', 'halftone', 'tape', 'stamps'];
 
 /* ── MERCH DROP ── */
 function MerchDrop({ ctx }) {
-  const { T, set, img, setImg, layers, data, variant, safeBottom } = ctx;
+  const { T, set, img, setImg, layers, flags, data, variant, safeBottom } = ctx;
   const m = data.product;
   const sold = variant === 1 || m.soldOut;
   const accentVar = sold ? 'var(--red)' : 'var(--magenta)';
@@ -163,9 +171,11 @@ function MerchDrop({ ctx }) {
         {sold
           ? <div style={{ position: 'absolute', top: '46%', left: '50%', transform: 'translate(-50%,-50%) rotate(-8deg)', zIndex: 4 }}><div className="s-soldout" style={{ fontSize: 64 }}>★ SOLD OUT ★</div></div>
           : (layers.stamps && <div style={{ position: 'absolute', top: 36, left: 36, zIndex: 4 }}><span className="s-stamp s-stamp--lg s-stamp--red s-stamp--fill" style={{ transform: 'rotate(-4deg)' }}><span>★ DROP ★</span></span></div>)}
-        <div style={{ position: 'absolute', bottom: 28, right: 28, zIndex: 4 }}>
-          <div className="s-price-sticker" style={{ fontSize: 72, transform: 'rotate(5deg)' }}><EditableText value={T('price', String(m.price))} onCommit={(v) => set('price', v)} single />₪</div>
-        </div>
+        {flags.show_price && (
+          <div style={{ position: 'absolute', bottom: 28, right: 28, zIndex: 4 }}>
+            <div className="s-price-sticker" style={{ fontSize: 72, transform: 'rotate(5deg)' }}><EditableText value={T('price', String(m.price))} onCommit={(v) => set('price', v)} single />₪</div>
+          </div>
+        )}
         <Tape on={layers.tape} color="cyan" style={{ top: 18, right: 70, width: 200, height: 40, transform: 'rotate(5deg)', zIndex: 5 }} />
       </div>
       <Grain on={layers.grain} />
@@ -180,7 +190,7 @@ function MerchDrop({ ctx }) {
           {sold
             ? <span className="s-btn" style={{ fontSize: 34, background: 'var(--ink)', color: 'var(--red)', boxShadow: '6px 6px 0 var(--magenta)' }}>РАСПРОДАНО</span>
             : <span className="s-btn s-btn--primary" style={{ fontSize: 34 }}><EditableText value={T('cta', 'КУПИТЬ')} onCommit={(v) => set('cta', v)} single /> →</span>}
-          <span className="s-handle" style={{ fontSize: 24 }}>{window.YB_DATA.site.handle}</span>
+          {flags.show_footer_chrome && <span className="s-handle" style={{ fontSize: 24 }}>{window.YB_DATA.site.handle}</span>}
         </div>
       </div>
     </div>
