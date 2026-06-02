@@ -150,6 +150,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_instagram(event, http_method, path)
         elif path.startswith('/api/studio'):
             return handle_studio(event, http_method, path)
+        elif path.startswith('/api/facebook'):
+            return handle_facebook_ads(event, http_method, path)
         elif path == '/api/upload-image' and http_method == 'POST':
             return handle_image_upload(event)
         elif path == '/api/upload-image/quick' and http_method == 'POST':
@@ -4791,6 +4793,207 @@ def studio_delete_template(request_event: Dict, tpl_id: str) -> Dict:
 
     db.delete_template(tpl_id)
     return success_response({'deleted': tpl_id})
+
+
+def handle_facebook_ads(event: Dict, method: str, path: str) -> Dict:
+    if method == 'POST' and path == '/api/facebook/create-ad':
+        return fb_create_ad_campaign(event)
+    if method == 'GET' and path == '/api/facebook/upload-url':
+        return fb_get_video_upload_url(event)
+    if method == 'GET' and path == '/api/facebook/campaigns':
+        return fb_get_campaigns(event)
+    return error_response(404, 'Not found')
+
+
+def fb_create_ad_campaign(request_event: Dict) -> Dict:
+    """POST /api/facebook/create-ad — create FB campaign + ad set + ads."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    try:
+        body = json.loads(request_event.get('body') or '{}')
+        event_id       = (body.get('event_id') or '').strip()
+        campaign_name  = (body.get('campaign_name') or '').strip()
+        ad_text        = (body.get('ad_text') or '').strip()
+        daily_budget_ils = body.get('daily_budget_ils')
+        start_date     = (body.get('start_date') or '').strip()
+        end_date       = (body.get('end_date') or '').strip()
+        city_lat       = body.get('city_lat')
+        city_lng       = body.get('city_lng')
+        creatives      = body.get('creatives') or {}
+
+        if not all([event_id, campaign_name, ad_text, daily_budget_ils, start_date, end_date]):
+            return error_response(400, 'Missing required fields')
+        if not creatives:
+            return error_response(400, 'At least one creative is required')
+
+        ev = db.get_event(event_id)
+        if not ev:
+            return error_response(404, 'Event not found')
+
+        slug = ev.get('slug') or event_id
+        link_url = f"https://yallabalagan.org/events/{slug}.html"
+
+        from datetime import datetime, timezone
+        start_unix = int(datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp())
+        end_unix   = int(datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp())
+        daily_budget_cents = int(float(daily_budget_ils)) * 100
+
+        token          = os.environ['FB_SYSTEM_USER_TOKEN']
+        ad_account_id  = os.environ['FB_AD_ACCOUNT_ID']
+        page_id        = os.environ['FB_PAGE_ID']
+        pixel_id       = os.environ.get('FB_PIXEL_ID', '')
+
+        from utils.facebook_ads import (
+            CAMPAIGN_PREFIX,
+            build_targeting, create_campaign, create_ad_set,
+            upload_image, upload_video_from_url,
+            create_image_ad_creative, create_video_ad_creative, create_ad,
+        )
+
+        prefixed_name = f"{CAMPAIGN_PREFIX}{campaign_name}"
+        targeting = build_targeting(city_lat or 32.0853, city_lng or 34.7818)
+
+        campaign_id = create_campaign(prefixed_name, token, ad_account_id, pixel_id)
+        ad_set_id   = create_ad_set(
+            campaign_id, prefixed_name, daily_budget_cents,
+            start_unix, end_unix, targeting, pixel_id, page_id, token, ad_account_id,
+        )
+
+        IMAGE_SLOTS = ('story_image', 'square_image', 'horizontal_image')
+        ads_created = []
+        ads_failed  = []
+
+        for slot_key, url in creatives.items():
+            if not url:
+                continue
+            try:
+                if slot_key in IMAGE_SLOTS:
+                    image_hash  = upload_image(url, token, ad_account_id)
+                    creative_id = create_image_ad_creative(page_id, ad_text, image_hash, link_url, token, ad_account_id)
+                elif slot_key == 'story_video':
+                    video_id    = upload_video_from_url(url, campaign_name, token, ad_account_id)
+                    creative_id = create_video_ad_creative(page_id, ad_text, video_id, link_url, token, ad_account_id)
+                else:
+                    continue
+                ad_id = create_ad(ad_set_id, creative_id, slot_key, token, ad_account_id)
+                ads_created.append({'slot': slot_key, 'ad_id': ad_id})
+            except (RuntimeError, Exception) as e:
+                ads_failed.append({'slot': slot_key, 'error': str(e)})
+
+        manager_url = f"https://www.facebook.com/adsmanager/manage/campaigns?act={ad_account_id.replace('act_', '')}"
+        return success_response({
+            'campaign_id': campaign_id,
+            'ad_set_id': ad_set_id,
+            'ads_created': ads_created,
+            'ads_failed': ads_failed,
+            'partial': len(ads_failed) > 0,
+            'manager_url': manager_url,
+        })
+
+    except (KeyError, EnvironmentError) as e:
+        return error_response(500, f'Server configuration error: {str(e)}')
+    except RuntimeError as e:
+        print(f"fb_create_ad_campaign FB error: {e}")
+        return error_response(502, str(e))
+    except Exception as e:
+        print(f"fb_create_ad_campaign error: {e}")
+        return error_response(500, 'Internal server error')
+
+
+def fb_get_video_upload_url(request_event: Dict) -> Dict:
+    """GET /api/facebook/upload-url — presigned S3 PUT URL for video upload."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    try:
+        params       = request_event.get('queryStringParameters') or {}
+        filename     = (params.get('filename') or '').strip()
+        content_type = (params.get('contentType') or '').strip()
+
+        if not filename or not content_type:
+            return error_response(400, 'Missing filename or contentType')
+        if content_type != 'video/mp4':
+            return error_response(400, 'Only video/mp4 is supported')
+
+        import uuid
+        safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', os.path.basename(filename))
+        object_key = f"videos/{uuid.uuid4().hex[:8]}_{safe_name}"
+
+        bucket_name = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
+        s3_client   = boto3.client('s3', region_name='eu-north-1')
+
+        upload_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={'Bucket': bucket_name, 'Key': object_key, 'ContentType': content_type},
+            ExpiresIn=300,
+        )
+        s3_url = f"https://{bucket_name}.s3.eu-north-1.amazonaws.com/{object_key}"
+        return success_response({'upload_url': upload_url, 's3_url': s3_url})
+
+    except Exception as e:
+        print(f"fb_get_video_upload_url error: {e}")
+        return error_response(500, 'Internal server error')
+
+
+def fb_get_campaigns(request_event: Dict) -> Dict:
+    """GET /api/facebook/campaigns — list active/paused campaigns with lifetime insights."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    try:
+        token         = os.environ['FB_SYSTEM_USER_TOKEN']
+        ad_account_id = os.environ['FB_AD_ACCOUNT_ID']
+        from utils.facebook_ads import get_campaigns_with_insights
+        raw = get_campaigns_with_insights(token, ad_account_id)
+
+        campaigns = []
+        for c in raw:
+            ins_list = c.get('insights', {}).get('data', [])
+            ins = ins_list[0] if ins_list else {}
+            actions = ins.get('actions', [])
+            conversions = sum(
+                int(a.get('value', 0))
+                for a in actions
+                if a.get('action_type') == 'purchase'
+            )
+            daily_ils = round(int(c.get('daily_budget') or 0) / 100)
+            campaigns.append({
+                'id':               c['id'],
+                'name':             c.get('name', ''),
+                'status':           c.get('status', ''),
+                'daily_budget_ils': daily_ils,
+                'start_time':       c.get('start_time', ''),
+                'end_time':         c.get('end_time', ''),
+                'impressions':      int(ins.get('impressions') or 0),
+                'clicks':           int(ins.get('clicks') or 0),
+                'spend_ils':        round(float(ins.get('spend') or 0), 2),
+                'conversions':      conversions,
+                'manager_url':      (
+                    f"https://www.facebook.com/adsmanager/manage/campaigns"
+                    f"?act={ad_account_id.replace('act_', '')}&campaign_ids={c['id']}"
+                ),
+            })
+        return success_response({'campaigns': campaigns})
+
+    except RuntimeError as e:
+        print(f"fb_get_campaigns FB error: {e}")
+        return error_response(502, str(e))
+    except Exception as e:
+        print(f"fb_get_campaigns error: {e}")
+        return error_response(500, 'Internal server error')
 
 
 def handle_instagram(event: Dict, method: str, path: str) -> Dict:

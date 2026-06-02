@@ -73,6 +73,9 @@ def generate_sitemap(events, locations, performers=None, products=None, shows=No
     add_url(f'{BASE}/shows.html',      'weekly',  '0.6')
     add_url(f'{BASE}/loyalty.html',    'monthly', '0.5')
     add_url(f'{BASE}/accessibility.html', 'monthly', '0.3')
+    add_url(f'{BASE}/privacy.html',        'yearly',  '0.2')
+    add_url(f'{BASE}/terms.html',          'yearly',  '0.2')
+    add_url(f'{BASE}/return-policy.html',  'yearly',  '0.2')
 
     # Events — prefer slug URL, include lastmod
     for event in (events or []):
@@ -512,6 +515,27 @@ def generate_html_files(site_data, output_dir, templates_dir):
     template = env.get_template('pages/accessibility.html')
     html = template.render()
     (output_dir / 'accessibility.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
+
+    # Generate privacy.html
+    print("Generating privacy.html...")
+    template = env.get_template('pages/privacy.html')
+    html = template.render()
+    (output_dir / 'privacy.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
+
+    # Generate terms.html
+    print("Generating terms.html...")
+    template = env.get_template('pages/terms.html')
+    html = template.render()
+    (output_dir / 'terms.html').write_text(html, encoding='utf-8')
+    pages_generated += 1
+
+    # Generate return-policy.html
+    print("Generating return-policy.html...")
+    template = env.get_template('pages/return-policy.html')
+    html = template.render()
+    (output_dir / 'return-policy.html').write_text(html, encoding='utf-8')
     pages_generated += 1
 
     # Generate loyalty.html

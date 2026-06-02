@@ -284,9 +284,15 @@ const RESIZE_PRESETS = {
 let _crop = null; // active crop session
 
 function showCropModal(file, targetW, targetH, quality, onDone) {
-    const MARGIN   = 50;
-    const CROP_W   = Math.min(420, window.innerWidth - 80);
-    const CROP_H   = Math.round(CROP_W * targetH / targetW);
+    const MARGIN = 40;
+    // 340px = dialog chrome (title+subtitle+slider+buttons+padding ~206px) + modal outer padding (32px) + MARGIN*2 (80px) + safety buffer
+    const MAX_CROP_H = window.innerHeight - 340;
+    let CROP_W = Math.min(420, window.innerWidth - 80);
+    let CROP_H = Math.round(CROP_W * targetH / targetW);
+    if (CROP_H > MAX_CROP_H) {
+        CROP_H = MAX_CROP_H;
+        CROP_W = Math.round(CROP_H * targetW / targetH);
+    }
     const DISPLAY_W = CROP_W + MARGIN * 2;
     const DISPLAY_H = CROP_H + MARGIN * 2;
 

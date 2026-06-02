@@ -116,6 +116,22 @@ Parameters:
     Default: ""
     Description: Meta (Facebook) App Secret for Instagram OAuth
 
+  FbAdAccountId:
+    Type: String
+    Default: ""
+    Description: Facebook Ad Account ID (e.g. act_123456789)
+
+  FbPageId:
+    Type: String
+    Default: ""
+    Description: Facebook Page ID for ad creatives
+
+  FbSystemUserToken:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Non-expiring Facebook System User token for Marketing API
+
   InstagramTokenKey:
     Type: String
     NoEcho: true
@@ -163,6 +179,9 @@ Globals:
         META_APP_ID: !Ref MetaAppId
         META_APP_SECRET: !Ref MetaAppSecret
         INSTAGRAM_TOKEN_KEY: !Ref InstagramTokenKey
+        FB_AD_ACCOUNT_ID: !Ref FbAdAccountId
+        FB_PAGE_ID: !Ref FbPageId
+        FB_SYSTEM_USER_TOKEN: !Ref FbSystemUserToken
         API_BASE_URL: !Ref ApiBaseUrl
         ADMIN_BASE_URL: !Ref AdminBaseUrl
         MEDIA_BUCKET: !Ref MediaBucket
