@@ -4,6 +4,8 @@
 {% block title %}{{ location.name }} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ location.description | truncate(160, True, '…') if location.description else location.name }}{% endblock %}
 {% block og_image %}{{ (location.get('media', {}).get('photos', []) or [''])[0] or super() }}{% endblock %}
+{% block canonical %}https://yallabalagan.org/locations/{{ location.get('slug', location.location_id) }}.html{% endblock %}
+{% block og_url %}https://yallabalagan.org/locations/{{ location.get('slug', location.location_id) }}.html{% endblock %}
 
 {% block content %}
 

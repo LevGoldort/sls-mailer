@@ -178,7 +178,11 @@ cat > /tmp/ticket-api-env.json <<EOF
     "API_BASE_URL": "${API_URL}",
     "ADMIN_BASE_URL": "${ADMIN_BASE_URL}",
     "MEDIA_BUCKET": "${MEDIA_BUCKET}",
-    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}"
+    "FRONTEND_BUCKET": "${FRONTEND_BUCKET}",
+    "FB_AD_ACCOUNT_ID": "${FbAdAccountId}",
+    "FB_PAGE_ID": "${FbPageId}",
+    "FB_SYSTEM_USER_TOKEN": "${FbSystemUserToken}",
+    "FB_PIXEL_ID": "${FB_PIXEL_ID}"
   }
 }
 EOF

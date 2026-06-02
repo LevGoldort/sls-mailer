@@ -16,6 +16,7 @@ parameter_overrides = [
     "FBPixelId=738718761834602",
     "FrontendDistributionId=E395U4QHM2AOIF"
     # AllPay credentials loaded from .env.prod via deploy script
+    # FB Ads credentials loaded from .env.prod via deploy script
 ]
 confirm_changeset = true
 image_repositories = []
@@ -59,7 +60,10 @@ parameter_overrides = [
     "FBPixelId=000000000",
     "PaymentMode=mock",
     "AllPayUseApi=false",
-    "AllPayWebhookSecret=dev-secret"
+    "AllPayWebhookSecret=dev-secret",
+    "FbAdAccountId=",
+    "FbPageId=",
+    "FbSystemUserToken="
 ]
 confirm_changeset = false
 image_repositories = []

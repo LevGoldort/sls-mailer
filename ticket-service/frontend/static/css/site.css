@@ -297,15 +297,15 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   font-size: 13px;
   line-height: 1.8;
 }
-.yb-footer__social-row {
+.yb-footer__socials .yb-footer__social-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px dashed rgba(26,20,16,.3);
   padding: 3px 0;
 }
-.yb-footer__social-row span:first-child { font-weight: 700; }
-.yb-footer__social-row span:last-child   { opacity: .6; }
+.yb-footer__socials .yb-footer__social-row span:first-child { font-weight: 700; }
+.yb-footer__socials .yb-footer__social-row span:last-child   { opacity: .6; }
 .yb-footer__bottom {
   margin-top: 36px;
   padding-top: 18px;

@@ -2,6 +2,8 @@
 
 {% block title %}{{ show.name }} — {{ strings.site.name }}{% endblock %}
 {% block description %}{{ show.short_description }}{% endblock %}
+{% block canonical %}https://yallabalagan.org/shows/{{ show.slug }}.html{% endblock %}
+{% block og_url %}https://yallabalagan.org/shows/{{ show.slug }}.html{% endblock %}
 
 {% block content %}
 

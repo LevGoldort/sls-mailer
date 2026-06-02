@@ -63,6 +63,7 @@
         </div>
         <div class="page-actions">
           <a id="mgmt-sms-link" href="#" class="btn btn-ghost">SMS рассылка</a>
+          <a id="fb-ads-link" href="fb-ads-studio.html" class="btn btn-ghost">📢 Реклама в FB</a>
         </div>
       </div>
 
@@ -468,6 +469,7 @@
       document.getElementById('mgmt-date').textContent  = formatDate(event.date);
       document.getElementById('mgmt-status').innerHTML  = `<span class="badge badge-${event.status}">${event.status}</span>`;
       document.getElementById('mgmt-sms-link').href     = `sms-blast.html?id=${id}`;
+      document.getElementById('fb-ads-link').href       = `fb-ads-studio.html?event_id=${id}`;
 
       // Fill form fields
       document.getElementById('title').value       = event.title;

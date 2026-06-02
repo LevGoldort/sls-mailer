@@ -394,6 +394,7 @@ const NAV_ITEMS = [
     { href: 'quick-post.html',     icon: '⚡', label: 'Быстрый пост',    adminOnly: true },
     { href: 'sms-blast.html',      icon: '💬', label: 'SMS рассылка',    adminOnly: true },
     { href: 'stories-studio.html',    icon: '✦',  label: 'Stories Studio',  adminOnly: true },
+    { href: 'fb-ads-studio.html',     icon: '📢', label: 'FB Ads Studio',   adminOnly: true },
     { href: 'instagram-settings.html', icon: '📸', label: 'Instagram',        adminOnly: true },
     { href: 'instagram-history.html',  icon: '🕓', label: 'История Instagram', adminOnly: true },
 ];

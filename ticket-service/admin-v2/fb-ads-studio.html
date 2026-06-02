@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FB Ads Studio — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="fb-ads-studio.css">
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">FB Ads Studio</h1>
+        <p class="page-subtitle">Быстрый запуск рекламы в Facebook</p>
+      </div>
+    </div>
+
+    <div class="fb-tabs">
+      <button class="fb-tab active" onclick="switchTab('create')">✏️ Создать</button>
+      <button class="fb-tab" onclick="switchTab('campaigns')">📊 Кампании</button>
+    </div>
+
+    <!-- Success state (shown after campaign creation) -->
+    <div id="success-section" style="display:none; max-width:640px;">
+      <div class="fb-success-card">
+        <div style="font-size:48px; margin-bottom:12px;">✅</div>
+        <h2>Кампания создана!</h2>
+        <p>Кампания создана в статусе <strong>PAUSED</strong>. Проверь и активируй её в Ads Manager.</p>
+        <div style="font-size:13px; color:#555; margin-bottom:20px;">
+          Campaign ID: <code id="result-campaign-id"></code>
+        </div>
+        <a id="ads-manager-link" href="#" target="_blank" class="btn btn-primary">
+          Открыть в Ads Manager →
+        </a>
+        <button onclick="resetForm()" class="btn btn-ghost" style="margin-top:12px; display:block; margin-left:auto; margin-right:auto;">
+          Создать ещё
+        </button>
+        <div id="partial-warning" class="fb-ads-failed" style="display:none;">
+          <strong>Некоторые объявления не создались:</strong>
+          <ul id="failed-ads-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main form -->
+    <div id="form-section" style="max-width:720px;">
+
+      <!-- Event picker -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Событие</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Выбери событие</label>
+            <select class="form-input" id="event-select" onchange="onEventSelected()">
+              <option value="">— Загрузка... —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Campaign settings -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Настройки кампании</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Название кампании</label>
+            <input class="form-input" type="text" id="campaign-name" placeholder="Название события — FB Ads">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Текст объявления</label>
+            <textarea class="form-textarea" id="ad-text" rows="4" placeholder="Описание события..."></textarea>
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Бюджет в день (₪)</label>
+              <input class="form-input" type="number" id="daily-budget" min="10" step="10" placeholder="150">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Начало</label>
+              <input class="form-input" type="date" id="start-date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Конец</label>
+              <input class="form-input" type="date" id="end-date">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Город (центр аудитории, радиус 10 км, язык: русский)</label>
+            <select class="form-input" id="city-select"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Creative slots -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Креативы</span></div>
+        <div class="card-body">
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+            Хотя бы один креатив обязателен. Изображения событий подставляются автоматически — можно заменить.
+          </p>
+          <div class="creative-slots-grid" id="slots-grid"></div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="save-bar">
+        <div class="save-bar-actions">
+          <button class="btn btn-primary" id="submit-btn" onclick="handleSubmit()">
+            Создать кампанию (PAUSED)
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /form-section -->
+
+    <!-- Campaigns tab -->
+    <div id="campaigns-section" style="display:none; max-width:900px;">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 class="card-title" style="margin:0;">Активные кампании</h2>
+          <button class="btn btn-ghost" onclick="loadCampaigns()">↺ Обновить</button>
+        </div>
+        <div id="campaigns-list">
+          <span style="opacity:.5;font-size:13px;">Загрузка...</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script src="shared-image-upload.js"></script>
+<script src="fb-ads-studio.js"></script>
+</body>
+</html>
