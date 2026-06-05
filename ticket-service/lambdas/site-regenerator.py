@@ -188,6 +188,9 @@ def fetch_data():
     response.raise_for_status()
     all_events_raw = response.json().get('events', [])
 
+    PUBLIC_STATUSES = {'active', 'sold_out'}
+    all_events_raw = [e for e in all_events_raw if e.get('status') in PUBLIC_STATUSES]
+
     upcoming_events = [e for e in all_events_raw if not is_event_past(e['date'])]
     past_events = [e for e in all_events_raw if is_event_past(e['date'])]
     filtered_count = len(past_events)

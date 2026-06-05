@@ -186,22 +186,20 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 }
 .yb-header__logo {
   display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
   text-decoration: none;
 }
 .yb-header__logo-box {
   background: var(--yb-ink);
-  color: var(--yb-yellow);
-  font-family: var(--yb-font-display);
-  letter-spacing: .02em;
-  padding: 8px 12px 6px;
-  font-size: 20px;
-  line-height: 1;
   border: var(--yb-border);
   box-shadow: 4px 4px 0 var(--yb-magenta);
-  text-transform: uppercase;
+  padding: 5px;
   transform: rotate(-1.5deg);
+}
+.yb-header__logo-mark {
+  width: 44px;
+  height: 44px;
+  display: block;
 }
 .yb-header__nav {
   display: flex;

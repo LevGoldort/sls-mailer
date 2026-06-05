@@ -79,6 +79,44 @@ echo "Building SAM application..."
 sam build
 echo "Build complete"
 
+# Helper: create Lambda function if it doesn't exist yet
+ensure_lambda() {
+  local function_name=$1
+  local handler=$2
+  local timeout=${3:-30}
+  local memory=${4:-512}
+
+  local exists
+  exists=$(aws lambda get-function --function-name "$function_name" \
+    --region "$REGION" --profile "$PROFILE" --query 'Configuration.FunctionName' \
+    --output text 2>/dev/null || echo "")
+
+  if [ -z "$exists" ]; then
+    echo "  Creating Lambda: $function_name..."
+    # Use a minimal placeholder zip so the function can be created before code upload
+    echo 'def lambda_handler(e,c): pass' > /tmp/_placeholder.py
+    zip -j -q /tmp/_placeholder.zip /tmp/_placeholder.py
+    LAMBDA_ROLE=$(aws lambda get-function-configuration \
+      --function-name yallabalagan-ticket-api \
+      --region "$REGION" --profile "$PROFILE" \
+      --query 'Role' --output text)
+    aws lambda create-function \
+      --function-name "$function_name" \
+      --runtime python3.12 \
+      --role "$LAMBDA_ROLE" \
+      --handler "$handler" \
+      --timeout "$timeout" \
+      --memory-size "$memory" \
+      --zip-file fileb:///tmp/_placeholder.zip \
+      --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+    aws lambda wait function-active \
+      --function-name "$function_name" \
+      --region "$REGION" --profile "$PROFILE"
+    rm -f /tmp/_placeholder.py /tmp/_placeholder.zip
+    echo "  Created"
+  fi
+}
+
 # Helper: update a single Lambda function
 update_lambda() {
   local function_name=$1
@@ -172,6 +210,16 @@ cat > /tmp/ticket-api-env.json <<EOF
     "EPISODES_TABLE": "yallabalagan-episodes",
     "INFLUENCERS_TABLE": "yallabalagan-influencers",
     "INSTAGRAM_CONNECTIONS_TABLE": "yallabalagan-instagram",
+    "TIKTOK_CONNECTIONS_TABLE": "yallabalagan-tiktok",
+    "TIKTOK_CLIENT_KEY": "${TIKTOK_CLIENT_KEY}",
+    "TIKTOK_CLIENT_SECRET": "${TIKTOK_CLIENT_SECRET}",
+    "TIKTOK_TOKEN_KEY": "${TIKTOK_TOKEN_KEY}",
+    "YOUTUBE_CONNECTIONS_TABLE": "yallabalagan-youtube",
+    "YOUTUBE_CLIENT_ID": "${YOUTUBE_CLIENT_ID}",
+    "YOUTUBE_CLIENT_SECRET": "${YOUTUBE_CLIENT_SECRET}",
+    "YOUTUBE_TOKEN_KEY": "${YOUTUBE_TOKEN_KEY}",
+    "SOCIAL_POSTS_TABLE": "yallabalagan-social-posts",
+    "SOCIAL_POSTER_LAMBDA": "yallabalagan-social-poster",
     "META_APP_ID": "${META_APP_ID}",
     "META_APP_SECRET": "${META_APP_SECRET}",
     "INSTAGRAM_TOKEN_KEY": "${INSTAGRAM_TOKEN_KEY}",
@@ -526,9 +574,36 @@ ensure_table "yallabalagan-instagram" \
 
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-instagram"
 
+ensure_table "yallabalagan-tiktok" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-tiktok"
+
+ensure_table "yallabalagan-youtube" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-youtube"
+
+ensure_table "yallabalagan-social-posts" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S AttributeName=status,AttributeType=S AttributeName=scheduled_at,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+  --global-secondary-indexes '[{"IndexName":"StatusScheduledIndex","KeySchema":[{"AttributeName":"status","KeyType":"HASH"},{"AttributeName":"scheduled_at","KeyType":"RANGE"}],"Projection":{"ProjectionType":"ALL"}}]'
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-social-posts"
+
+# Allow ticket-api to invoke social-poster
+aws iam put-role-policy \
+  --role-name "$TICKET_API_ROLE" \
+  --policy-name "InvokeSocialPoster" \
+  --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:${REGION}:${ACTUAL_ACCOUNT}:function:yallabalagan-social-poster\"}]}" \
+  --profile "$PROFILE" 2>/dev/null && echo "  Policy attached: $TICKET_API_ROLE → InvokeSocialPoster" || true
+
 # Deploy instagram-token-refresher Lambda
 echo ""
 echo "Deploying instagram-token-refresher..."
+ensure_lambda "yallabalagan-instagram-token-refresher" "lambdas/instagram-token-refresher.lambda_handler"
 update_lambda "yallabalagan-instagram-token-refresher" \
   ".aws-sam/build/InstagramTokenRefresherFunction" \
   "lambdas/instagram-token-refresher.lambda_handler"
@@ -557,6 +632,77 @@ if [ -n "$IG_REFRESHER_ROLE" ]; then
   ensure_dynamodb_policy "$IG_REFRESHER_ROLE" "yallabalagan-instagram"
 fi
 echo "  instagram-token-refresher deployed"
+
+# Deploy social-poster Lambda
+echo ""
+echo "Deploying social-poster..."
+ensure_lambda "yallabalagan-social-poster" "lambdas/social-poster.lambda_handler" 300 1024
+update_lambda "yallabalagan-social-poster" \
+  ".aws-sam/build/SocialPosterFunction" \
+  "lambdas/social-poster.lambda_handler"
+
+cat > /tmp/social-poster-env.json <<EOF
+{
+  "Variables": {
+    "SOCIAL_POSTS_TABLE": "yallabalagan-social-posts",
+    "INSTAGRAM_CONNECTIONS_TABLE": "yallabalagan-instagram",
+    "INSTAGRAM_TOKEN_KEY": "${INSTAGRAM_TOKEN_KEY}",
+    "TIKTOK_CONNECTIONS_TABLE": "yallabalagan-tiktok",
+    "TIKTOK_CLIENT_KEY": "${TIKTOK_CLIENT_KEY}",
+    "TIKTOK_CLIENT_SECRET": "${TIKTOK_CLIENT_SECRET}",
+    "TIKTOK_TOKEN_KEY": "${TIKTOK_TOKEN_KEY}",
+    "YOUTUBE_CONNECTIONS_TABLE": "yallabalagan-youtube",
+    "YOUTUBE_CLIENT_ID": "${YOUTUBE_CLIENT_ID}",
+    "YOUTUBE_CLIENT_SECRET": "${YOUTUBE_CLIENT_SECRET}",
+    "YOUTUBE_TOKEN_KEY": "${YOUTUBE_TOKEN_KEY}",
+    "MEDIA_BUCKET": "${MEDIA_BUCKET}",
+    "ENVIRONMENT": "${ENV}"
+  }
+}
+EOF
+aws lambda wait function-updated \
+  --function-name yallabalagan-social-poster \
+  --region "$REGION" --profile "$PROFILE"
+aws lambda update-function-configuration \
+  --function-name yallabalagan-social-poster \
+  --environment file:///tmp/social-poster-env.json \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+rm -f /tmp/social-poster-env.json
+
+SOCIAL_POSTER_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-social-poster --region "$REGION" --profile "$PROFILE" --query 'Role' --output text 2>/dev/null | sed 's|.*/||' || echo "")
+if [ -n "$SOCIAL_POSTER_ROLE" ]; then
+  ensure_dynamodb_policy "$SOCIAL_POSTER_ROLE" "yallabalagan-social-posts"
+  ensure_dynamodb_policy "$SOCIAL_POSTER_ROLE" "yallabalagan-instagram"
+  ensure_dynamodb_policy "$SOCIAL_POSTER_ROLE" "yallabalagan-tiktok"
+  ensure_dynamodb_policy "$SOCIAL_POSTER_ROLE" "yallabalagan-youtube"
+  aws iam put-role-policy \
+    --role-name "$SOCIAL_POSTER_ROLE" \
+    --policy-name "S3-ReadMedia" \
+    --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":\"arn:aws:s3:::${MEDIA_BUCKET}/*\"}]}" \
+    --profile "$PROFILE" 2>/dev/null && echo "  Policy attached: $SOCIAL_POSTER_ROLE → S3 read" || true
+fi
+echo "  social-poster deployed"
+
+# Wire EventBridge schedule → social-poster (idempotent)
+echo ""
+echo "Wiring EventBridge schedule for social-poster..."
+aws events put-rule \
+  --name "yallabalagan-social-poster-schedule" \
+  --schedule-expression "rate(5 minutes)" \
+  --state ENABLED \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+aws events put-targets \
+  --rule "yallabalagan-social-poster-schedule" \
+  --targets "[{\"Id\":\"SocialPoster\",\"Arn\":\"arn:aws:lambda:${REGION}:${ACTUAL_ACCOUNT}:function:yallabalagan-social-poster\",\"Input\":\"{\\\"source\\\":\\\"scheduler\\\"}\"}]" \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
+aws lambda add-permission \
+  --function-name yallabalagan-social-poster \
+  --statement-id allow-eventbridge-schedule \
+  --action lambda:InvokeFunction \
+  --principal events.amazonaws.com \
+  --source-arn "arn:aws:events:${REGION}:${ACTUAL_ACCOUNT}:rule/yallabalagan-social-poster-schedule" \
+  --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null 2>&1 || true
+echo "  EventBridge schedule wired (rate 5 min)"
 
 # Allow site-regenerator to invalidate CloudFront
 echo "  Ensuring CloudFront invalidation policy for site-regenerator..."

@@ -138,7 +138,7 @@ def get_ig_user_info(ig_user_id: str, access_token: str) -> dict:
     """GET /{ig_user_id}?fields=id,name,username — IG Business account info."""
     resp = requests.get(f"{GRAPH_URL}/{ig_user_id}", params={
         'access_token': access_token,
-        'fields': 'id,name,username',
+        'fields': 'id,name,username,profile_picture_url',
     }, timeout=10)
     resp.raise_for_status()
     return resp.json()
@@ -195,6 +195,91 @@ def post_story(ig_user_id: str, image_url: str, access_token: str, link: str = '
     )
     if not publish_resp.ok:
         print(f"Meta publish error {publish_resp.status_code}: {publish_resp.text}")
+        publish_resp.raise_for_status()
+    return publish_resp.json()['id']
+
+
+def post_reel(ig_user_id: str, video_url: str, caption: str, access_token: str,
+              cover_url: str = None, collaborators: list = None) -> str:
+    """Post a video as Instagram Reel. Returns media_id."""
+    import time
+
+    data = {
+        'video_url': video_url,
+        'media_type': 'REELS',
+        'caption': caption,
+        'access_token': access_token,
+    }
+    if cover_url:
+        data['cover_url'] = cover_url
+    if collaborators:
+        data['collaborators'] = ','.join(collaborators[:3])
+
+    container_resp = requests.post(
+        f"{GRAPH_URL}/{ig_user_id}/media",
+        data=data,
+        timeout=30,
+    )
+    print(f"Instagram Reel container {container_resp.status_code}: {container_resp.text}")
+    container_resp.raise_for_status()
+    creation_id = container_resp.json()['id']
+
+    # Video processing takes longer than images — poll up to 3 minutes
+    for attempt in range(36):
+        time.sleep(5)
+        status_resp = requests.get(
+            f"{GRAPH_URL}/{creation_id}",
+            params={'fields': 'status_code', 'access_token': access_token},
+            timeout=10,
+        )
+        if status_resp.ok:
+            status_code = status_resp.json().get('status_code', '')
+            print(f"Reel container {creation_id} status: {status_code} (attempt {attempt + 1})")
+            if status_code == 'FINISHED':
+                break
+            if status_code == 'ERROR':
+                raise RuntimeError(f"Meta Reel container failed: {status_resp.json()}")
+        if attempt == 35:
+            raise RuntimeError("Reel container not ready after 3 minutes — retry later")
+
+    publish_resp = requests.post(
+        f"{GRAPH_URL}/{ig_user_id}/media_publish",
+        data={'creation_id': creation_id, 'access_token': access_token},
+        timeout=15,
+    )
+    if not publish_resp.ok:
+        print(f"Meta Reel publish error {publish_resp.status_code}: {publish_resp.text}")
+        publish_resp.raise_for_status()
+    return publish_resp.json()['id']
+
+
+def post_feed_image(ig_user_id: str, image_url: str, caption: str, access_token: str,
+                    collaborators: list = None) -> str:
+    """Post an image as Instagram Feed post. Returns media_id."""
+    data = {
+        'image_url': image_url,
+        'caption': caption,
+        'access_token': access_token,
+    }
+    if collaborators:
+        data['collaborators'] = ','.join(collaborators[:3])
+
+    container_resp = requests.post(
+        f"{GRAPH_URL}/{ig_user_id}/media",
+        data=data,
+        timeout=15,
+    )
+    print(f"Instagram Feed container {container_resp.status_code}: {container_resp.text}")
+    container_resp.raise_for_status()
+    creation_id = container_resp.json()['id']
+
+    publish_resp = requests.post(
+        f"{GRAPH_URL}/{ig_user_id}/media_publish",
+        data={'creation_id': creation_id, 'access_token': access_token},
+        timeout=15,
+    )
+    if not publish_resp.ok:
+        print(f"Meta Feed publish error {publish_resp.status_code}: {publish_resp.text}")
         publish_resp.raise_for_status()
     return publish_resp.json()['id']
 

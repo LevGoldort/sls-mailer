@@ -10,6 +10,7 @@ from decimal import Decimal
 import boto3
 import base64
 import re
+import uuid
 import hmac
 from difflib import SequenceMatcher
 
@@ -148,6 +149,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_influencers(event, http_method, path)
         elif path.startswith('/api/instagram'):
             return handle_instagram(event, http_method, path)
+        elif path.startswith('/api/tiktok'):
+            return handle_tiktok(event, http_method, path)
+        elif path.startswith('/api/youtube'):
+            return handle_youtube(event, http_method, path)
+        elif path.startswith('/api/social'):
+            return handle_social(event, http_method, path)
         elif path.startswith('/api/studio'):
             return handle_studio(event, http_method, path)
         elif path.startswith('/api/facebook'):
@@ -5067,12 +5074,12 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
     admin_url = os.environ.get('ADMIN_BASE_URL', '')
 
     if error or not code:
-        return _ig_redirect(admin_url, 'instagram-settings.html', error='oauth_denied')
+        return _ig_redirect(admin_url, 'social-settings.html', error='oauth_denied')
 
     try:
         app_id, app_secret, token_key, api_base_url = _ig_env()
     except ValueError:
-        return _ig_redirect(admin_url, 'instagram-settings.html', error='config_error')
+        return _ig_redirect(admin_url, 'social-settings.html', error='config_error')
 
     try:
         from utils.instagram import (
@@ -5114,7 +5121,7 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
 
         if not ig_account:
             print("Instagram OAuth: no IG Business account linked to any FB page")
-            return _ig_redirect(admin_url, 'instagram-settings.html', error='no_ig_business')
+            return _ig_redirect(admin_url, 'social-settings.html', error='no_ig_business')
 
         ig_user_id = ig_account['id']
         ig_info = get_ig_user_info(ig_user_id, long_token)
@@ -5126,6 +5133,7 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
             'ig_user_id': ig_user_id,
             'ig_username': ig_info.get('username', ''),
             'ig_name': ig_info.get('name', ''),
+            'ig_picture_url': ig_info.get('profile_picture_url', ''),
             'access_token': encrypt_token(long_token, token_key),
             'token_expires_at': token_expires_at(expires_in),
             'page_id': page_id,
@@ -5133,12 +5141,12 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
             'status': 'active',
         }
         db.put_instagram_connection(connection)
-        return _ig_redirect(admin_url, 'instagram-settings.html', success='connected')
+        return _ig_redirect(admin_url, 'social-settings.html', success='connected')
 
     except Exception as e:
         print(f"Instagram OAuth callback error: {e}")
         import traceback; traceback.print_exc()
-        return _ig_redirect(admin_url, 'instagram-settings.html', error='callback_failed')
+        return _ig_redirect(admin_url, 'social-settings.html', error='callback_failed')
 
 
 def _ig_redirect(admin_url: str, page: str, **params) -> Dict:
@@ -5241,6 +5249,473 @@ def ig_list_history(request_event: Dict) -> Dict:
     month = qs.get('month', datetime.now(timezone.utc).strftime('%Y-%m'))
     items = db.list_instagram_logs(month)
     return success_response({'history': items, 'month': month})
+
+
+# ─── TikTok API ───────────────────────────────────────────────────────────────
+
+def handle_tiktok(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET'    and path == '/api/tiktok/accounts':           return tiktok_list_accounts(event)
+    if method == 'GET'    and path == '/api/tiktok/oauth/start':        return tiktok_oauth_start(event)
+    if method == 'GET'    and path == '/api/tiktok/oauth/callback':     return tiktok_oauth_callback(event)
+    if method == 'DELETE' and path.startswith('/api/tiktok/accounts/'): return tiktok_disconnect(event, path.split('/')[-1])
+    return error_response(404, 'Not found')
+
+
+def tiktok_list_accounts(request_event: Dict) -> Dict:
+    """GET /api/tiktok/accounts — list connected TikTok accounts."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    accounts = db.list_tiktok_connections()
+    safe = [{k: v for k, v in a.items() if k not in ('access_token', 'refresh_token', 'PK')} for a in accounts]
+    return success_response({'accounts': safe})
+
+
+def tiktok_oauth_start(request_event: Dict) -> Dict:
+    """GET /api/tiktok/oauth/start — redirect URL to TikTok OAuth."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    client_key = os.environ.get('TIKTOK_CLIENT_KEY', '')
+    api_base_url = os.environ.get('API_BASE_URL', '')
+    if not client_key:
+        return error_response(503, 'TikTok not configured')
+
+    import secrets as _secrets
+    state = _secrets.token_urlsafe(16)
+    redirect_uri = f"{api_base_url}/api/tiktok/oauth/callback"
+
+    from utils.tiktok import get_oauth_url
+    url = get_oauth_url(client_key, redirect_uri, state)
+    return success_response({'url': url})
+
+
+def tiktok_oauth_callback(request_event: Dict) -> Dict:
+    """GET /api/tiktok/oauth/callback — exchange code, store tokens, redirect."""
+    qs = request_event.get('queryStringParameters') or {}
+    admin_url = os.environ.get('ADMIN_BASE_URL', '')
+    api_base_url = os.environ.get('API_BASE_URL', '')
+
+    code = qs.get('code', '')
+    error = qs.get('error', '')
+    if error or not code:
+        return _tt_redirect(admin_url, error='oauth_denied')
+
+    client_key = os.environ.get('TIKTOK_CLIENT_KEY', '')
+    client_secret = os.environ.get('TIKTOK_CLIENT_SECRET', '')
+    token_key = os.environ.get('TIKTOK_TOKEN_KEY', '')
+    if not client_key or not client_secret or not token_key:
+        return _tt_redirect(admin_url, error='config_error')
+
+    try:
+        from utils.tiktok import exchange_code, get_user_info, encrypt_token, token_expires_at
+        redirect_uri = f"{api_base_url}/api/tiktok/oauth/callback"
+        tokens = exchange_code(client_key, client_secret, redirect_uri, code)
+
+        access_token = tokens['access_token']
+        refresh_token = tokens.get('refresh_token', '')
+        open_id = tokens.get('open_id', '')
+        expires_in = tokens.get('expires_in', 86400)
+        refresh_expires_in = tokens.get('refresh_expires_in', 31536000)
+
+        user_info = get_user_info(access_token, open_id)
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        connection = {
+            'PK': 'CONNECTION',
+            'SK': open_id,
+            'tiktok_user_id': open_id,
+            'display_name': user_info.get('display_name', ''),
+            'avatar_url': user_info.get('avatar_url', ''),
+            'access_token': encrypt_token(access_token, token_key),
+            'refresh_token': encrypt_token(refresh_token, token_key) if refresh_token else '',
+            'token_expires_at': token_expires_at(expires_in),
+            'refresh_token_expires_at': token_expires_at(refresh_expires_in),
+            'connected_at': now,
+            'status': 'active',
+        }
+        db.put_tiktok_connection(connection)
+        return _tt_redirect(admin_url, success='tiktok_connected')
+
+    except Exception as e:
+        print(f"TikTok OAuth callback error: {e}")
+        import traceback; traceback.print_exc()
+        return _tt_redirect(admin_url, error='callback_failed')
+
+
+def _tt_redirect(admin_url: str, **params) -> Dict:
+    from urllib.parse import urlencode
+    qs = urlencode(params)
+    location = f"{admin_url}/social-settings.html?{qs}" if admin_url else f"/social-settings.html?{qs}"
+    return {
+        'statusCode': 302,
+        'headers': {'Location': location, 'Access-Control-Allow-Origin': '*'},
+        'body': '',
+    }
+
+
+def tiktok_disconnect(request_event: Dict, tiktok_user_id: str) -> Dict:
+    """DELETE /api/tiktok/accounts/{user_id} — remove TikTok connection."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    if not db.get_tiktok_connection(tiktok_user_id):
+        return error_response(404, 'Account not found')
+
+    db.delete_tiktok_connection(tiktok_user_id)
+    return success_response({'message': 'Disconnected'})
+
+
+# ─── YouTube API ───────────────────────────────────────────────────────────────
+
+def handle_youtube(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET'    and path == '/api/youtube/accounts':            return youtube_list_accounts(event)
+    if method == 'GET'    and path == '/api/youtube/oauth/start':         return youtube_oauth_start(event)
+    if method == 'GET'    and path == '/api/youtube/oauth/callback':      return youtube_oauth_callback(event)
+    if method == 'DELETE' and path.startswith('/api/youtube/accounts/'):  return youtube_disconnect(event, path.split('/')[-1])
+    return error_response(404, 'Not found')
+
+
+def youtube_list_accounts(request_event: Dict) -> Dict:
+    """GET /api/youtube/accounts — list connected YouTube channels."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    accounts = db.list_youtube_connections()
+    safe = [{k: v for k, v in a.items() if k not in ('access_token', 'refresh_token', 'PK')} for a in accounts]
+    return success_response({'accounts': safe})
+
+
+def youtube_oauth_start(request_event: Dict) -> Dict:
+    """GET /api/youtube/oauth/start — redirect URL to Google OAuth."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    client_id = os.environ.get('YOUTUBE_CLIENT_ID', '')
+    api_base_url = os.environ.get('API_BASE_URL', '')
+    if not client_id:
+        return error_response(503, 'YouTube not configured')
+
+    import secrets as _secrets
+    state = _secrets.token_urlsafe(16)
+    redirect_uri = f"{api_base_url}/api/youtube/oauth/callback"
+
+    from utils.youtube import get_oauth_url
+    url = get_oauth_url(client_id, redirect_uri, state)
+    return success_response({'url': url})
+
+
+def youtube_oauth_callback(request_event: Dict) -> Dict:
+    """GET /api/youtube/oauth/callback — exchange code, store tokens, redirect."""
+    qs = request_event.get('queryStringParameters') or {}
+    admin_url = os.environ.get('ADMIN_BASE_URL', '')
+    api_base_url = os.environ.get('API_BASE_URL', '')
+
+    code = qs.get('code', '')
+    error = qs.get('error', '')
+    if error or not code:
+        return _yt_redirect(admin_url, error='oauth_denied')
+
+    client_id = os.environ.get('YOUTUBE_CLIENT_ID', '')
+    client_secret = os.environ.get('YOUTUBE_CLIENT_SECRET', '')
+    token_key = os.environ.get('YOUTUBE_TOKEN_KEY', '')
+    if not client_id or not client_secret or not token_key:
+        return _yt_redirect(admin_url, error='config_error')
+
+    try:
+        from utils.youtube import exchange_code, get_channel_info, encrypt_token, token_expires_at
+        redirect_uri = f"{api_base_url}/api/youtube/oauth/callback"
+        print(f"YouTube OAuth callback: redirect_uri={redirect_uri} code_len={len(code)}")
+        tokens = exchange_code(client_id, client_secret, redirect_uri, code)
+
+        access_token = tokens['access_token']
+        refresh_token = tokens.get('refresh_token', '')
+        expires_in = tokens.get('expires_in', 3600)
+
+        channel = get_channel_info(access_token)
+        channel_id = channel['channel_id']
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        connection = {
+            'PK': 'CONNECTION',
+            'SK': channel_id,
+            'youtube_channel_id': channel_id,
+            'channel_title': channel.get('channel_title', ''),
+            'channel_thumbnail_url': channel.get('channel_thumbnail_url', ''),
+            'access_token': encrypt_token(access_token, token_key),
+            'refresh_token': encrypt_token(refresh_token, token_key) if refresh_token else '',
+            'token_expires_at': token_expires_at(expires_in),
+            'connected_at': now,
+            'status': 'active',
+        }
+        db.put_youtube_connection(connection)
+        return _yt_redirect(admin_url, success='youtube_connected')
+
+    except Exception as e:
+        print(f"YouTube OAuth callback error: {e}")
+        import traceback; traceback.print_exc()
+        return _yt_redirect(admin_url, error='callback_failed')
+
+
+def _yt_redirect(admin_url: str, **params) -> Dict:
+    from urllib.parse import urlencode
+    qs = urlencode(params)
+    location = f"{admin_url}/social-settings.html?{qs}" if admin_url else f"/social-settings.html?{qs}"
+    return {
+        'statusCode': 302,
+        'headers': {'Location': location, 'Access-Control-Allow-Origin': '*'},
+        'body': '',
+    }
+
+
+def youtube_disconnect(request_event: Dict, channel_id: str) -> Dict:
+    """DELETE /api/youtube/accounts/{channel_id} — remove YouTube connection."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    if not db.get_youtube_connection(channel_id):
+        return error_response(404, 'Account not found')
+
+    db.delete_youtube_connection(channel_id)
+    return success_response({'message': 'Disconnected'})
+
+
+# ─── Social Cross-Post API ─────────────────────────────────────────────────────
+
+def handle_social(event: Dict, method: str, path: str) -> Dict:
+    if method == 'GET' and path == '/api/social/posts':
+        return social_list_posts(event)
+    if method == 'POST' and path == '/api/social/posts':
+        return social_create_post(event)
+    if method == 'GET' and path == '/api/social/upload-url':
+        return social_upload_url(event)
+    if method == 'POST' and path.startswith('/api/social/posts/') and path.endswith('/publish'):
+        post_id = path.split('/')[-2]
+        return social_publish_post(event, post_id)
+    if method == 'DELETE' and path.startswith('/api/social/posts/'):
+        post_id = path.split('/')[-1]
+        return social_delete_post(event, post_id)
+    return error_response(404, 'Not found')
+
+
+def social_list_posts(request_event: Dict) -> Dict:
+    """GET /api/social/posts — list cross-posts (newest first)."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    posts = db.list_social_posts()
+
+    ig_conns = {c['SK']: c.get('ig_username', '') or c.get('ig_name', '') for c in db.list_instagram_connections()}
+    tt_conns = {c['SK']: c.get('display_name', '') for c in db.list_tiktok_connections()}
+    yt_conns = {c['SK']: c.get('channel_title', '') for c in db.list_youtube_connections()}
+    account_labels = {'instagram': ig_conns, 'tiktok': tt_conns, 'youtube': yt_conns}
+
+    for post in posts:
+        for target in post.get('targets', []):
+            platform = target.get('platform', '')
+            account_id = target.get('account_id', '')
+            target['account_label'] = account_labels.get(platform, {}).get(account_id, '')
+
+    return success_response({'posts': posts})
+
+
+def social_create_post(request_event: Dict) -> Dict:
+    """POST /api/social/posts — create a cross-post (draft, schedule, or publish immediately)."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, 'Invalid JSON')
+
+    title = body.get('title', '')
+    description = body.get('description', body.get('caption', ''))
+    tags = body.get('tags', [])
+    cover = body.get('cover')  # { type, timestamp_ms?, s3_key, public_url }
+    collaborators = body.get('collaborators', [])
+    media = body.get('media', [])
+    targets = body.get('targets', [])
+    scheduled_at = body.get('scheduled_at')
+
+    if not targets:
+        return error_response(400, 'At least one target account is required')
+    if not media:
+        return error_response(400, 'At least one media item is required')
+
+    # Validate targets
+    for t in targets:
+        if t.get('platform') == 'instagram':
+            if not db.get_instagram_connection(t.get('account_id', '')):
+                return error_response(400, f"Instagram account {t.get('account_id')} not connected")
+        elif t.get('platform') == 'tiktok':
+            if not db.get_tiktok_connection(t.get('account_id', '')):
+                return error_response(400, f"TikTok account {t.get('account_id')} not connected")
+        elif t.get('platform') == 'youtube':
+            if not db.get_youtube_connection(t.get('account_id', '')):
+                return error_response(400, f"YouTube account {t.get('account_id')} not connected")
+
+    import uuid
+    post_id = uuid.uuid4().hex
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    targets_with_status = [{**t, 'status': 'pending'} for t in targets]
+
+    if scheduled_at:
+        status = 'scheduled'
+    else:
+        status = 'publishing'
+
+    item = {
+        'PK': 'POST',
+        'SK': post_id,
+        'status': status,
+        'title': title,
+        'description': description,
+        'media': media,
+        'targets': targets_with_status,
+        'created_at': now,
+        'created_by': ctx.get('user_id', '') if isinstance(ctx, dict) else getattr(ctx, 'user_id', ''),
+    }
+    if tags:
+        item['tags'] = tags
+    if cover:
+        item['cover'] = cover
+    if collaborators:
+        item['collaborators'] = collaborators[:3]
+    if scheduled_at:
+        item['scheduled_at'] = scheduled_at
+
+    db.put_social_post(item)
+
+    if not scheduled_at:
+        _invoke_social_poster(post_id)
+
+    return success_response({'post_id': post_id, 'status': status}, status_code=201)
+
+
+def social_upload_url(request_event: Dict) -> Dict:
+    """GET /api/social/upload-url?filename=video.mp4&content_type=video/mp4 — pre-signed S3 PUT URL for video."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    qs = request_event.get('queryStringParameters') or {}
+    filename = qs.get('filename', 'upload')
+    content_type = qs.get('content_type', 'video/mp4')
+
+    allowed_types = {
+        'video/mp4', 'video/quicktime', 'video/webm',
+        'image/jpeg', 'image/png', 'image/webp',
+    }
+    if content_type not in allowed_types:
+        return error_response(400, f"Unsupported content type: {content_type}")
+
+    safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', os.path.basename(filename))
+    s3_key = f"social-posts/{uuid.uuid4().hex[:8]}_{safe_name}"
+    bucket_name = os.environ.get('MEDIA_BUCKET', 'yallabalagan-ticket-media')
+
+    s3_client = boto3.client('s3', region_name='eu-north-1')
+    upload_url = s3_client.generate_presigned_url(
+        'put_object',
+        Params={'Bucket': bucket_name, 'Key': s3_key, 'ContentType': content_type},
+        ExpiresIn=600,
+    )
+    public_url = f"https://{bucket_name}.s3.eu-north-1.amazonaws.com/{s3_key}"
+
+    return success_response({'upload_url': upload_url, 's3_key': s3_key, 'public_url': public_url})
+
+
+def social_publish_post(request_event: Dict, post_id: str) -> Dict:
+    """POST /api/social/posts/{id}/publish — trigger immediate publish of a draft."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    post = db.get_social_post(post_id)
+    if not post:
+        return error_response(404, 'Post not found')
+    if post.get('status') not in ('draft', 'scheduled', 'failed'):
+        return error_response(400, f"Cannot publish post with status={post.get('status')}")
+
+    # Reset only failed targets to pending so poster retries them (published ones stay as-is)
+    targets = [{**t, 'status': 'pending'} if t.get('status') == 'failed' else t for t in post.get('targets', [])]
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    db.update_social_post(post_id, {'status': 'publishing', 'publishing_since': now, 'targets': targets})
+    _invoke_social_poster(post_id)
+
+    return success_response({'post_id': post_id, 'status': 'publishing'})
+
+
+def social_delete_post(request_event: Dict, post_id: str) -> Dict:
+    """DELETE /api/social/posts/{id} — delete a draft or failed post."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_admin(ctx, ctx.get('tenant_id', '')):
+        return error_response(403, 'Access denied')
+
+    post = db.get_social_post(post_id)
+    if not post:
+        return error_response(404, 'Post not found')
+    if post.get('status') not in ('draft', 'failed', 'scheduled'):
+        return error_response(400, f"Cannot delete post with status={post.get('status')}")
+
+    db.delete_social_post(post_id)
+    return success_response({'message': 'Deleted'})
+
+
+def _invoke_social_poster(post_id: str):
+    """Async-invoke the social-poster Lambda with the given post_id."""
+    lambda_name = os.environ.get('SOCIAL_POSTER_LAMBDA', 'yallabalagan-social-poster')
+    try:
+        lambda_client = boto3.client('lambda', region_name='eu-north-1')
+        lambda_client.invoke(
+            FunctionName=lambda_name,
+            InvocationType='Event',
+            Payload=json.dumps({'post_id': post_id}),
+        )
+    except Exception as e:
+        print(f"Warning: failed to invoke social-poster for post {post_id}: {e}")
 
 
 # For local testing

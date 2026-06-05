@@ -138,6 +138,42 @@ Parameters:
     Default: ""
     Description: 64-char hex key (32 bytes) for AES-256-GCM encryption of Instagram tokens
 
+  TikTokClientKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: TikTok app client_key (from TikTok Developer Portal)
+
+  TikTokClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: TikTok app client_secret
+
+  TikTokTokenKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: 64-char hex key (32 bytes) for AES-256-GCM encryption of TikTok tokens
+
+  YoutubeClientId:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Google OAuth 2.0 client_id for YouTube integration
+
+  YoutubeClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Google OAuth 2.0 client_secret for YouTube integration
+
+  YoutubeTokenKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: 64-char hex key (32 bytes) for AES-256-GCM encryption of YouTube tokens
+
   ApiBaseUrl:
     Type: String
     Default: ""
@@ -175,6 +211,16 @@ Globals:
         EPISODES_TABLE: !Ref EpisodesTable
         INFLUENCERS_TABLE: !Ref InfluencersTable
         INSTAGRAM_CONNECTIONS_TABLE: !Ref InstagramConnectionsTable
+        TIKTOK_CONNECTIONS_TABLE: !Ref TikTokConnectionsTable
+        TIKTOK_CLIENT_KEY: !Ref TikTokClientKey
+        TIKTOK_CLIENT_SECRET: !Ref TikTokClientSecret
+        TIKTOK_TOKEN_KEY: !Ref TikTokTokenKey
+        YOUTUBE_CONNECTIONS_TABLE: !Ref YouTubeConnectionsTable
+        YOUTUBE_CLIENT_ID: !Ref YoutubeClientId
+        YOUTUBE_CLIENT_SECRET: !Ref YoutubeClientSecret
+        YOUTUBE_TOKEN_KEY: !Ref YoutubeTokenKey
+        SOCIAL_POSTS_TABLE: !Ref SocialPostsTable
+        SOCIAL_POSTER_LAMBDA: yallabalagan-social-poster
         CONFIG_TABLE: !Ref ConfigTable
         META_APP_ID: !Ref MetaAppId
         META_APP_SECRET: !Ref MetaAppSecret
@@ -680,6 +726,82 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  TikTokConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-tiktok
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  YouTubeConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-youtube
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  SocialPostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-social-posts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: scheduled_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: StatusScheduledIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: scheduled_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
   ConfigTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -907,6 +1029,12 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref InstagramConnectionsTable
         - DynamoDBCrudPolicy:
+            TableName: !Ref TikTokConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref YouTubeConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SocialPostsTable
+        - DynamoDBCrudPolicy:
             TableName: !Ref ConfigTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
@@ -919,6 +1047,7 @@ Resources:
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-site-regenerator*"
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-email-sender*"
                 - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-sms-sender*"
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:yallabalagan-social-poster*"
 
   UserApiFunction:
     Type: AWS::Serverless::Function
@@ -1070,6 +1199,35 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref InstagramConnectionsTable
+
+  # Social Poster
+  SocialPosterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: yallabalagan-social-poster
+      CodeUri: .
+      Handler: lambdas/social-poster.lambda_handler
+      Description: Posts to social platforms (Instagram Reels/Feed, TikTok, YouTube). Triggered by api-handler (immediate) or EventBridge cron (scheduled).
+      MemorySize: 1024
+      Timeout: 300
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Input: '{"source": "scheduler"}'
+            Description: Check for due scheduled social posts every 5 min
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SocialPostsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref InstagramConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TikTokConnectionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref YouTubeConnectionsTable
+        - S3ReadPolicy:
+            BucketName: !Ref MediaBucket
 
   ##############################################################################
   # Lambda Layers
