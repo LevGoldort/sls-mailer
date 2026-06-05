@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Социальные сети — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .platform-section { margin-bottom: 40px; }
+    .platform-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+    }
+    .platform-icon { font-size: 24px; }
+    .platform-title { font-size: 18px; font-weight: 600; color: var(--dark); margin: 0; }
+    .social-accounts { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .social-card {
+      display: flex; align-items: center; gap: 16px;
+      border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px;
+      background: #fff;
+    }
+    .social-avatar {
+      width: 48px; height: 48px; border-radius: 50%; background: var(--gray-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0; overflow: hidden;
+    }
+    .social-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .social-info { flex: 1; min-width: 0; }
+    .social-handle { font-weight: 600; font-size: 15px; color: var(--dark); }
+    .social-name { font-size: 13px; color: var(--gray-mid); margin-top: 2px; }
+    .social-meta { font-size: 12px; color: var(--gray-mid); margin-top: 4px; }
+    .social-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+    .social-status.active { color: #16a34a; }
+    .social-status.expiring { color: #d97706; }
+    .connect-box {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 24px 32px;
+      text-align: center; background: var(--gray-bg);
+    }
+    .connect-box p { color: var(--gray-mid); margin-bottom: 16px; font-size: 14px; }
+    .coming-soon-box {
+      border: 1px solid var(--border); border-radius: 12px; padding: 24px 32px;
+      text-align: center; background: var(--gray-bg); opacity: 0.7;
+    }
+    .coming-soon-box p { color: var(--gray-mid); font-size: 14px; margin: 0; }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Социальные сети</h1>
+        <p class="page-subtitle">Подключённые аккаунты для кросс-постинга</p>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" style="display:none"></div>
+
+    <!-- Instagram -->
+    <div class="platform-section">
+      <div class="platform-header">
+        <span class="platform-icon">📸</span>
+        <h2 class="platform-title">Instagram</h2>
+      </div>
+      <div id="ig-accounts-container">
+        <div class="loading">Загрузка...</div>
+      </div>
+      <div class="connect-box" style="margin-top:12px">
+        <p>Business или Creator аккаунт, привязанный к Facebook Page.</p>
+        <button class="btn btn-primary" id="ig-connect-btn" onclick="startIgOAuth()">Подключить Instagram</button>
+      </div>
+    </div>
+
+    <!-- TikTok -->
+    <div class="platform-section">
+      <div class="platform-header">
+        <span class="platform-icon">🎵</span>
+        <h2 class="platform-title">TikTok</h2>
+      </div>
+      <div id="tt-accounts-container">
+        <div class="loading">Загрузка...</div>
+      </div>
+      <div class="connect-box" style="margin-top:12px">
+        <p>Подключите TikTok аккаунт для публикации видео (Reels).</p>
+        <button class="btn btn-primary" id="tt-connect-btn" onclick="startTikTokOAuth()">Подключить TikTok</button>
+      </div>
+    </div>
+
+    <!-- YouTube -->
+    <div class="platform-section">
+      <div class="platform-header">
+        <span class="platform-icon">▶️</span>
+        <h2 class="platform-title">YouTube</h2>
+      </div>
+      <div id="yt-accounts-container">
+        <div class="loading">Загрузка...</div>
+      </div>
+      <div class="connect-box" style="margin-top:12px">
+        <p>Подключите YouTube канал для публикации видео.</p>
+        <button class="btn btn-primary" id="yt-connect-btn" onclick="startYouTubeOAuth()">Подключить YouTube</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    await initAdmin();
+    checkUrlParams();
+    loadIgAccounts();
+    loadTikTokAccounts();
+    loadYouTubeAccounts();
+  });
+
+  function checkUrlParams() {
+    const p = new URLSearchParams(window.location.search);
+    const success = p.get('success');
+    const error = p.get('error');
+
+    if (success === 'connected' || success === 'tiktok_connected' || success === 'youtube_connected') {
+      const msg = success === 'tiktok_connected' ? 'TikTok аккаунт подключён!'
+                : success === 'youtube_connected' ? 'YouTube канал подключён!'
+                : 'Instagram аккаунт подключён!';
+      showToast(msg, 'success');
+      history.replaceState({}, '', 'social-settings.html');
+    } else if (error) {
+      const msgs = {
+        oauth_denied: 'Авторизация отменена',
+        no_ig_business: 'Не найден Business/Creator Instagram аккаунт. Убедитесь, что аккаунт переключён в Business режим.',
+        config_error: 'Ошибка конфигурации сервера. Обратитесь к администратору.',
+        callback_failed: 'Ошибка при подключении. Попробуйте ещё раз.',
+      };
+      showToast(msgs[error] || 'Ошибка подключения', 'error');
+      history.replaceState({}, '', 'social-settings.html');
+    }
+  }
+
+  // ── Instagram ────────────────────────────────────────────────────────────────
+
+  async function loadIgAccounts() {
+    const container = document.getElementById('ig-accounts-container');
+    try {
+      const data = await apiCall('/api/instagram/accounts');
+      renderIgAccounts(data.accounts || []);
+    } catch (e) {
+      container.innerHTML = `<div class="error-msg">Ошибка загрузки: ${e.message}</div>`;
+    }
+  }
+
+  function renderIgAccounts(accounts) {
+    const container = document.getElementById('ig-accounts-container');
+    if (!accounts.length) {
+      container.innerHTML = '<p style="color:var(--gray-mid);font-size:14px">Нет подключённых аккаунтов.</p>';
+      return;
+    }
+    const now = new Date();
+    const warnThreshold = new Date(now.getTime() + 10 * 86400 * 1000);
+    container.innerHTML = `<div class="social-accounts">${accounts.map(acc => {
+      const expiresAt = acc.token_expires_at ? new Date(acc.token_expires_at) : null;
+      const expiring = expiresAt && expiresAt < warnThreshold;
+      const statusLabel = expiring ? '⚠ Токен скоро истекает' : '● Активен';
+      const statusClass = expiring ? 'expiring' : 'active';
+      const expiryText = expiresAt ? `Токен до ${expiresAt.toLocaleDateString('ru-RU')}` : 'Срок не известен';
+      const connectedAt = acc.connected_at ? new Date(acc.connected_at).toLocaleDateString('ru-RU') : '—';
+      return `
+        <div class="social-card">
+          <div class="social-avatar">${acc.ig_picture_url ? `<img src="${acc.ig_picture_url}" alt="">` : '📷'}</div>
+          <div class="social-info">
+            <div class="social-handle">@${acc.ig_username || acc.ig_user_id}</div>
+            <div class="social-name">${acc.ig_name || ''}</div>
+            <div class="social-meta">${expiryText} · Подключён ${connectedAt}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <span class="social-status ${statusClass}">${statusLabel}</span>
+            <button class="btn btn-secondary btn-sm" onclick="disconnectIg('${acc.ig_user_id}', '@${acc.ig_username}')">Отключить</button>
+          </div>
+        </div>
+      `;
+    }).join('')}</div>`;
+  }
+
+  async function startIgOAuth() {
+    const btn = document.getElementById('ig-connect-btn');
+    btn.disabled = true;
+    btn.textContent = 'Перенаправляем...';
+    try {
+      const data = await apiCall('/api/instagram/oauth/start');
+      window.location.href = data.url;
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Подключить Instagram';
+    }
+  }
+
+  async function disconnectIg(igUserId, handle) {
+    if (!confirm(`Отключить ${handle}? Публикация через этот аккаунт станет недоступна.`)) return;
+    try {
+      await apiCall(`/api/instagram/accounts/${igUserId}`, 'DELETE');
+      showToast(`${handle} отключён`, 'success');
+      loadIgAccounts();
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+    }
+  }
+
+  // ── TikTok ───────────────────────────────────────────────────────────────────
+
+  async function loadTikTokAccounts() {
+    const container = document.getElementById('tt-accounts-container');
+    try {
+      const data = await apiCall('/api/tiktok/accounts');
+      renderTikTokAccounts(data.accounts || []);
+    } catch (e) {
+      container.innerHTML = `<div class="error-msg">Ошибка загрузки: ${e.message}</div>`;
+    }
+  }
+
+  function renderTikTokAccounts(accounts) {
+    const container = document.getElementById('tt-accounts-container');
+    if (!accounts.length) {
+      container.innerHTML = '<p style="color:var(--gray-mid);font-size:14px">Нет подключённых аккаунтов.</p>';
+      return;
+    }
+    const now = new Date();
+    // For TikTok show refresh_token_expires_at as "connected until" (access token refreshes automatically)
+    const warnThreshold = new Date(now.getTime() + 30 * 86400 * 1000); // warn 30 days before refresh token expires
+    container.innerHTML = `<div class="social-accounts">${accounts.map(acc => {
+      const refreshExpires = acc.refresh_token_expires_at ? new Date(acc.refresh_token_expires_at) : null;
+      const expiring = refreshExpires && refreshExpires < warnThreshold;
+      const statusLabel = expiring ? '⚠ Нужно переподключить' : '● Активен';
+      const statusClass = expiring ? 'expiring' : 'active';
+      const expiryText = refreshExpires ? `Подключён до ${refreshExpires.toLocaleDateString('ru-RU')}` : 'Активен';
+      const connectedAt = acc.connected_at ? new Date(acc.connected_at).toLocaleDateString('ru-RU') : '—';
+      const name = acc.display_name || acc.tiktok_user_id || acc.SK || '';
+      return `
+        <div class="social-card">
+          <div class="social-avatar">${acc.avatar_url ? `<img src="${acc.avatar_url}" alt="">` : '🎵'}</div>
+          <div class="social-info">
+            <div class="social-handle">${escapeHtml(name)}</div>
+            <div class="social-meta">${expiryText} · Подключён ${connectedAt}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <span class="social-status ${statusClass}">${statusLabel}</span>
+            <button class="btn btn-secondary btn-sm" onclick="disconnectTikTok('${acc.SK || acc.tiktok_user_id}', '${escapeHtml(name)}')">Отключить</button>
+          </div>
+        </div>
+      `;
+    }).join('')}</div>`;
+  }
+
+  async function startTikTokOAuth() {
+    const btn = document.getElementById('tt-connect-btn');
+    btn.disabled = true;
+    btn.textContent = 'Перенаправляем...';
+    try {
+      const data = await apiCall('/api/tiktok/oauth/start');
+      window.location.href = data.url;
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Подключить TikTok';
+    }
+  }
+
+  async function disconnectTikTok(userId, name) {
+    if (!confirm(`Отключить ${name}? Публикация через этот аккаунт станет недоступна.`)) return;
+    try {
+      await apiCall(`/api/tiktok/accounts/${userId}`, 'DELETE');
+      showToast(`${name} отключён`, 'success');
+      loadTikTokAccounts();
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+    }
+  }
+
+  // ── YouTube ───────────────────────────────────────────────────────────────────
+
+  async function loadYouTubeAccounts() {
+    const container = document.getElementById('yt-accounts-container');
+    try {
+      const data = await apiCall('/api/youtube/accounts');
+      renderYouTubeAccounts(data.accounts || []);
+    } catch (e) {
+      container.innerHTML = `<div class="error-msg">Ошибка загрузки: ${e.message}</div>`;
+    }
+  }
+
+  function renderYouTubeAccounts(accounts) {
+    const container = document.getElementById('yt-accounts-container');
+    if (!accounts.length) {
+      container.innerHTML = '<p style="color:var(--gray-mid);font-size:14px">Нет подключённых каналов.</p>';
+      return;
+    }
+    const connectedAt = acc => acc.connected_at ? new Date(acc.connected_at).toLocaleDateString('ru-RU') : '—';
+    container.innerHTML = `<div class="social-accounts">${accounts.map(acc => {
+      const name = acc.channel_title || acc.youtube_channel_id || acc.SK || '';
+      return `
+        <div class="social-card">
+          <div class="social-avatar">${acc.channel_thumbnail_url ? `<img src="${acc.channel_thumbnail_url}" alt="">` : '▶️'}</div>
+          <div class="social-info">
+            <div class="social-handle">${escapeHtml(name)}</div>
+            <div class="social-meta">Подключён ${connectedAt(acc)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <span class="social-status active">● Активен</span>
+            <button class="btn btn-secondary btn-sm" onclick="disconnectYouTube('${acc.SK || acc.youtube_channel_id}', '${escapeHtml(name)}')">Отключить</button>
+          </div>
+        </div>
+      `;
+    }).join('')}</div>`;
+  }
+
+  async function startYouTubeOAuth() {
+    const btn = document.getElementById('yt-connect-btn');
+    btn.disabled = true;
+    btn.textContent = 'Перенаправляем...';
+    try {
+      const data = await apiCall('/api/youtube/oauth/start');
+      window.location.href = data.url;
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Подключить YouTube';
+    }
+  }
+
+  async function disconnectYouTube(channelId, name) {
+    if (!confirm(`Отключить ${name}? Публикация через этот канал станет недоступна.`)) return;
+    try {
+      await apiCall(`/api/youtube/accounts/${channelId}`, 'DELETE');
+      showToast(`${name} отключён`, 'success');
+      loadYouTubeAccounts();
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+    }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast toast-${type}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кросс-пост — Yalla Balagan Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .studio-form { max-width: 680px; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--dark); margin: 0 0 16px; }
+
+    /* Media */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 10px; padding: 32px;
+      text-align: center; cursor: pointer; transition: border-color .15s; background: var(--gray-bg);
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); }
+    .upload-zone p { color: var(--gray-mid); font-size: 14px; margin: 0; }
+    .upload-zone .upload-hint { font-size: 12px; color: var(--gray-mid); margin-top: 6px; }
+    .media-preview { display: none; }
+    .media-preview img, .media-preview video { max-width: 100%; max-height: 300px; border-radius: 8px; display: block; margin: 0 auto; }
+    .media-clear { margin-top: 10px; }
+    .upload-progress { display: none; font-size: 13px; color: var(--gray-mid); margin-top: 8px; }
+
+    /* Cover */
+    .cover-tabs { display: flex; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .cover-tab { flex: 1; padding: 8px 12px; font-size: 13px; border: none; background: none; cursor: pointer; color: var(--gray-mid); transition: background .1s; }
+    .cover-tab.active { background: var(--primary); color: #fff; }
+    .cover-canvas-wrap { background: #111; border-radius: 8px; overflow: hidden; margin-bottom: 10px; text-align: center; }
+    #cover-canvas { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    .scrubber-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    #cover-scrubber { flex: 1; cursor: pointer; }
+    .cover-time { font-size: 12px; color: var(--gray-mid); min-width: 38px; }
+    .cover-upload-zone {
+      border: 2px dashed var(--border); border-radius: 8px; padding: 24px;
+      text-align: center; cursor: pointer; color: var(--gray-mid); font-size: 14px;
+      transition: border-color .15s;
+    }
+    .cover-upload-zone:hover { border-color: var(--primary); }
+    .aspect-btns { display: flex; gap: 8px; margin-bottom: 10px; }
+    .aspect-btn { padding: 4px 14px; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .aspect-btn.active { border-color: var(--primary); color: var(--primary); background: #f0f4ff; }
+    #crop-canvas { display: block; width: 100%; border-radius: 8px; cursor: grab; margin-bottom: 10px; }
+    #crop-canvas:active { cursor: grabbing; }
+    .crop-hint { font-size: 12px; color: var(--gray-mid); margin-bottom: 10px; }
+    .cover-notice {
+      font-size: 12px; color: #555; margin: 10px 0 0;
+      background: #fffbea; border: 1px solid #f0d060; border-radius: 6px; padding: 8px 10px;
+    }
+    .cover-selected-bar {
+      display: flex; align-items: center; gap: 10px; margin-top: 12px;
+      padding: 8px 12px; background: #f0faf0; border: 1px solid #a5d6a7; border-radius: 8px;
+      font-size: 13px; color: #2e7d32;
+    }
+    .cover-selected-bar img { height: 40px; border-radius: 4px; object-fit: cover; }
+    .cover-selected-bar span { flex: 1; }
+
+    /* Content */
+    .field-label { display: block; font-size: 13px; font-weight: 600; color: var(--dark); margin-bottom: 6px; }
+    .field-sub { font-weight: 400; color: var(--gray-mid); font-size: 12px; }
+    #title-input {
+      width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; font-size: 14px; color: var(--dark);
+    }
+    #title-input:focus { outline: none; border-color: var(--primary); }
+    textarea#description {
+      width: 100%; min-height: 100px; resize: vertical; box-sizing: border-box;
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+      font-size: 14px; font-family: inherit; color: var(--dark); margin-top: 14px;
+    }
+    textarea#description:focus { outline: none; border-color: var(--primary); }
+    .char-count { font-size: 11px; color: var(--gray-mid); text-align: right; margin-top: 4px; }
+
+    /* Tags */
+    .tags-section { margin-top: 18px; }
+    .tags-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .btn-link { background: none; border: none; color: var(--primary); font-size: 13px; cursor: pointer; padding: 0; }
+    .tag-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .tag-suggestion-chip {
+      background: var(--gray-bg); border: 1px solid var(--border); border-radius: 100px;
+      padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--dark);
+    }
+    .tag-suggestion-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .tags-input-wrap {
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 40px;
+    }
+    .tags-input-wrap:focus-within { border-color: var(--primary); }
+    .tag-chip {
+      background: var(--primary); color: #fff; border-radius: 100px;
+      padding: 3px 8px 3px 10px; font-size: 12px; display: flex; align-items: center; gap: 4px;
+    }
+    .tag-chip button { background: none; border: none; color: rgba(255,255,255,.8); cursor: pointer; font-size: 14px; padding: 0; line-height: 1; }
+    #tag-input { border: none; outline: none; font-size: 14px; min-width: 100px; flex: 1; background: transparent; }
+
+    /* Accounts */
+    .accounts-list { display: flex; flex-direction: column; gap: 8px; }
+    .account-row {
+      display: flex; align-items: center; gap: 12px; border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; cursor: pointer; transition: background .1s;
+    }
+    .account-row:hover { background: var(--gray-bg); }
+    .account-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+    .account-avatar {
+      width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+      background: var(--gray-light); display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+    }
+    .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .platform-badge {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .3px;
+      padding: 2px 6px; border-radius: 4px; color: #fff; margin-bottom: 2px;
+    }
+    .platform-badge.instagram { background: #e1306c; }
+    .platform-badge.tiktok    { background: #010101; }
+    .platform-badge.youtube   { background: #ff0000; }
+    .account-handle { font-weight: 600; font-size: 14px; color: var(--dark); }
+    .account-name { font-size: 12px; color: var(--gray-mid); }
+    .no-accounts { font-size: 14px; color: var(--gray-mid); }
+    .no-accounts a { color: var(--primary); }
+
+    /* Collaborators */
+    .collab-hint { font-size: 12px; color: var(--gray-mid); margin: 0 0 12px; line-height: 1.5; }
+    .collab-input-row {
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 44px;
+    }
+    .collab-input-row:focus-within { border-color: var(--primary); }
+    .collab-chip {
+      background: #f3e5f5; color: #7b1fa2; border-radius: 100px;
+      padding: 3px 8px 3px 10px; font-size: 12px; display: flex; align-items: center; gap: 4px;
+    }
+    .collab-chip button { background: none; border: none; color: #7b1fa2; cursor: pointer; font-size: 14px; padding: 0; line-height: 1; }
+    #collab-input { border: none; outline: none; font-size: 14px; min-width: 120px; flex: 1; background: transparent; }
+    .collab-add-btn { flex-shrink: 0; }
+    .collab-quick { margin-top: 12px; }
+    .collab-quick-label { font-size: 12px; color: var(--gray-mid); margin-bottom: 8px; }
+    .collab-quick-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .collab-quick-btn {
+      display: flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+      border-radius: 100px; padding: 4px 12px 4px 6px; cursor: pointer; background: none;
+      font-size: 13px; transition: border-color .1s;
+    }
+    .collab-quick-btn:hover { border-color: var(--primary); }
+    .collab-quick-btn img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+    .collab-quick-btn .cq-initials {
+      width: 24px; height: 24px; border-radius: 50%; background: #e1306c;
+      color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
+    .collab-quick-btn span { font-weight: 600; }
+
+    /* Schedule */
+    .schedule-radios { display: flex; gap: 16px; margin-bottom: 16px; }
+    .schedule-radios label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+    #scheduled-at-wrap { display: none; }
+    #scheduled-at-wrap input { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 14px; color: var(--dark); }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mobile-menu-btn">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar-container"></nav>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Кросс-пост</h1>
+        <p class="page-subtitle">Публикация в несколько соц. сетей одновременно</p>
+      </div>
+      <div class="page-actions">
+        <a href="social-history.html" class="btn btn-secondary">История</a>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" style="display:none"></div>
+
+    <div class="studio-form">
+
+      <!-- Media -->
+      <div class="card">
+        <p class="card-title">Медиа</p>
+        <div class="upload-zone" id="upload-zone">
+          <p>Нажмите или перетащите файл</p>
+          <p class="upload-hint">Фото: JPG, PNG, WEBP · Видео: MP4, MOV (для Reels)</p>
+        </div>
+        <div class="upload-progress" id="upload-progress">Загрузка...</div>
+        <div class="media-preview" id="media-preview"></div>
+        <button class="btn btn-secondary btn-sm media-clear" id="media-clear" style="display:none" onclick="clearMedia()">✕ Убрать медиа</button>
+        <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" style="display:none">
+      </div>
+
+      <!-- Cover (hidden until media uploaded) -->
+      <div class="card" id="cover-card" style="display:none">
+        <p class="card-title">Обложка</p>
+        <div class="cover-tabs" id="cover-tabs">
+          <button class="cover-tab active" id="tab-frame" onclick="switchCoverTab('frame')">Выбрать кадр</button>
+          <button class="cover-tab" id="tab-custom" onclick="switchCoverTab('custom')">Загрузить обложку</button>
+        </div>
+
+        <!-- Frame pane -->
+        <div id="cover-frame-pane">
+          <video id="cover-video" style="display:none" muted crossOrigin="anonymous" preload="metadata"></video>
+          <div class="cover-canvas-wrap">
+            <canvas id="cover-canvas" width="360" height="202"></canvas>
+          </div>
+          <div class="scrubber-row">
+            <input type="range" id="cover-scrubber" min="0" step="0.033" value="0" oninput="onScrubberInput()" style="flex:1">
+            <span class="cover-time" id="cover-time">0:00</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="useCurrentFrame()">Использовать этот кадр</button>
+          <p class="cover-notice">ℹ️ TikTok поддерживает только выбор кадра — кастомная обложка там игнорируется. Кастомная обложка применяется только к Instagram и YouTube.</p>
+        </div>
+
+        <!-- Custom upload pane -->
+        <div id="cover-custom-pane" style="display:none">
+          <div class="cover-upload-zone" id="cover-upload-zone" onclick="document.getElementById('cover-file').click()">
+            Нажмите, чтобы выбрать изображение обложки
+          </div>
+          <input type="file" id="cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
+          <div id="crop-ui" style="display:none; margin-top:12px">
+            <div class="aspect-btns">
+              <button class="aspect-btn active" onclick="setAspectRatio(this, 9/16)">9:16</button>
+              <button class="aspect-btn" onclick="setAspectRatio(this, 1)">1:1</button>
+              <button class="aspect-btn" onclick="setAspectRatio(this, 16/9)">16:9</button>
+            </div>
+            <canvas id="crop-canvas"></canvas>
+            <p class="crop-hint">Перетащите изображение для выбора области</p>
+            <button class="btn btn-secondary btn-sm" onclick="applyCrop()">Применить</button>
+          </div>
+          <p class="cover-notice" style="margin-top:12px">ℹ️ TikTok не поддерживает кастомную обложку — она будет применена только к Instagram и YouTube.</p>
+        </div>
+
+        <!-- Selected cover bar -->
+        <div class="cover-selected-bar" id="cover-selected-bar" style="display:none">
+          <img id="cover-selected-img" src="" alt="">
+          <span id="cover-selected-label"></span>
+          <button class="btn btn-secondary btn-sm" onclick="clearCover()">✕ Убрать</button>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="card">
+        <p class="card-title">Контент</p>
+
+        <label class="field-label" for="title-input">
+          Заголовок <span class="field-sub">(YouTube, TikTok · макс. 100)</span>
+        </label>
+        <input type="text" id="title-input" maxlength="150" placeholder="Заголовок поста..." oninput="updateTitleCount()">
+        <div class="char-count" id="title-count">0 / 100</div>
+
+        <label class="field-label" for="description" style="margin-top:14px">
+          Описание <span class="field-sub">(Instagram, YouTube)</span>
+        </label>
+        <textarea id="description" placeholder="Текст поста..." oninput="updateDescCount()"></textarea>
+        <div class="char-count" id="desc-count">0 / 2200</div>
+
+        <!-- Tags -->
+        <div class="tags-section">
+          <div class="tags-header">
+            <label class="field-label" style="margin:0">
+              Теги <span class="field-sub">(YouTube)</span>
+            </label>
+            <button class="btn-link" onclick="suggestTags()">✦ Предложить из текста</button>
+          </div>
+          <div id="tag-suggestions" class="tag-suggestions" style="display:none"></div>
+          <div class="tags-input-wrap" onclick="document.getElementById('tag-input').focus()">
+            <div id="tags-chips"></div>
+            <input type="text" id="tag-input" placeholder="Добавить тег..." onkeydown="onTagKeydown(event)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Accounts -->
+      <div class="card">
+        <p class="card-title">Аккаунты</p>
+        <div id="accounts-container"><div class="loading">Загрузка...</div></div>
+      </div>
+
+      <!-- Collaborators (shown when Instagram selected) -->
+      <div class="card" id="collaborators-card" style="display:none">
+        <p class="card-title">Коллабораторы Instagram</p>
+        <p class="collab-hint">До 3 аккаунтов · только публичные · без @ · они получат уведомление и должны принять инвайт</p>
+        <div class="collab-input-row">
+          <div id="collab-chips"></div>
+          <input type="text" id="collab-input" placeholder="username" maxlength="30" onkeydown="onCollabKeydown(event)">
+          <button class="btn btn-secondary btn-sm collab-add-btn" onclick="addCollaboratorFromInput()">Добавить</button>
+        </div>
+        <div class="collab-quick" id="collab-quick" style="display:none">
+          <p class="collab-quick-label">Быстрое добавление из подключённых аккаунтов:</p>
+          <div class="collab-quick-list" id="collab-quick-list"></div>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="card">
+        <p class="card-title">Публикация</p>
+        <div class="schedule-radios">
+          <label><input type="radio" name="publish_when" value="now" checked onchange="toggleSchedule()"> Сейчас</label>
+          <label><input type="radio" name="publish_when" value="scheduled" onchange="toggleSchedule()"> Запланировать</label>
+        </div>
+        <div id="scheduled-at-wrap">
+          <input type="datetime-local" id="scheduled-at">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="submit-btn" onclick="submitPost()" style="width:100%;padding:14px">
+        Опубликовать
+      </button>
+
+    </div>
+  </main>
+</div>
+<script src="auth.js"></script>
+<script src="shared.js"></script>
+<script>
+  // ── State ────────────────────────────────────────────────────────────────────
+  let uploadedMedia = null; // { s3_key, type, filename, public_url }
+  let selectedCover = null; // { type:'frame'|'custom', timestamp_ms?, s3_key, public_url }
+  let tags = [];
+  let collaborators = [];
+  let igAccounts = []; // all loaded instagram accounts (for quick-add)
+
+  const STOP_WORDS = new Set([
+    'и','в','на','с','по','для','не','это','что','как','из','но','а','то','да',
+    'он','она','они','мы','вы','я','к','от','за','при','до','во','об','бы','же',
+    'уже','еще','ещё','или','the','a','an','is','of','in','to','for','and','or',
+    'not','be','are','was','were','it','its','this','that','with','at','by','from',
+  ]);
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await initAdmin();
+    loadAccounts();
+    setupUploadZone();
+    setupCoverDrag();
+  });
+
+  // ── Accounts ─────────────────────────────────────────────────────────────────
+
+  async function loadAccounts() {
+    const container = document.getElementById('accounts-container');
+    try {
+      const [igData, ttData, ytData] = await Promise.all([
+        apiCall('/api/instagram/accounts'),
+        apiCall('/api/tiktok/accounts'),
+        apiCall('/api/youtube/accounts'),
+      ]);
+      igAccounts = (igData.accounts || []).map(a => ({
+        platform: 'instagram',
+        account_id: a.ig_user_id,
+        handle: a.ig_username,
+        name: a.ig_name,
+        avatar: a.ig_picture_url || '',
+      }));
+      const ttAccounts = (ttData.accounts || []).map(a => ({
+        platform: 'tiktok',
+        account_id: a.SK || a.tiktok_user_id,
+        handle: a.display_name || a.tiktok_user_id,
+        name: '',
+        avatar: a.avatar_url || '',
+      }));
+      const ytAccounts = (ytData.accounts || []).map(a => ({
+        platform: 'youtube',
+        account_id: a.SK || a.youtube_channel_id,
+        handle: a.channel_title || a.youtube_channel_id,
+        name: '',
+        avatar: a.channel_thumbnail_url || '',
+      }));
+      renderAccounts([...igAccounts, ...ttAccounts, ...ytAccounts]);
+    } catch (e) {
+      container.innerHTML = `<div class="error-msg">Ошибка: ${e.message}</div>`;
+    }
+  }
+
+  function renderAccounts(accounts) {
+    const container = document.getElementById('accounts-container');
+    if (!accounts.length) {
+      container.innerHTML = `<p class="no-accounts">Нет подключённых аккаунтов. <a href="social-settings.html">Подключить →</a></p>`;
+      return;
+    }
+    const PLATFORM_NAMES = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube' };
+    const PLATFORM_INITIALS = { instagram: 'IG', tiktok: 'TT', youtube: 'YT' };
+    container.innerHTML = `<div class="accounts-list">${accounts.map(a => {
+      const avatarInner = a.avatar
+        ? `<img src="${a.avatar}" alt="">`
+        : PLATFORM_INITIALS[a.platform] || '?';
+      return `
+      <label class="account-row">
+        <input type="checkbox" class="account-checkbox" data-platform="${a.platform}" data-id="${a.account_id}" onchange="onAccountChange()">
+        <div class="account-avatar">${avatarInner}</div>
+        <span>
+          <div><span class="platform-badge ${a.platform}">${PLATFORM_NAMES[a.platform] || a.platform}</span></div>
+          <div class="account-handle">${escapeHtml(a.handle || a.account_id)}</div>
+          ${a.name ? `<div class="account-name">${escapeHtml(a.name)}</div>` : ''}
+        </span>
+      </label>
+    `}).join('')}</div>`;
+  }
+
+  function onAccountChange() {
+    const igSelected = [...document.querySelectorAll('.account-checkbox:checked')]
+      .some(cb => cb.dataset.platform === 'instagram');
+    const collabCard = document.getElementById('collaborators-card');
+    collabCard.style.display = igSelected ? 'block' : 'none';
+    if (igSelected) renderCollabQuickAdd();
+  }
+
+  // ── Upload ───────────────────────────────────────────────────────────────────
+
+  function setupUploadZone() {
+    const zone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+  }
+
+  async function handleFile(file) {
+    if (!file.type.startsWith('video/') && !file.type.startsWith('image/')) {
+      showToast('Поддерживаются только видео и фото', 'error'); return;
+    }
+    setUploading(true);
+    try {
+      if (file.type.startsWith('video/')) await uploadVideo(file);
+      else await uploadImage(file);
+    } catch (e) {
+      showToast(`Ошибка загрузки: ${e.message}`, 'error');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function uploadVideo(file) {
+    const urlData = await apiCall(
+      `/api/social/upload-url?filename=${encodeURIComponent(file.name)}&content_type=${encodeURIComponent(file.type)}`
+    );
+    const { upload_url, s3_key, public_url } = urlData;
+    const resp = await fetch(upload_url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+    if (!resp.ok) throw new Error(`S3 upload failed: ${resp.status}`);
+    uploadedMedia = { s3_key, type: 'video', filename: file.name, public_url };
+    showMediaPreview('video', public_url);
+    showCoverCard('video', public_url);
+  }
+
+  async function uploadImage(file) {
+    const reader = new FileReader();
+    const base64 = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const data = await apiCall('/api/upload-image', 'POST', {
+      filename: `social-posts/${file.name}`, contentType: file.type, data: base64,
+    });
+    const url = new URL(data.url);
+    const s3_key = url.pathname.slice(1);
+    uploadedMedia = { s3_key, type: 'image', filename: file.name, public_url: data.url };
+    showMediaPreview('image', data.url);
+    showCoverCard('image', null);
+  }
+
+  function showMediaPreview(type, url) {
+    const preview = document.getElementById('media-preview');
+    document.getElementById('upload-zone').style.display = 'none';
+    preview.style.display = 'block';
+    document.getElementById('media-clear').style.display = 'inline-block';
+    preview.innerHTML = type === 'video'
+      ? `<video src="${url}" controls></video>`
+      : `<img src="${url}" alt="preview">`;
+  }
+
+  function clearMedia() {
+    uploadedMedia = null;
+    document.getElementById('media-preview').style.display = 'none';
+    document.getElementById('media-preview').innerHTML = '';
+    document.getElementById('upload-zone').style.display = '';
+    document.getElementById('media-clear').style.display = 'none';
+    document.getElementById('file-input').value = '';
+    document.getElementById('cover-card').style.display = 'none';
+    clearCover();
+  }
+
+  function setUploading(on) {
+    document.getElementById('upload-progress').style.display = on ? 'block' : 'none';
+    document.getElementById('upload-zone').style.pointerEvents = on ? 'none' : '';
+    document.getElementById('submit-btn').disabled = on;
+  }
+
+  // ── Cover card ───────────────────────────────────────────────────────────────
+
+  function showCoverCard(mediaType, videoUrl) {
+    const card = document.getElementById('cover-card');
+    card.style.display = 'block';
+    if (mediaType === 'video') {
+      // Show both tabs; frame tab is active by default
+      document.getElementById('tab-frame').style.display = '';
+      switchCoverTab('frame');
+      const video = document.getElementById('cover-video');
+      video.src = videoUrl;
+      video.addEventListener('loadedmetadata', () => {
+        const scrubber = document.getElementById('cover-scrubber');
+        scrubber.max = video.duration;
+        drawVideoFrame();
+      }, { once: true });
+    } else {
+      // Image: only custom tab available
+      document.getElementById('tab-frame').style.display = 'none';
+      switchCoverTab('custom');
+    }
+  }
+
+  function switchCoverTab(tab) {
+    document.getElementById('cover-frame-pane').style.display = tab === 'frame' ? 'block' : 'none';
+    document.getElementById('cover-custom-pane').style.display = tab === 'custom' ? 'block' : 'none';
+    document.getElementById('tab-frame').classList.toggle('active', tab === 'frame');
+    document.getElementById('tab-custom').classList.toggle('active', tab === 'custom');
+  }
+
+  // ── Frame scrubber ───────────────────────────────────────────────────────────
+
+  function onScrubberInput() {
+    const video = document.getElementById('cover-video');
+    const scrubber = document.getElementById('cover-scrubber');
+    video.currentTime = parseFloat(scrubber.value);
+    document.getElementById('cover-time').textContent = formatTime(video.currentTime);
+  }
+
+  function drawVideoFrame() {
+    const video = document.getElementById('cover-video');
+    const canvas = document.getElementById('cover-canvas');
+    if (!video.videoWidth) return;
+    const aspect = video.videoWidth / video.videoHeight;
+    canvas.width = 360;
+    canvas.height = Math.round(360 / aspect);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  }
+
+  document.getElementById && document.addEventListener('DOMContentLoaded', () => {
+    const video = document.getElementById('cover-video');
+    video.addEventListener('seeked', drawVideoFrame);
+  });
+
+  async function useCurrentFrame() {
+    const video = document.getElementById('cover-video');
+    const canvas = document.getElementById('cover-canvas');
+    drawVideoFrame();
+    const timestamp_ms = Math.round(video.currentTime * 1000);
+    showToast('Загрузка кадра...', 'info');
+    try {
+      const blob = await new Promise((res, rej) => {
+        canvas.toBlob(b => b ? res(b) : rej(new Error('Canvas export failed')), 'image/jpeg', 0.92);
+      });
+      const urlData = await apiCall('/api/social/upload-url?filename=cover-frame.jpg&content_type=image%2Fjpeg');
+      const resp = await fetch(urlData.upload_url, {
+        method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' },
+      });
+      if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`);
+      selectedCover = { type: 'frame', timestamp_ms, s3_key: urlData.s3_key, public_url: urlData.public_url };
+      showCoverSelectedBar(urlData.public_url, `Кадр ${formatTime(video.currentTime)}`);
+      showToast('Кадр выбран', 'success');
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+    }
+  }
+
+  // ── Custom cover & crop ──────────────────────────────────────────────────────
+
+  const cropState = { img: null, aspectRatio: 9/16, panX: 0, panY: 0, isDragging: false, lastX: 0, lastY: 0 };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const coverFile = document.getElementById('cover-file');
+    coverFile.addEventListener('change', () => { if (coverFile.files[0]) loadCropImage(coverFile.files[0]); });
+  });
+
+  function loadCropImage(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        cropState.img = img;
+        cropState.panX = 0;
+        cropState.panY = 0;
+        document.getElementById('crop-ui').style.display = 'block';
+        document.getElementById('cover-upload-zone').style.display = 'none';
+        drawCrop();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function setAspectRatio(btn, ratio) {
+    document.querySelectorAll('.aspect-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    cropState.aspectRatio = ratio;
+    cropState.panX = 0;
+    cropState.panY = 0;
+    drawCrop();
+  }
+
+  function drawCrop() {
+    const canvas = document.getElementById('crop-canvas');
+    const ctx = canvas.getContext('2d');
+    const { img, aspectRatio, panX, panY } = cropState;
+    if (!img) return;
+    const W = 360;
+    const H = Math.round(W / aspectRatio);
+    canvas.width = W;
+    canvas.height = H;
+    const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+    const drawW = img.naturalWidth * scale;
+    const drawH = img.naturalHeight * scale;
+    const maxPX = Math.max(0, (drawW - W) / 2);
+    const maxPY = Math.max(0, (drawH - H) / 2);
+    cropState.panX = Math.max(-maxPX, Math.min(maxPX, panX));
+    cropState.panY = Math.max(-maxPY, Math.min(maxPY, panY));
+    const x = (W - drawW) / 2 + cropState.panX;
+    const y = (H - drawH) / 2 + cropState.panY;
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(img, x, y, drawW, drawH);
+  }
+
+  function setupCoverDrag() {
+    const canvas = document.getElementById('crop-canvas');
+    if (!canvas) return;
+    const start = (x, y) => { cropState.isDragging = true; cropState.lastX = x; cropState.lastY = y; };
+    const move = (x, y) => {
+      if (!cropState.isDragging) return;
+      cropState.panX += (x - cropState.lastX);
+      cropState.panY += (y - cropState.lastY);
+      cropState.lastX = x; cropState.lastY = y;
+      drawCrop();
+    };
+    const end = () => { cropState.isDragging = false; };
+    canvas.addEventListener('mousedown', e => start(e.clientX, e.clientY));
+    canvas.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+    document.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', e => { const t = e.touches[0]; start(t.clientX, t.clientY); });
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: false });
+    canvas.addEventListener('touchend', end);
+  }
+
+  async function applyCrop() {
+    const canvas = document.getElementById('crop-canvas');
+    showToast('Загрузка обложки...', 'info');
+    try {
+      const blob = await new Promise((res, rej) => {
+        canvas.toBlob(b => b ? res(b) : rej(new Error('Canvas export failed')), 'image/jpeg', 0.92);
+      });
+      const urlData = await apiCall('/api/social/upload-url?filename=cover-custom.jpg&content_type=image%2Fjpeg');
+      const resp = await fetch(urlData.upload_url, {
+        method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' },
+      });
+      if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`);
+      selectedCover = { type: 'custom', s3_key: urlData.s3_key, public_url: urlData.public_url };
+      showCoverSelectedBar(urlData.public_url, 'Кастомная обложка');
+      showToast('Обложка загружена', 'success');
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+    }
+  }
+
+  function showCoverSelectedBar(previewUrl, label) {
+    document.getElementById('cover-selected-img').src = previewUrl;
+    document.getElementById('cover-selected-label').textContent = '✓ ' + label;
+    document.getElementById('cover-selected-bar').style.display = 'flex';
+  }
+
+  function clearCover() {
+    selectedCover = null;
+    document.getElementById('cover-selected-bar').style.display = 'none';
+    // Reset crop UI
+    document.getElementById('cover-upload-zone').style.display = '';
+    document.getElementById('crop-ui').style.display = 'none';
+    document.getElementById('cover-file').value = '';
+    cropState.img = null;
+  }
+
+  // ── Tags ─────────────────────────────────────────────────────────────────────
+
+  function suggestTags() {
+    const text = [
+      document.getElementById('title-input').value,
+      document.getElementById('description').value,
+    ].join(' ');
+    const words = text.toLowerCase().match(/[a-zа-яё]+/gi) || [];
+    const candidates = [...new Set(
+      words.filter(w => w.length > 3 && !STOP_WORDS.has(w) && !tags.includes(w))
+    )].slice(0, 15);
+    const suggestionsEl = document.getElementById('tag-suggestions');
+    if (!candidates.length) {
+      suggestionsEl.style.display = 'none'; return;
+    }
+    suggestionsEl.style.display = 'flex';
+    suggestionsEl.innerHTML = candidates.map(w =>
+      `<button class="tag-suggestion-chip" onclick="addTag('${escapeHtml(w)}'); this.remove(); if(!document.querySelectorAll('.tag-suggestion-chip').length) document.getElementById('tag-suggestions').style.display='none'">${escapeHtml(w)}</button>`
+    ).join('');
+  }
+
+  function onTagKeydown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = e.target.value.trim().replace(/,$/, '');
+      if (val) { addTag(val); e.target.value = ''; }
+    }
+  }
+
+  function addTag(tag) {
+    tag = tag.trim().toLowerCase().replace(/^#/, '');
+    if (!tag || tags.includes(tag) || tags.length >= 500) return;
+    tags.push(tag);
+    renderTags();
+  }
+
+  function removeTag(tag) {
+    tags = tags.filter(t => t !== tag);
+    renderTags();
+  }
+
+  function renderTags() {
+    document.getElementById('tags-chips').innerHTML = tags.map(t =>
+      `<span class="tag-chip">#${escapeHtml(t)}<button onclick="removeTag('${escapeHtml(t)}')" title="Удалить">×</button></span>`
+    ).join('');
+  }
+
+  // ── Collaborators ────────────────────────────────────────────────────────────
+
+  function renderCollabQuickAdd() {
+    const selectedIds = [...document.querySelectorAll('.account-checkbox:checked[data-platform="instagram"]')]
+      .map(cb => cb.dataset.id);
+    const available = igAccounts.filter(a => !selectedIds.includes(a.account_id) && !collaborators.includes(a.handle));
+    const quickEl = document.getElementById('collab-quick');
+    const listEl = document.getElementById('collab-quick-list');
+    if (!available.length) { quickEl.style.display = 'none'; return; }
+    quickEl.style.display = 'block';
+    listEl.innerHTML = available.map(a => {
+      const avatarHtml = a.avatar
+        ? `<img src="${a.avatar}" alt="">`
+        : `<span class="cq-initials">IG</span>`;
+      return `<button class="collab-quick-btn" onclick="addCollaborator('${escapeHtml(a.handle)}')">${avatarHtml}<span>@${escapeHtml(a.handle)}</span></button>`;
+    }).join('');
+  }
+
+  function onCollabKeydown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addCollaboratorFromInput(); }
+  }
+
+  function addCollaboratorFromInput() {
+    const input = document.getElementById('collab-input');
+    const val = input.value.trim().replace(/^@/, '');
+    if (val) { addCollaborator(val); input.value = ''; }
+  }
+
+  function addCollaborator(username) {
+    username = username.replace(/^@/, '').trim();
+    if (!username || collaborators.includes(username) || collaborators.length >= 3) return;
+    collaborators.push(username);
+    renderCollaborators();
+    renderCollabQuickAdd();
+  }
+
+  function removeCollaborator(username) {
+    collaborators = collaborators.filter(c => c !== username);
+    renderCollaborators();
+    renderCollabQuickAdd();
+  }
+
+  function renderCollaborators() {
+    const input = document.getElementById('collab-input');
+    const addBtn = document.querySelector('.collab-add-btn');
+    const maxReached = collaborators.length >= 3;
+    input.disabled = maxReached;
+    input.placeholder = maxReached ? 'Максимум 3 коллабораторa' : 'username';
+    if (addBtn) addBtn.disabled = maxReached;
+    document.getElementById('collab-chips').innerHTML = collaborators.map(u =>
+      `<span class="collab-chip">@${escapeHtml(u)}<button onclick="removeCollaborator('${escapeHtml(u)}')" title="Удалить">×</button></span>`
+    ).join('');
+  }
+
+  // ── Submit ───────────────────────────────────────────────────────────────────
+
+  async function submitPost() {
+    if (!uploadedMedia) { showToast('Загрузите медиа', 'error'); return; }
+
+    const targets = [...document.querySelectorAll('.account-checkbox:checked')].map(cb => ({
+      platform: cb.dataset.platform,
+      account_id: cb.dataset.id,
+    }));
+    if (!targets.length) { showToast('Выберите хотя бы один аккаунт', 'error'); return; }
+
+    const publishWhen = document.querySelector('input[name=publish_when]:checked').value;
+    const scheduledAt = publishWhen === 'scheduled' ? document.getElementById('scheduled-at').value : null;
+    if (publishWhen === 'scheduled' && !scheduledAt) {
+      showToast('Укажите дату и время публикации', 'error'); return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = publishWhen === 'scheduled' ? 'Сохранение...' : 'Публикуем...';
+
+    try {
+      const payload = {
+        title: document.getElementById('title-input').value.trim(),
+        description: document.getElementById('description').value.trim(),
+        tags: tags.length ? tags : undefined,
+        media: [{ s3_key: uploadedMedia.s3_key, type: uploadedMedia.type, filename: uploadedMedia.filename }],
+        targets,
+      };
+      if (selectedCover) payload.cover = { type: selectedCover.type, timestamp_ms: selectedCover.timestamp_ms, s3_key: selectedCover.s3_key };
+      if (collaborators.length) payload.collaborators = collaborators;
+      if (scheduledAt) payload.scheduled_at = new Date(scheduledAt).toISOString();
+
+      await apiCall('/api/social/posts', 'POST', payload);
+      showToast(publishWhen === 'scheduled' ? 'Пост запланирован!' : 'Пост отправлен на публикацию!', 'success');
+      setTimeout(() => { window.location.href = 'social-history.html'; }, 1200);
+    } catch (e) {
+      showToast(`Ошибка: ${e.message}`, 'error');
+      btn.disabled = false;
+      btn.textContent = publishWhen === 'scheduled' ? 'Запланировать' : 'Опубликовать';
+    }
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────────
+
+  function toggleSchedule() {
+    const isScheduled = document.querySelector('input[name=publish_when]:checked').value === 'scheduled';
+    document.getElementById('scheduled-at-wrap').style.display = isScheduled ? 'block' : 'none';
+    document.getElementById('submit-btn').textContent = isScheduled ? 'Запланировать' : 'Опубликовать';
+  }
+
+  function updateTitleCount() {
+    const len = document.getElementById('title-input').value.length;
+    const el = document.getElementById('title-count');
+    el.textContent = `${len} / 100`;
+    el.style.color = len > 100 ? '#e53935' : 'var(--gray-mid)';
+  }
+
+  function updateDescCount() {
+    const len = document.getElementById('description').value.length;
+    const el = document.getElementById('desc-count');
+    el.textContent = `${len} / 2200`;
+    el.style.color = len > 2200 ? '#e53935' : 'var(--gray-mid)';
+  }
+
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast toast-${type}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+</script>
+</body>
+</html>

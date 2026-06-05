@@ -37,6 +37,12 @@ class DynamoDBClient:
         self.influencers_table = self.dynamodb.Table(self.influencers_table_name)
         self.instagram_table_name = os.environ.get('INSTAGRAM_CONNECTIONS_TABLE', 'yallabalagan-instagram')
         self.instagram_table = self.dynamodb.Table(self.instagram_table_name)
+        self.tiktok_table_name = os.environ.get('TIKTOK_CONNECTIONS_TABLE', 'yallabalagan-tiktok')
+        self.tiktok_table = self.dynamodb.Table(self.tiktok_table_name)
+        self.youtube_table_name = os.environ.get('YOUTUBE_CONNECTIONS_TABLE', 'yallabalagan-youtube')
+        self.youtube_table = self.dynamodb.Table(self.youtube_table_name)
+        self.social_posts_table_name = os.environ.get('SOCIAL_POSTS_TABLE', 'yallabalagan-social-posts')
+        self.social_posts_table = self.dynamodb.Table(self.social_posts_table_name)
         self.config_table_name = os.environ.get('CONFIG_TABLE', 'yallabalagan-config')
         self.config_table = self.dynamodb.Table(self.config_table_name)
 
@@ -881,6 +887,119 @@ class DynamoDBClient:
         resp = self.instagram_table.query(
             KeyConditionExpression=DKey('PK').eq(f'LOG#{month}'),
             ScanIndexForward=False,
+        )
+        return resp.get('Items', [])
+
+    # ===== TikTok Connections =====
+
+    def put_tiktok_connection(self, item: dict):
+        self.tiktok_table.put_item(Item=item)
+
+    def get_tiktok_connection(self, tiktok_user_id: str) -> Optional[dict]:
+        resp = self.tiktok_table.get_item(Key={'PK': 'CONNECTION', 'SK': tiktok_user_id})
+        return resp.get('Item')
+
+    def list_tiktok_connections(self) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey
+        resp = self.tiktok_table.query(
+            KeyConditionExpression=DKey('PK').eq('CONNECTION'),
+        )
+        return resp.get('Items', [])
+
+    def delete_tiktok_connection(self, tiktok_user_id: str):
+        self.tiktok_table.delete_item(Key={'PK': 'CONNECTION', 'SK': tiktok_user_id})
+
+    def update_tiktok_tokens(self, tiktok_user_id: str, access_token_enc: str,
+                             token_expires_at: str, refresh_token_enc: str,
+                             refresh_token_expires_at: str):
+        self.tiktok_table.update_item(
+            Key={'PK': 'CONNECTION', 'SK': tiktok_user_id},
+            UpdateExpression='SET access_token = :a, token_expires_at = :e, refresh_token = :r, refresh_token_expires_at = :re',
+            ExpressionAttributeValues={
+                ':a': access_token_enc,
+                ':e': token_expires_at,
+                ':r': refresh_token_enc,
+                ':re': refresh_token_expires_at,
+            },
+        )
+
+    # ===== YouTube Connections =====
+
+    def put_youtube_connection(self, item: dict):
+        self.youtube_table.put_item(Item=item)
+
+    def get_youtube_connection(self, channel_id: str) -> Optional[dict]:
+        resp = self.youtube_table.get_item(Key={'PK': 'CONNECTION', 'SK': channel_id})
+        return resp.get('Item')
+
+    def list_youtube_connections(self) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey
+        resp = self.youtube_table.query(
+            KeyConditionExpression=DKey('PK').eq('CONNECTION'),
+        )
+        return resp.get('Items', [])
+
+    def delete_youtube_connection(self, channel_id: str):
+        self.youtube_table.delete_item(Key={'PK': 'CONNECTION', 'SK': channel_id})
+
+    def update_youtube_token(self, channel_id: str, access_token_enc: str, token_expires_at: str):
+        self.youtube_table.update_item(
+            Key={'PK': 'CONNECTION', 'SK': channel_id},
+            UpdateExpression='SET access_token = :a, token_expires_at = :e',
+            ExpressionAttributeValues={':a': access_token_enc, ':e': token_expires_at},
+        )
+
+    # ===== Social Posts =====
+
+    def put_social_post(self, item: dict):
+        self.social_posts_table.put_item(Item=item)
+
+    def get_social_post(self, post_id: str) -> Optional[dict]:
+        resp = self.social_posts_table.get_item(Key={'PK': 'POST', 'SK': post_id})
+        return resp.get('Item')
+
+    def list_social_posts(self, limit: int = 50) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey
+        resp = self.social_posts_table.query(
+            KeyConditionExpression=DKey('PK').eq('POST'),
+            ScanIndexForward=False,
+            Limit=limit,
+        )
+        return resp.get('Items', [])
+
+    def update_social_post(self, post_id: str, updates: dict):
+        if not updates:
+            return
+        keys = list(updates.keys())
+        expr = 'SET ' + ', '.join(f'#{k} = :{k}' for k in keys)
+        names = {f'#{k}': k for k in keys}
+        values = {f':{k}': v for k, v in updates.items()}
+        self.social_posts_table.update_item(
+            Key={'PK': 'POST', 'SK': post_id},
+            UpdateExpression=expr,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
+
+    def delete_social_post(self, post_id: str):
+        self.social_posts_table.delete_item(Key={'PK': 'POST', 'SK': post_id})
+
+    def list_stale_publishing_posts(self, stale_before: str) -> List[dict]:
+        """Return posts stuck in 'publishing' with publishing_since < stale_before (ISO-8601)."""
+        from boto3.dynamodb.conditions import Attr
+        resp = self.social_posts_table.scan(
+            FilterExpression=Attr('status').eq('publishing') & Attr('publishing_since').lt(stale_before)
+        )
+        return resp.get('Items', [])
+
+    def list_due_scheduled_posts(self) -> List[dict]:
+        """Return scheduled posts with scheduled_at <= now (ISO-8601)."""
+        from boto3.dynamodb.conditions import Key as DKey, Attr
+        import datetime
+        now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        resp = self.social_posts_table.query(
+            IndexName='StatusScheduledIndex',
+            KeyConditionExpression=DKey('status').eq('scheduled') & DKey('scheduled_at').lte(now),
         )
         return resp.get('Items', [])
 

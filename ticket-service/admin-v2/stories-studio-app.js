@@ -714,7 +714,7 @@ function Studio() {
               : igAccounts.length === 0
                 ? <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12 }}>
                     Нет подключённых аккаунтов.{' '}
-                    <a href="instagram-settings.html" style={{ color: 'var(--paper)' }}>Подключить →</a>
+                    <a href="social-settings.html" style={{ color: 'var(--paper)' }}>Подключить →</a>
                   </div>
                 : igAccounts.map(acc => (
                     <button key={acc.ig_user_id} className="st-ig-account-btn"

@@ -395,8 +395,9 @@ const NAV_ITEMS = [
     { href: 'sms-blast.html',      icon: '💬', label: 'SMS рассылка',    adminOnly: true },
     { href: 'stories-studio.html',    icon: '✦',  label: 'Stories Studio',  adminOnly: true },
     { href: 'fb-ads-studio.html',     icon: '📢', label: 'FB Ads Studio',   adminOnly: true },
-    { href: 'instagram-settings.html', icon: '📸', label: 'Instagram',        adminOnly: true },
-    { href: 'instagram-history.html',  icon: '🕓', label: 'История Instagram', adminOnly: true },
+    { href: 'social-settings.html',    icon: '📱', label: 'Соц. сети',         adminOnly: true },
+    { href: 'cross-post-studio.html', icon: '✉️', label: 'Кросс-пост',        adminOnly: true },
+    { href: 'social-history.html',    icon: '🕓', label: 'История постов',     adminOnly: true },
 ];
 
 // Pages whose active state rolls up to a parent item
@@ -408,6 +409,8 @@ const PARENT_MAP = {
     'shows-edit.html':       'shows.html',
     'episodes-edit.html':    'shows.html',
     'episodes.html':         'shows.html',
+    'cross-post-studio.html': 'social-settings.html',
+    'social-history.html':    'social-settings.html',
 };
 
 function renderSidebar() {
