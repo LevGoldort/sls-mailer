@@ -178,6 +178,13 @@ class DynamoDBClient:
             traceback.print_exc()
             raise
 
+    def put_ticket_lookup(self, ticket_code: str, order_id: str):
+        self.orders_table.put_item(Item={
+            'PK': f'TICKET#{ticket_code}',
+            'SK': 'LOOKUP',
+            'order_id': order_id,
+        })
+
     def get_order(self, order_id: str) -> Optional[Dict]:
         """Получает заказ по ID"""
         print(f"[DEBUG] get_order called for order_id: {order_id}")
@@ -293,29 +300,13 @@ class DynamoDBClient:
         )
 
     def get_order_by_ticket_code(self, ticket_code: str) -> Optional[Dict]:
-        """Находит заказ по коду билета (сканирует все заказы)"""
-        # Scan orders table and filter by ticket code
-        # Note: This is not efficient for large datasets, but works for MVP
-        # TODO: Consider adding GSI for ticket codes if needed
-        
-        response = self.orders_table.scan()
-        
-        for item in response.get('Items', []):
-            qr_codes = item.get('qr_codes', [])
-            for qr in qr_codes:
-                if qr.get('code') == ticket_code:
-                    return item
-        
-        # Handle pagination if needed
-        while 'LastEvaluatedKey' in response:
-            response = self.orders_table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
-            for item in response.get('Items', []):
-                qr_codes = item.get('qr_codes', [])
-                for qr in qr_codes:
-                    if qr.get('code') == ticket_code:
-                        return item
-        
-        return None
+        response = self.orders_table.get_item(
+            Key={'PK': f'TICKET#{ticket_code}', 'SK': 'LOOKUP'}
+        )
+        lookup = response.get('Item')
+        if not lookup:
+            return None
+        return self.get_order(lookup['order_id'])
 
     def update_ticket_scanned_status(self, order_id: str, ticket_code: str, scanned: bool = True, scanned_by_event: str = None):
         """Атомарно обновляет статус сканирования.
@@ -369,8 +360,11 @@ class DynamoDBClient:
 
     def list_orders(self, limit: int = None) -> List[Dict]:
         """Получает список всех заказов (с пагинацией)"""
+        from boto3.dynamodb.conditions import Attr
         items = []
-        scan_params = {}
+        scan_params = {
+            'FilterExpression': Attr('PK').begins_with('ORDER#'),
+        }
 
         while True:
             response = self.orders_table.scan(**scan_params)

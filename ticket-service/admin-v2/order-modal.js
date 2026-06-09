@@ -283,6 +283,7 @@
             await API.cancelTickets(orderId, { qr_codes: codes });
             showToast(`${codes.length} билет(а) отменено`);
             await openOrderModal(orderId);
+            window.dispatchEvent(new CustomEvent('yb:orderUpdated', { detail: { orderId } }));
         } catch (err) {
             showToast('Ошибка отмены: ' + err.message, 'error');
             btn.disabled = false;

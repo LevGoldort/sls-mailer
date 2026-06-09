@@ -121,11 +121,30 @@
         (o.customer?.email || '').toLowerCase().includes(q) ||
         (o.customer?.phone || '').toLowerCase().includes(q) ||
         (o.customer?.name  || '').toLowerCase().includes(q) ||
-        (o.coupon_code || '').toLowerCase().includes(q);
+        (o.coupon_code || '').toLowerCase().includes(q) ||
+        (o.qr_codes || []).some(qr => (qr.code || '').toLowerCase().includes(q));
       const matchStatus = !status || (o.payment?.status || '') === status;
       const matchEvent  = !evId   || o.event_id === evId;
       return matchQ && matchStatus && matchEvent;
     });
+  }
+
+  function getOrderDisplayStatus(order) {
+    const paymentStatus = (order.payment || {}).status || 'pending';
+    if (paymentStatus !== 'completed') {
+      return { label: paymentStatus, cls: 'status-' + paymentStatus };
+    }
+    const qrCodes = order.qr_codes || [];
+    if (qrCodes.length > 0) {
+      const cancelledCount = qrCodes.filter(qr => qr.cancelled).length;
+      if (cancelledCount === qrCodes.length) {
+        return { label: 'cancelled', cls: 'status-cancelled' };
+      }
+      if (cancelledCount > 0) {
+        return { label: 'partially cancelled', cls: 'status-partially_cancelled' };
+      }
+    }
+    return { label: 'completed', cls: 'status-completed' };
   }
 
   function renderRows(orders, tbodyId) {
@@ -136,7 +155,7 @@
     }
     tbody.innerHTML = orders.map(o => {
       const ticketCount = (o.tickets || []).reduce((s, t) => s + (t.quantity || 0), 0);
-      const status = o.payment?.status || 'pending';
+      const status = getOrderDisplayStatus(o);
       const eventTitle = getEventTitle(o.event_id);
       return `
         <tr style="cursor:pointer;" onclick="openOrderModal('${o.order_id}')">
@@ -146,7 +165,7 @@
           <td class="hide-mobile" style="font-size:13px;">${escapeHtml(o.customer?.email || '-')}</td>
           <td class="hide-mobile">${ticketCount}</td>
           <td>${formatCurrency(o.total_amount)}</td>
-          <td><span class="status-badge status-${status}">${status}</span></td>
+          <td><span class="status-badge ${status.cls}">${status.label}</span></td>
           <td class="hide-mobile" style="font-size:13px;">${formatDate(o.created_at)}</td>
         </tr>`;
     }).join('');
@@ -184,6 +203,17 @@
   document.getElementById('search').addEventListener('input', render);
   document.getElementById('status-filter').addEventListener('change', render);
   document.getElementById('event-filter').addEventListener('change', render);
+
+  window.addEventListener('yb:orderUpdated', async ({ detail }) => {
+    try {
+      const fresh = await API.getOrder(detail.orderId);
+      const idx = allOrders.findIndex(o => o.order_id === detail.orderId);
+      if (idx !== -1) allOrders[idx] = fresh.order;
+      render();
+    } catch (e) {
+      console.warn('Failed to refresh order after update:', e);
+    }
+  });
 
   load();
 </script>

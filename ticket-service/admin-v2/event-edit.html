@@ -627,7 +627,8 @@
       o.order_id.toLowerCase().includes(q) ||
       (o.customer?.email  || '').toLowerCase().includes(q) ||
       (o.customer?.phone  || '').toLowerCase().includes(q) ||
-      (o.customer?.name   || '').toLowerCase().includes(q)
+      (o.customer?.name   || '').toLowerCase().includes(q) ||
+      (o.qr_codes || []).some(qr => (qr.code || '').toLowerCase().includes(q))
     ));
   }
 
@@ -683,6 +684,18 @@
       document.getElementById('save-status').textContent = 'Новое событие';
     }
   }
+
+  window.addEventListener('yb:orderUpdated', async ({ detail }) => {
+    const idx = allEventOrders.findIndex(o => o.order_id === detail.orderId);
+    if (idx === -1) return;
+    try {
+      const fresh = await API.getOrder(detail.orderId);
+      allEventOrders[idx] = fresh.order;
+      filterOrders();
+    } catch (e) {
+      console.warn('Failed to refresh order after update:', e);
+    }
+  });
 
   init();
 </script>

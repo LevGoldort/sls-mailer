@@ -504,8 +504,10 @@
         try {
             await API.cancelTickets(orderId, { qr_codes: codes });
             showToast(`${codes.length} ticket(s) cancelled successfully`);
-            // Reload modal
+            // Reload modal with fresh data
             await openOrderModal(orderId);
+            // Notify list pages to refresh this order's row
+            window.dispatchEvent(new CustomEvent('yb:orderUpdated', { detail: { orderId } }));
         } catch (err) {
             showToast('Failed to cancel tickets: ' + err.message, 'error');
             btn.disabled = false;

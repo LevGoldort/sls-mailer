@@ -2619,12 +2619,19 @@
                 displayOrders(allEventOrders);
                 return;
             }
+            const searchDigits = search.replace(/\D/g, '');
             const filtered = allEventOrders.filter(o => {
                 const customer = o.customer || {};
+                const phoneDigits = (customer.phone || '').replace(/\D/g, '');
+                const hasQrMatch = (o.qr_codes || []).some(qr =>
+                    (qr.code || '').toLowerCase().includes(search)
+                );
                 return (
                     o.order_id.toLowerCase().includes(search) ||
                     (customer.email || '').toLowerCase().includes(search) ||
-                    (customer.name || '').toLowerCase().includes(search)
+                    (customer.name || '').toLowerCase().includes(search) ||
+                    (searchDigits.length >= 4 && phoneDigits.includes(searchDigits)) ||
+                    hasQrMatch
                 );
             });
             displayOrders(filtered);
@@ -3657,6 +3664,18 @@
         };
 
         init();
+
+        window.addEventListener('yb:orderUpdated', async ({ detail }) => {
+            const idx = allEventOrders.findIndex(o => o.order_id === detail.orderId);
+            if (idx === -1) return;
+            try {
+                const fresh = await API.getOrder(detail.orderId);
+                allEventOrders[idx] = fresh.order;
+                filterOrders();
+            } catch (e) {
+                console.warn('Failed to refresh order after update:', e);
+            }
+        });
     </script>
 </body>
 </html>

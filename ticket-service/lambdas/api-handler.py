@@ -1600,6 +1600,8 @@ def create_order(request_event: Dict) -> Dict:
 
                 # 4. Сохраняем завершенный заказ с QR кодами
                 db.put_order(order.to_dynamodb_item())
+                for qr in order.qr_codes:
+                    db.put_ticket_lookup(qr.code, order.order_id)
                 print(f"Free order {order.order_id} completed successfully")
 
                 # 5. Триггерим email Lambda асинхронно
@@ -4480,6 +4482,8 @@ def handle_allpay_webhook(event: Dict) -> Dict:
 
                 # Сохраняем обновленный заказ с QR кодами
                 db.put_order(order.to_dynamodb_item())
+                for qr in order.qr_codes:
+                    db.put_ticket_lookup(qr.code, order.order_id)
                 print(f"Order {order_id} finalized with QR codes and tickets decremented")
 
                 # Trigger email Lambda asynchronously

@@ -407,6 +407,27 @@
             exportToCSV(buildCSV(allOrders), 'all-orders.csv');
         }
 
+        window.addEventListener('yb:orderUpdated', async ({ detail }) => {
+            try {
+                const fresh = await API.getOrder(detail.orderId);
+                const updated = fresh.order;
+                const replaceIn = (list) => {
+                    const idx = list.findIndex(o => o.order_id === detail.orderId);
+                    if (idx !== -1) list[idx] = updated;
+                };
+                replaceIn(activeOrders);
+                if (allOrders) replaceIn(allOrders);
+                const searchActive = document.getElementById('search-active').value.toLowerCase();
+                displayOrders(searchActive ? filterList(activeOrders, searchActive) : activeOrders, 'active-orders-container');
+                if (allOrders !== null) {
+                    const searchAll = document.getElementById('search-all').value.toLowerCase();
+                    displayOrders(searchAll ? filterList(allOrders, searchAll) : allOrders, 'all-orders-container');
+                }
+            } catch (e) {
+                console.warn('Failed to refresh order after update:', e);
+            }
+        });
+
         loadActiveOrders();
     </script>
 </body>
