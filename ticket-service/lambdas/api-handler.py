@@ -4707,6 +4707,7 @@ def handle_allpay_webhook(event: Dict) -> Dict:
                                     'order_id': order.order_id,
                                     'event_id': order.event_id,
                                     'event_title': event_title,
+                                    'tenant_id': event_item.get('tenant_id', '') if event_item else '',
                                     'tickets': total_tickets,
                                     'subtotal': Decimal(str(round(subtotal, 2))),
                                     'commission': Decimal(str(commission)),
@@ -4840,7 +4841,14 @@ def handle_influencers(event: Dict, method: str, path: str) -> Dict:
 
 
 def register_influencer(request_event: Dict) -> Dict:
-    """POST /api/influencers — public registration"""
+    """POST /api/influencers — platform_admin only"""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_platform_admin(ctx):
+        return error_response(403, "Only platform_admin can register influencers")
+
     try:
         body = json.loads(request_event.get('body') or '{}')
     except json.JSONDecodeError:
@@ -4937,23 +4945,41 @@ def get_influencer_dashboard(influencer_id: str) -> Dict:
 
 
 def list_influencers_admin(request_event: Dict) -> Dict:
-    """GET /api/influencers — admin only"""
-    tenant_id = None
+    """GET /api/influencers — admin only; returns per-tenant stats for non-platform_admin."""
+    ctx = None
     try:
         ctx = authenticate(request_event)
-        tenant_id = ctx.get("tenant_id")
     except AuthError:
         auth = get_admin_authenticator()
         if not auth.verify_admin_key(auth.extract_api_key(request_event)):
             return error_response(401, "Unauthorized")
-    items = db.list_influencers(tenant_id=tenant_id)
+
+    items = db.list_influencers()
     influencers = []
     for item in items:
         try:
-            inf = Influencer.from_dynamodb_item(item)
-            influencers.append(inf.to_dict())
+            influencers.append(Influencer.from_dynamodb_item(item).to_dict())
         except Exception as e:
             print(f"Error parsing influencer: {e}")
+
+    if ctx and not is_platform_admin(ctx):
+        tenant_id = ctx.get('tenant_id')
+        commissions = db.list_commissions_by_tenant(tenant_id)
+        agg = {}
+        for c in commissions:
+            iid = c.get('influencer_id', '')
+            if iid not in agg:
+                agg[iid] = {'total_sales': 0.0, 'total_commission': 0.0, 'orders_count': 0}
+            agg[iid]['total_sales']      += float(c.get('subtotal', 0))
+            agg[iid]['total_commission'] += float(c.get('commission', 0))
+            agg[iid]['orders_count']     += 1
+        for inf in influencers:
+            iid = inf['influencer_id']
+            t = agg.get(iid, {'total_sales': 0.0, 'total_commission': 0.0, 'orders_count': 0})
+            inf['total_sales']      = round(t['total_sales'], 2)
+            inf['total_commission'] = round(t['total_commission'], 2)
+            inf['orders_count']     = t['orders_count']
+
     return success_response({'influencers': influencers})
 
 

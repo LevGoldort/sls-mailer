@@ -853,6 +853,13 @@ class DynamoDBClient:
         )
         return response.get('Items', [])
 
+    def list_commissions_by_tenant(self, tenant_id: str) -> List[Dict]:
+        from boto3.dynamodb.conditions import Attr
+        response = self.influencers_table.scan(
+            FilterExpression=Attr('tenant_id').eq(tenant_id) & Attr('SK').begins_with('COMMISSION#')
+        )
+        return response.get('Items', [])
+
     def list_influencers(self, tenant_id: str = None) -> List[Dict]:
         from boto3.dynamodb.conditions import Attr
         if tenant_id:
