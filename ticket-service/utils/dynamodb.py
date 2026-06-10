@@ -45,6 +45,8 @@ class DynamoDBClient:
         self.social_posts_table = self.dynamodb.Table(self.social_posts_table_name)
         self.config_table_name = os.environ.get('CONFIG_TABLE', 'yallabalagan-config')
         self.config_table = self.dynamodb.Table(self.config_table_name)
+        self.tenants_table_name = os.environ.get('TENANTS_TABLE', 'yallabalagan-tenants')
+        self.tenants_table = self.dynamodb.Table(self.tenants_table_name)
 
     # ===== Events =====
     def put_event(self, event_item: Dict):
@@ -61,8 +63,14 @@ class DynamoDBClient:
         )
         return response.get('Item')
 
-    def list_events(self, limit: int = 50) -> List[Dict]:
-        """Получает список всех событий"""
+    def list_events(self, limit: int = 50, tenant_id: str = None) -> List[Dict]:
+        """Получает список событий; если задан tenant_id — фильтрует по нему."""
+        if tenant_id:
+            from boto3.dynamodb.conditions import Attr
+            response = self.events_table.scan(
+                FilterExpression=Attr('tenant_id').eq(tenant_id),
+            )
+            return response.get('Items', [])
         response = self.events_table.query(
             IndexName='GSI1',
             KeyConditionExpression='GSI1PK = :pk',
@@ -70,7 +78,7 @@ class DynamoDBClient:
                 ':pk': 'EVENT'
             },
             Limit=limit,
-            ScanIndexForward=True  # Сортировка по дате
+            ScanIndexForward=True
         )
         return response.get('Items', [])
 
@@ -145,10 +153,27 @@ class DynamoDBClient:
         items = response.get('Items', [])
         return items[0] if items else None
 
-    def list_locations(self, limit: int = 50) -> List[Dict]:
-        """Получает список всех локаций"""
-        response = self.locations_table.scan(Limit=limit)
-        return response.get('Items', [])
+    def list_locations(self, tenant_id: str = None, limit: int = 50) -> List[Dict]:
+        if tenant_id:
+            from boto3.dynamodb.conditions import Attr
+            own = self.locations_table.query(
+                IndexName='TenantIndex',
+                KeyConditionExpression='tenant_id = :tid',
+                ExpressionAttributeValues={':tid': tenant_id},
+            ).get('Items', [])
+            shared = self.locations_table.scan(
+                FilterExpression=Attr('allowed_tenants').contains(tenant_id)
+            ).get('Items', [])
+            seen = {i['PK'] for i in own}
+            return own + [i for i in shared if i['PK'] not in seen]
+        return self.locations_table.scan(Limit=limit).get('Items', [])
+
+    def update_location_sharing(self, location_id: str, allowed_tenants: List[str]):
+        self.locations_table.update_item(
+            Key={'PK': f'LOCATION#{location_id}', 'SK': 'METADATA'},
+            UpdateExpression='SET allowed_tenants = :at',
+            ExpressionAttributeValues={':at': allowed_tenants},
+        )
 
     def delete_location(self, location_id: str):
         """Удаляет локацию"""
@@ -395,20 +420,28 @@ class DynamoDBClient:
         )
         return response.get('Item')
 
-    def list_coupons(self, status: str = None, limit: int = 100) -> List[Dict]:
-        """Получает список купонов, опционально фильтрует по статусу"""
-        if status:
-            # Используем GSI для фильтрации по статусу
+    def list_coupons(self, status: str = None, tenant_id: str = None, limit: int = 100) -> List[Dict]:
+        """Получает список купонов, опционально фильтрует по статусу и/или tenant_id."""
+        from boto3.dynamodb.conditions import Attr
+        if tenant_id:
+            kwargs = {
+                'IndexName': 'TenantIndex',
+                'KeyConditionExpression': 'tenant_id = :tid',
+                'ExpressionAttributeValues': {':tid': tenant_id},
+            }
+            if status:
+                kwargs['FilterExpression'] = Attr('status').eq(status)
+            response = self.coupons_table.query(**kwargs)
+        elif status:
             response = self.coupons_table.query(
                 IndexName='StatusIndex',
                 KeyConditionExpression='#status = :status',
                 ExpressionAttributeNames={'#status': 'status'},
                 ExpressionAttributeValues={':status': status},
                 Limit=limit,
-                ScanIndexForward=False  # Сортировка по valid_until (новые первые)
+                ScanIndexForward=False,
             )
         else:
-            # Сканируем всю таблицу
             response = self.coupons_table.scan(Limit=limit)
 
         return response.get('Items', [])
@@ -478,6 +511,7 @@ class DynamoDBClient:
         return items[0] if items else None
 
     def list_performers(self, tenant_id: str = 'yallabalagan', status: str = None) -> List[Dict]:
+        from boto3.dynamodb.conditions import Attr
         gsi1pk = f'TENANT#{tenant_id}'
         kwargs = {
             'IndexName': 'TenantIndex',
@@ -487,8 +521,20 @@ class DynamoDBClient:
         if status:
             kwargs['KeyConditionExpression'] += ' AND begins_with(GSI1SK, :status_prefix)'
             kwargs['ExpressionAttributeValues'][':status_prefix'] = f'{status}#'
-        response = self.performers_table.query(**kwargs)
-        return response.get('Items', [])
+        own = self.performers_table.query(**kwargs).get('Items', [])
+        shared_kwargs = {'FilterExpression': Attr('allowed_tenants').contains(tenant_id)}
+        if status:
+            shared_kwargs['FilterExpression'] = shared_kwargs['FilterExpression'] & Attr('status').eq(status)
+        shared = self.performers_table.scan(**shared_kwargs).get('Items', [])
+        seen = {i['PK'] for i in own}
+        return own + [i for i in shared if i['PK'] not in seen]
+
+    def update_performer_sharing(self, performer_id: str, allowed_tenants: List[str]):
+        self.performers_table.update_item(
+            Key={'PK': f'PERFORMER#{performer_id}', 'SK': 'METADATA'},
+            UpdateExpression='SET allowed_tenants = :at',
+            ExpressionAttributeValues={':at': allowed_tenants},
+        )
 
     def delete_performer(self, performer_id: str):
         return self.performers_table.delete_item(
@@ -515,7 +561,14 @@ class DynamoDBClient:
         items = response.get('Items', [])
         return items[0] if items else None
 
-    def list_products(self, status: str = 'active') -> List[Dict]:
+    def list_products(self, status: str = 'active', tenant_id: str = None) -> List[Dict]:
+        if tenant_id:
+            from boto3.dynamodb.conditions import Attr
+            fe = Attr('tenant_id').eq(tenant_id)
+            if status:
+                fe = fe & Attr('status').eq(status)
+            response = self.products_table.scan(FilterExpression=fe)
+            return response.get('Items', [])
         response = self.products_table.query(
             IndexName='StatusIndex',
             KeyConditionExpression='GSI2PK = :status',
@@ -715,9 +768,27 @@ class DynamoDBClient:
         items = response.get('Items', [])
         return items[0] if items else None
 
-    def list_shows(self) -> List[Dict]:
-        response = self.shows_table.scan()
-        return response.get('Items', [])
+    def list_shows(self, tenant_id: str = None) -> List[Dict]:
+        if tenant_id:
+            from boto3.dynamodb.conditions import Attr
+            own = self.shows_table.query(
+                IndexName='TenantIndex',
+                KeyConditionExpression='tenant_id = :tid',
+                ExpressionAttributeValues={':tid': tenant_id},
+            ).get('Items', [])
+            shared = self.shows_table.scan(
+                FilterExpression=Attr('allowed_tenants').contains(tenant_id)
+            ).get('Items', [])
+            seen = {i['PK'] for i in own}
+            return own + [i for i in shared if i['PK'] not in seen]
+        return self.shows_table.scan().get('Items', [])
+
+    def update_show_sharing(self, show_id: str, allowed_tenants: List[str]):
+        self.shows_table.update_item(
+            Key={'PK': f'SHOW#{show_id}', 'SK': 'METADATA'},
+            UpdateExpression='SET allowed_tenants = :at',
+            ExpressionAttributeValues={':at': allowed_tenants},
+        )
 
     def delete_show(self, show_id: str):
         return self.shows_table.delete_item(
@@ -782,11 +853,18 @@ class DynamoDBClient:
         )
         return response.get('Items', [])
 
-    def list_influencers(self) -> List[Dict]:
+    def list_influencers(self, tenant_id: str = None) -> List[Dict]:
         from boto3.dynamodb.conditions import Attr
-        response = self.influencers_table.scan(
-            FilterExpression=Attr('SK').eq('METADATA')
-        )
+        if tenant_id:
+            response = self.influencers_table.query(
+                IndexName='TenantIndex',
+                KeyConditionExpression='tenant_id = :tid',
+                ExpressionAttributeValues={':tid': tenant_id},
+            )
+        else:
+            response = self.influencers_table.scan(
+                FilterExpression=Attr('SK').eq('METADATA')
+            )
         return response.get('Items', [])
 
     def add_influencer_commission(self, commission_item: Dict):
@@ -852,11 +930,18 @@ class DynamoDBClient:
         resp = self.instagram_table.get_item(Key={'PK': 'CONNECTION', 'SK': ig_user_id})
         return resp.get('Item')
 
-    def list_instagram_connections(self) -> List[dict]:
-        from boto3.dynamodb.conditions import Key as DKey
-        resp = self.instagram_table.query(
-            KeyConditionExpression=DKey('PK').eq('CONNECTION'),
-        )
+    def list_instagram_connections(self, tenant_id: str = None) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey, Attr
+        if tenant_id:
+            resp = self.instagram_table.query(
+                IndexName='TenantIndex',
+                KeyConditionExpression='tenant_id = :tid',
+                ExpressionAttributeValues={':tid': tenant_id},
+            )
+        else:
+            resp = self.instagram_table.query(
+                KeyConditionExpression=DKey('PK').eq('CONNECTION'),
+            )
         return resp.get('Items', [])
 
     def delete_instagram_connection(self, ig_user_id: str):
@@ -893,11 +978,18 @@ class DynamoDBClient:
         resp = self.tiktok_table.get_item(Key={'PK': 'CONNECTION', 'SK': tiktok_user_id})
         return resp.get('Item')
 
-    def list_tiktok_connections(self) -> List[dict]:
+    def list_tiktok_connections(self, tenant_id: str = None) -> List[dict]:
         from boto3.dynamodb.conditions import Key as DKey
-        resp = self.tiktok_table.query(
-            KeyConditionExpression=DKey('PK').eq('CONNECTION'),
-        )
+        if tenant_id:
+            resp = self.tiktok_table.query(
+                IndexName='TenantIndex',
+                KeyConditionExpression='tenant_id = :tid',
+                ExpressionAttributeValues={':tid': tenant_id},
+            )
+        else:
+            resp = self.tiktok_table.query(
+                KeyConditionExpression=DKey('PK').eq('CONNECTION'),
+            )
         return resp.get('Items', [])
 
     def delete_tiktok_connection(self, tiktok_user_id: str):
@@ -926,11 +1018,18 @@ class DynamoDBClient:
         resp = self.youtube_table.get_item(Key={'PK': 'CONNECTION', 'SK': channel_id})
         return resp.get('Item')
 
-    def list_youtube_connections(self) -> List[dict]:
+    def list_youtube_connections(self, tenant_id: str = None) -> List[dict]:
         from boto3.dynamodb.conditions import Key as DKey
-        resp = self.youtube_table.query(
-            KeyConditionExpression=DKey('PK').eq('CONNECTION'),
-        )
+        if tenant_id:
+            resp = self.youtube_table.query(
+                IndexName='TenantIndex',
+                KeyConditionExpression='tenant_id = :tid',
+                ExpressionAttributeValues={':tid': tenant_id},
+            )
+        else:
+            resp = self.youtube_table.query(
+                KeyConditionExpression=DKey('PK').eq('CONNECTION'),
+            )
         return resp.get('Items', [])
 
     def delete_youtube_connection(self, channel_id: str):
@@ -952,13 +1051,17 @@ class DynamoDBClient:
         resp = self.social_posts_table.get_item(Key={'PK': 'POST', 'SK': post_id})
         return resp.get('Item')
 
-    def list_social_posts(self, limit: int = 50) -> List[dict]:
-        from boto3.dynamodb.conditions import Key as DKey
-        resp = self.social_posts_table.query(
-            KeyConditionExpression=DKey('PK').eq('POST'),
-            ScanIndexForward=False,
-            Limit=limit,
-        )
+    def list_social_posts(self, limit: int = 50, tenant_id: str = None) -> List[dict]:
+        from boto3.dynamodb.conditions import Key as DKey, Attr
+        kwargs = {
+            'KeyConditionExpression': DKey('PK').eq('POST'),
+            'ScanIndexForward': False,
+        }
+        if tenant_id:
+            kwargs['FilterExpression'] = Attr('tenant_id').eq(tenant_id)
+        else:
+            kwargs['Limit'] = limit
+        resp = self.social_posts_table.query(**kwargs)
         return resp.get('Items', [])
 
     def update_social_post(self, post_id: str, updates: dict):
@@ -995,6 +1098,31 @@ class DynamoDBClient:
             IndexName='StatusScheduledIndex',
             KeyConditionExpression=DKey('status').eq('scheduled') & DKey('scheduled_at').lte(now),
         )
+        return resp.get('Items', [])
+
+    # ===== Tenants =====
+
+    def put_tenant(self, item: Dict):
+        self.tenants_table.put_item(Item=item)
+
+    def get_tenant(self, tenant_id: str) -> Optional[Dict]:
+        resp = self.tenants_table.get_item(
+            Key={'PK': f'TENANT#{tenant_id}', 'SK': 'METADATA'}
+        )
+        return resp.get('Item')
+
+    def get_tenant_by_slug(self, slug: str) -> Optional[Dict]:
+        resp = self.tenants_table.query(
+            IndexName='SlugIndex',
+            KeyConditionExpression='slug = :slug',
+            ExpressionAttributeValues={':slug': slug},
+            Limit=1,
+        )
+        items = resp.get('Items', [])
+        return items[0] if items else None
+
+    def list_tenants(self) -> List[Dict]:
+        resp = self.tenants_table.scan()
         return resp.get('Items', [])
 
     # ===== Studio HTML Templates =====

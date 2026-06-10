@@ -16,6 +16,7 @@ class Influencer:
     audience_size: str
     coupon_code: str
     status: str = "active"
+    tenant_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     total_sales: float = 0.0
     total_commission: float = 0.0
@@ -38,6 +39,7 @@ class Influencer:
             "coupon_code": self.coupon_code,
             "status": self.status,
             "created_at": self.created_at,
+            **({"tenant_id": self.tenant_id} if self.tenant_id else {}),
             "total_sales": Decimal(str(round(self.total_sales, 2))),
             "total_commission": Decimal(str(round(self.total_commission, 2))),
             "orders_count": self.orders_count,
@@ -54,6 +56,7 @@ class Influencer:
             audience_size=item.get("audience_size", ""),
             coupon_code=item["coupon_code"],
             status=item.get("status", "active"),
+            tenant_id=item.get("tenant_id"),
             created_at=item.get("created_at", ""),
             total_sales=float(item.get("total_sales", 0)),
             total_commission=float(item.get("total_commission", 0)),

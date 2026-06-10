@@ -76,16 +76,17 @@
       const addrStr = addrObj && typeof addrObj === 'object'
         ? [addrObj.street, addrObj.city].filter(Boolean).join(', ')
         : (addrObj || '—');
+      const actions = loc._readonly
+        ? `<button class="btn btn-ghost btn-sm" onclick="removeSharing('${loc.location_id}')">Убрать</button>`
+        : `<button class="btn btn-ghost btn-sm" onclick="navigateTo('location-edit.html?id=${loc.location_id}')">Редактировать</button>
+           <button class="btn btn-danger btn-sm" onclick="deleteLocation('${loc.location_id}','${escapeHtml(loc.name).replace(/'/g,"\\'")}')">Удалить</button>`;
       return `<tr>
         <td style="font-weight:500;">${escapeHtml(loc.name)}</td>
         <td class="hide-mobile">${escapeHtml(loc.city || '—')}</td>
         <td class="hide-mobile">${loc.capacity ? loc.capacity + ' мест' : '—'}</td>
         <td>${typeLabel}</td>
         <td class="hide-mobile" style="font-size:13px;color:var(--gray-mid);">${escapeHtml(addrStr)}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-ghost btn-sm" onclick="navigateTo('location-edit.html?id=${loc.location_id}')">Редактировать</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteLocation('${loc.location_id}','${escapeHtml(loc.name).replace(/'/g,"\\'")}')">Удалить</button>
-        </td>
+        <td style="white-space:nowrap;">${actions}</td>
       </tr>`;
     }).join('');
   }
@@ -97,6 +98,16 @@
       showToast('Локация удалена');
       load();
     } catch (err) { handleError(err, 'Ошибка удаления'); }
+  }
+
+  async function removeSharing(id) {
+    if (!confirm('Убрать эту локацию из вашего доступа?')) return;
+    try {
+      await apiCall(`/api/locations/${id}/sharing`, 'DELETE');
+      allLocations = allLocations.filter(l => l.location_id !== id);
+      render();
+      showToast('Убрано');
+    } catch (err) { handleError(err, 'Ошибка'); }
   }
 
   document.getElementById('search').addEventListener('input', render);

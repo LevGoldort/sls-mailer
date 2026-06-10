@@ -48,13 +48,17 @@ def _jwt_auth(token: str) -> dict:
     except TokenInvalidError as exc:
         raise AuthError(f"Invalid access token: {exc}")
 
-    return {
+    ctx = {
         "user_id": payload["sub"],
         "tenant_id": payload["tenant_id"],
         "email": payload["email"],
         "role": payload["role"],
         "auth_method": "jwt",
     }
+    if payload.get("is_mimicking"):
+        ctx["is_mimicking"] = True
+        ctx["original_tenant_id"] = payload.get("original_tenant_id")
+    return ctx
 
 
 def _api_key_auth(api_key: str) -> dict:

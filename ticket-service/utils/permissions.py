@@ -24,6 +24,7 @@ from typing import Union
 #   "*"                  — wildcard: all permissions (admin only)
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
+    "platform_admin": {"*", "tenants:manage"},
     "admin": {"*"},
     "content_manager": {
         "events:write",
@@ -67,6 +68,16 @@ def is_admin(user: Union[dict, object], tenant_id: str) -> bool:
 def can_manage_users(user: Union[dict, object], tenant_id: str) -> bool:
     """Only admins may create, update, or deactivate users."""
     return is_admin(user, tenant_id)
+
+
+def is_platform_admin(user: Union[dict, object]) -> bool:
+    """Return True if user has the platform_admin role (cross-tenant powers)."""
+    return _role(user) == "platform_admin"
+
+
+def can_manage_tenants(user: Union[dict, object]) -> bool:
+    """Only platform_admin may create, update, or list tenants."""
+    return is_platform_admin(user)
 
 
 def can_access_event(

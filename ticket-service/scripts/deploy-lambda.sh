@@ -20,6 +20,7 @@ echo "📦 Creating deployment package in $TEMP_DIR"
 # Копируем код
 cp -r models "$TEMP_DIR/"
 cp -r utils "$TEMP_DIR/"
+cp -r repositories "$TEMP_DIR/"
 mkdir -p "$TEMP_DIR/lambdas"
 cp lambdas/api-handler.py "$TEMP_DIR/lambdas/api-handler.py"
 

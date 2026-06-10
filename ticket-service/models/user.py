@@ -16,7 +16,7 @@ class User:
     email: str
     password_hash: str
     name: str
-    role: str        # 'admin' | 'organizer' — скоуплен к тенанту
+    role: str        # 'platform_admin' | 'admin' | 'organizer' | 'content_manager'
     status: str      # 'active' | 'inactive'
     created_at: str
     updated_at: str

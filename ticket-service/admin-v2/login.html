@@ -25,6 +25,11 @@
         <input class="form-input" type="password" id="password" name="password"
                placeholder="••••••••" required autocomplete="current-password">
       </div>
+      <div class="form-group">
+        <label class="form-label" for="tenant_id" style="font-size:12px;color:var(--gray-mid);">Тенант <span style="font-weight:400;">(оставьте пустым для Yalla Balagan)</span></label>
+        <input class="form-input" type="text" id="tenant_id" name="tenant_id"
+               placeholder="slug тенанта" autocomplete="off">
+      </div>
       <button class="btn btn-primary btn-lg" type="submit" id="submit-btn">
         Войти
       </button>
@@ -56,9 +61,10 @@
 
     const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
+    const tenantId = document.getElementById('tenant_id').value.trim();
 
     try {
-      await Auth.login(email, password);
+      await Auth.login(email, password, tenantId || null);
       window.location.href = 'index.html';
     } catch (err) {
       errEl.textContent = err.message || 'Ошибка входа';

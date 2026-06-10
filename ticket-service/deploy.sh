@@ -230,7 +230,8 @@ cat > /tmp/ticket-api-env.json <<EOF
     "FB_AD_ACCOUNT_ID": "${FbAdAccountId}",
     "FB_PAGE_ID": "${FbPageId}",
     "FB_SYSTEM_USER_TOKEN": "${FbSystemUserToken}",
-    "FB_PIXEL_ID": "${FB_PIXEL_ID}"
+    "FB_PIXEL_ID": "${FB_PIXEL_ID}",
+    "TENANTS_TABLE": "yallabalagan-tenants"
   }
 }
 EOF
@@ -255,6 +256,7 @@ cat > /tmp/user-api-env.json <<EOF
     "JWT_SECRET": "${JWT_SECRET}",
     "USERS_TABLE": "yallabalagan-users",
     "REFRESH_TOKENS_TABLE": "yallabalagan-refresh-tokens",
+    "TENANTS_TABLE": "yallabalagan-tenants",
     "TENANT_ID": "yallabalagan",
     "ENVIRONMENT": "${ENV}"
   }
@@ -301,7 +303,7 @@ else
   fi
 
   # Create routes (idempotent)
-  for ROUTE_KEY in "ANY /api/auth/{proxy+}" "ANY /api/users" "ANY /api/users/{proxy+}"; do
+  for ROUTE_KEY in "ANY /api/auth/{proxy+}" "ANY /api/users" "ANY /api/users/{proxy+}" "ANY /api/tenants" "ANY /api/tenants/{proxy+}"; do
     EXISTING_ROUTE=$(aws apigatewayv2 get-routes \
       --api-id "$API_ID" \
       --query "Items[?RouteKey=='${ROUTE_KEY}'].RouteId | [0]" \
@@ -559,6 +561,19 @@ REGEN_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-shows"
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-episodes"
 ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-config"
+
+ensure_table "yallabalagan-tenants" \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S AttributeName=slug,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+  --global-secondary-indexes '[{"IndexName":"SlugIndex","KeySchema":[{"AttributeName":"slug","KeyType":"HASH"}],"Projection":{"ProjectionType":"ALL"}}]'
+
+ensure_dynamodb_policy "$TICKET_API_ROLE" "yallabalagan-tenants"
+
+USER_API_ROLE=$(aws lambda get-function-configuration --function-name yallabalagan-user-api \
+  --region "$REGION" --profile "$PROFILE" --query 'Role' --output text 2>/dev/null | sed 's|.*/||' || echo "")
+if [ -n "$USER_API_ROLE" ]; then
+  ensure_dynamodb_policy "$USER_API_ROLE" "yallabalagan-tenants"
+fi
 ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-shows"
 ensure_dynamodb_policy "$REGEN_ROLE" "yallabalagan-episodes"
 

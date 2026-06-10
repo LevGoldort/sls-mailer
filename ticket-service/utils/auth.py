@@ -42,7 +42,7 @@ class AdminAuthenticator:
             try:
                 from utils.auth_jwt import decode_access_token
                 payload = decode_access_token(api_key)
-                return payload.get('role') == 'admin'
+                return payload.get('role') in ('admin', 'platform_admin')
             except Exception:
                 return False
 

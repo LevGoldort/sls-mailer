@@ -5,7 +5,7 @@ version = 0.1
 ##############################################################################
 [default.deploy.parameters]
 stack_name = "yallabalagan-ticket-service-prod"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-prod"
+s3_bucket = "yallabalagan-sam-artifacts-prod"
 s3_prefix = "yallabalagan-ticket-service"
 region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"

@@ -1,16 +1,21 @@
-"""User API Lambda — auth and user management endpoints.
+"""User API Lambda — auth, user management, and tenant management endpoints.
 
 Routes:
   POST /api/auth/login
   POST /api/auth/refresh
   POST /api/auth/logout
   POST /api/auth/change-password
+  POST /api/auth/switch-tenant
   GET    /api/users
   POST   /api/users
   GET    /api/users/{id}
   PUT    /api/users/{id}
   DELETE /api/users/{id}
   POST   /api/users/{id}/reset-password
+  GET    /api/tenants
+  POST   /api/tenants
+  GET    /api/tenants/{id}
+  PUT    /api/tenants/{id}
 """
 import json
 import os
@@ -27,14 +32,16 @@ from utils.auth_jwt import (
 )
 from utils.auth_middleware import authenticate, AuthError, stamp_deprecation_header
 from utils.auth_password import hash_password, verify_password
-from utils.permissions import can_manage_users
+from utils.permissions import can_manage_users, can_manage_tenants, is_platform_admin
 from utils.refresh_token_service import (
     store_refresh_token,
     validate_refresh_token,
     revoke_refresh_token,
 )
 from repositories import user_repository
+import repositories.tenant_repository as tenant_repository
 from models.user import User
+from models.tenant import Tenant
 from utils.rate_limiter import is_rate_limited, reset_rate_limit
 
 
@@ -90,7 +97,10 @@ def handle_login(event: dict) -> dict:
     if is_rate_limited(ip):
         return err(429, "Too many login attempts. Please try again later.")
 
-    tenant_id = os.environ.get("TENANT_ID", "yallabalagan")
+    tenant_raw = (body.get("tenant_id") or "").strip() or os.environ.get("TENANT_ID", "yallabalagan")
+    # Resolve slug → UUID (login form sends slugs, users are stored under UUIDs)
+    resolved = tenant_repository.get_tenant_by_slug(tenant_raw)
+    tenant_id = resolved.tenant_id if resolved else tenant_raw
     user = user_repository.get_user_by_email(email, tenant_id)
 
     if not user or not user.is_active():
@@ -196,7 +206,7 @@ def handle_change_password(event: dict) -> dict:
 # User management helpers
 # ---------------------------------------------------------------------------
 
-VALID_ROLES = {"admin", "organizer", "content_manager"}
+VALID_ROLES = {"admin", "organizer", "content_manager", "platform_admin"}
 
 
 def _require_admin(event: dict):
@@ -256,7 +266,13 @@ def handle_create_user(event: dict) -> dict:
     if len(password) < 8:
         return err(400, "password must be at least 8 characters")
 
-    tenant_id = _tenant(ctx)
+    # platform_admin not mimicking can specify a target tenant_id in the body
+    if is_platform_admin(ctx) and not ctx.get("is_mimicking") and body.get("tenant_id"):
+        tenant_id = body["tenant_id"]
+        if not tenant_repository.get_tenant_by_id(tenant_id):
+            return err(404, f"Tenant '{tenant_id}' not found")
+    else:
+        tenant_id = _tenant(ctx)
     if user_repository.get_user_by_email(email, tenant_id):
         return err(409, "A user with this email already exists")
 
@@ -344,6 +360,132 @@ def handle_reset_password(event: dict, user_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Tenant switch (platform_admin only)
+# ---------------------------------------------------------------------------
+
+def handle_switch_tenant(event: dict) -> dict:
+    try:
+        ctx = authenticate(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    if not is_platform_admin(ctx):
+        return err(403, "Only platform_admin can switch tenants")
+    if ctx.get("is_mimicking"):
+        return err(403, "Already mimicking a tenant — exit first")
+
+    body = parse_body(event)
+    target_tenant_id = (body.get("tenant_id") or "").strip()
+    if not target_tenant_id:
+        return err(400, "tenant_id is required")
+
+    tenant = tenant_repository.get_tenant_by_id(target_tenant_id)
+    if not tenant:
+        return err(404, "Tenant not found")
+    if tenant.status != "active":
+        return err(409, "Tenant is inactive")
+
+    mimic_token = generate_access_token(
+        user_id=ctx["user_id"],
+        tenant_id=target_tenant_id,
+        email=ctx["email"],
+        role="admin",
+        is_mimicking=True,
+        original_tenant_id=ctx["tenant_id"],
+    )
+    return ok({
+        "access_token": mimic_token,
+        "tenant": tenant.to_api_dict(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Tenant management (platform_admin only)
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+_SLUG_RE = _re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+
+
+def _require_platform_admin(event: dict) -> dict:
+    ctx = authenticate(event)
+    if not can_manage_tenants(ctx):
+        raise AuthError("platform_admin access required", status_code=403)
+    return ctx
+
+
+def handle_list_tenants(event: dict) -> dict:
+    try:
+        _require_platform_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    tenants = tenant_repository.list_tenants()
+    return ok({"tenants": [t.to_api_dict() for t in tenants]})
+
+
+def handle_create_tenant(event: dict) -> dict:
+    try:
+        _require_platform_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    body = parse_body(event)
+    name = (body.get("name") or "").strip()
+    slug = (body.get("slug") or "").strip().lower()
+
+    if not name or not slug:
+        return err(400, "name and slug are required")
+    if not _SLUG_RE.match(slug):
+        return err(400, "slug must be lowercase alphanumeric with hyphens only")
+
+    if tenant_repository.get_tenant_by_slug(slug):
+        return err(409, "A tenant with this slug already exists")
+
+    tenant = Tenant.create(name=name, slug=slug)
+    tenant_repository.create_tenant(tenant)
+    return ok({"tenant": tenant.to_api_dict()}, status=201)
+
+
+def handle_get_tenant(event: dict, tenant_id: str) -> dict:
+    try:
+        _require_platform_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    tenant = tenant_repository.get_tenant_by_id(tenant_id)
+    if not tenant:
+        return err(404, "Tenant not found")
+    return ok({"tenant": tenant.to_api_dict()})
+
+
+def handle_update_tenant(event: dict, tenant_id: str) -> dict:
+    try:
+        _require_platform_admin(event)
+    except AuthError as e:
+        return err(e.status_code, str(e))
+
+    tenant = tenant_repository.get_tenant_by_id(tenant_id)
+    if not tenant:
+        return err(404, "Tenant not found")
+
+    body = parse_body(event)
+    if "name" in body:
+        name = (body["name"] or "").strip()
+        if not name:
+            return err(400, "name cannot be empty")
+        tenant.name = name
+    if "status" in body:
+        if body["status"] not in {"active", "inactive"}:
+            return err(400, "status must be 'active' or 'inactive'")
+        tenant.status = body["status"]
+
+    tenant_repository.update_tenant(tenant)
+    return ok({"tenant": tenant.to_api_dict()})
+
+
+# ---------------------------------------------------------------------------
 # Lambda entry point
 # ---------------------------------------------------------------------------
 
@@ -378,6 +520,29 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> dict:
             response = handle_logout(event)
         elif path == "/api/auth/change-password" and method == "POST":
             response = handle_change_password(event)
+        elif path == "/api/auth/switch-tenant" and method == "POST":
+            response = handle_switch_tenant(event)
+
+        # /api/tenants routing
+        elif path == "/api/tenants":
+            if method == "GET":
+                response = handle_list_tenants(event)
+            elif method == "POST":
+                response = handle_create_tenant(event)
+            else:
+                response = err(405, "Method not allowed")
+        elif path.startswith("/api/tenants/"):
+            parts = path.split("/")
+            if len(parts) == 4:
+                tid = parts[3]
+                if method == "GET":
+                    response = handle_get_tenant(event, tid)
+                elif method == "PUT":
+                    response = handle_update_tenant(event, tid)
+                else:
+                    response = err(405, "Method not allowed")
+            else:
+                response = err(404, "Endpoint not found")
 
         # /api/users routing
         elif path == "/api/users":

@@ -46,20 +46,13 @@ def generate_access_token(
     tenant_id: str,
     email: str,
     role: str,
+    is_mimicking: bool = False,
+    original_tenant_id: Optional[str] = None,
 ) -> str:
-    """
-    Генерирует JWT access token (15 минут).
+    """Generates a JWT access token (15 minutes).
 
-    Payload: sub, tenant_id, email, role, exp, iat, type.
-
-    Args:
-        user_id:   ID пользователя (sub).
-        tenant_id: ID тенанта ('yallabalagan' сейчас).
-        email:     Email пользователя.
-        role:      Роль ('admin' | 'organizer').
-
-    Returns:
-        Подписанный JWT в виде строки.
+    When is_mimicking=True the token acts as `tenant_id` but carries
+    `original_tenant_id` so the client can restore the original session.
     """
     now = datetime.now(timezone.utc)
     payload = {
@@ -71,6 +64,9 @@ def generate_access_token(
         "iat": now,
         "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     }
+    if is_mimicking:
+        payload["is_mimicking"] = True
+        payload["original_tenant_id"] = original_tenant_id
     return jwt.encode(payload, _get_secret(), algorithm=ALGORITHM)
 
 

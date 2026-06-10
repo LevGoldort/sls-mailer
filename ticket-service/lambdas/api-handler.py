@@ -27,8 +27,13 @@ from utils.dynamodb import DynamoDBClient
 from utils.payment import get_payment_provider, parse_webhook_payload
 from utils.auth import get_admin_authenticator, is_scanner_or_admin, verify_scanner_token
 from utils.auth_middleware import authenticate, AuthError
-from utils.permissions import can_access_event, has_permission, is_admin
+from utils.permissions import can_access_event, has_permission, is_admin, is_platform_admin
 from datetime import datetime, timezone
+
+
+def _owns_record(ctx: dict, record_item: dict) -> bool:
+    """True if ctx's tenant owns this record, or if platform_admin (can edit anything)."""
+    return record_item.get('tenant_id') == ctx.get('tenant_id') or is_platform_admin(ctx)
 
 
 # Helper для конвертации Decimal в int/float
@@ -163,6 +168,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_image_upload(event)
         elif path == '/api/upload-image/quick' and http_method == 'POST':
             return handle_quick_image_upload(event)
+        elif path == '/api/sharing/bulk' and http_method == 'POST':
+            return handle_bulk_sharing(event)
         elif path == '/api/admin/regenerate-site' and http_method == 'POST':
             return handle_regenerate_site(event)
         elif path == '/api/webhooks/allpay' and http_method == 'POST':
@@ -249,11 +256,13 @@ def list_events(request_event: Dict = None) -> Dict:
         except AuthError:
             pass  # unauthenticated requests see all events (public endpoint)
 
-    # Organizer sees only their own events
+    # Organizer sees only their own events; admins see their tenant's events
     if ctx and not has_permission(ctx, "events:write") and has_permission(ctx, "events:write_own"):
         items = db.list_events_by_owner(ctx['user_id'])
+    elif ctx:
+        items = db.list_events(tenant_id=ctx.get('tenant_id'))
     else:
-        items = db.list_events()
+        items = db.list_events()  # public endpoint — no tenant filter
 
     events = []
     for item in items:
@@ -913,7 +922,7 @@ def handle_locations(event: Dict, method: str, path: str) -> Dict:
 
     # GET /api/locations - список локаций
     if method == 'GET' and path == '/api/locations':
-        return list_locations()
+        return list_locations(event)
 
     # GET /api/locations/{id} - детали локации
     if method == 'GET' and path.startswith('/api/locations/'):
@@ -928,6 +937,16 @@ def handle_locations(event: Dict, method: str, path: str) -> Dict:
     if method == 'POST' and path == '/api/locations':
         return create_location(event)
 
+    # PATCH /api/locations/{id}/sharing - управление шарингом (platform_admin)
+    if method == 'PATCH' and path.endswith('/sharing'):
+        location_id = path.split('/')[-2]
+        return patch_location_sharing(location_id, event)
+
+    # DELETE /api/locations/{id}/sharing - убрать себя из шаринга (любой тенант)
+    if method == 'DELETE' and path.endswith('/sharing'):
+        location_id = path.split('/')[-2]
+        return delete_location_sharing(location_id, event)
+
     # PUT /api/locations/{id} - обновить локацию (admin)
     if method == 'PUT' and path.startswith('/api/locations/'):
         location_id = path.split('/')[-1]
@@ -941,15 +960,25 @@ def handle_locations(event: Dict, method: str, path: str) -> Dict:
     return error_response(404, "Locations endpoint not found")
 
 
-def list_locations() -> Dict:
+def list_locations(request_event: Dict) -> Dict:
     """GET /api/locations"""
-    items = db.list_locations()
+    tenant_id = None
+    try:
+        ctx = authenticate(request_event)
+        tenant_id = ctx.get("tenant_id")
+    except AuthError:
+        pass
+
+    items = db.list_locations(tenant_id=tenant_id)
 
     locations = []
     for item in items:
         try:
             loc = Location.from_dynamodb_item(item)
-            locations.append(loc.to_dynamodb_item())
+            d = loc.to_dynamodb_item()
+            if tenant_id and item.get('tenant_id') != tenant_id:
+                d['_readonly'] = True
+            locations.append(d)
         except Exception as e:
             print(f"Error parsing location: {e}")
             continue
@@ -1075,7 +1104,8 @@ def create_location(request_event: Dict) -> Dict:
             short_description=body.get('short_description', ''),
             parkings=parkings,
             media=media,
-            venue_config=venue_config
+            venue_config=venue_config,
+            tenant_id=ctx.get('tenant_id', 'yallabalagan'),
         )
 
         # Сохраняем в DynamoDB
@@ -1107,14 +1137,14 @@ def update_location(location_id: str, request_event: Dict) -> Dict:
         return error_response(403, "Access denied")
 
     try:
-        # Проверяем что локация существует
         item = db.get_location(location_id)
         if not item:
             return error_response(404, "Location not found")
+        if not _owns_record(ctx, item):
+            return error_response(403, "This record belongs to another tenant")
 
         body = json.loads(request_event.get('body', '{}'))
 
-        # Получаем текущую локацию
         loc = Location.from_dynamodb_item(item)
 
         # Обновляем поля
@@ -1220,6 +1250,8 @@ def delete_location(location_id: str, request_event: Dict) -> Dict:
     item = db.get_location(location_id)
     if not item:
         return error_response(404, "Location not found")
+    if not _owns_record(ctx, item):
+        return error_response(403, "This record belongs to another tenant")
 
     db.delete_location(location_id)
 
@@ -1302,6 +1334,17 @@ def handle_orders(event: Dict, method: str, path: str) -> Dict:
     return error_response(404, "Orders endpoint not found")
 
 
+def _token_tenant_id(token: str) -> str | None:
+    """Extract tenant_id from a JWT access token; returns None for API keys."""
+    if token and token.startswith('eyJ'):
+        try:
+            from utils.auth_jwt import decode_access_token
+            return decode_access_token(token).get('tenant_id')
+        except Exception:
+            pass
+    return None
+
+
 def list_orders_by_event(event_id: str, request_event: Dict) -> Dict:
     """ADMIN ONLY - GET /api/orders?event_id=xxx - список заказов для события"""
 
@@ -1315,6 +1358,13 @@ def list_orders_by_event(event_id: str, request_event: Dict) -> Dict:
             'ip': get_client_identifier(request_event)
         })
         return error_response(401, "Unauthorized: Admin access required")
+
+    # Tenant isolation: verify this event belongs to the requester's tenant
+    tenant_id = _token_tenant_id(api_key)
+    if tenant_id:
+        event_item = db.get_event(event_id)
+        if not event_item or event_item.get('tenant_id') != tenant_id:
+            return error_response(403, "Access denied")
 
     try:
         items = db.get_orders_by_event(event_id)
@@ -1358,7 +1408,13 @@ def list_all_orders(request_event: Dict) -> Dict:
         return error_response(401, "Unauthorized: Admin access required")
 
     try:
-        items = db.list_orders()
+        tenant_id = _token_tenant_id(api_key)
+        if tenant_id:
+            tenant_event_ids = {e.get('event_id') for e in db.list_events(tenant_id=tenant_id)}
+            all_orders = db.list_orders()
+            items = [o for o in all_orders if o.get('event_id') in tenant_event_ids]
+        else:
+            items = db.list_orders()
         print(f"[DEBUG] list_orders: {len(items)} items from DB")
 
         orders = []
@@ -2609,18 +2665,21 @@ def handle_coupons(event: Dict, method: str, path: str) -> Dict:
 
 def list_coupons(status: str, request_event: Dict) -> Dict:
     """ADMIN ONLY - GET /api/coupons"""
+    tenant_id = None
+    try:
+        ctx = authenticate(request_event)
+        tenant_id = ctx.get("tenant_id")
+    except AuthError:
+        # Fall back to legacy API key check
+        auth = get_admin_authenticator()
+        api_key = auth.extract_api_key(request_event)
+        if not auth.verify_admin_key(api_key):
+            log_security_event('unauthorized_coupons_list', {
+                'ip': get_client_identifier(request_event)
+            })
+            return error_response(401, "Unauthorized: Admin access required")
 
-    # SECURITY: Require admin authentication
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(request_event)
-
-    if not auth.verify_admin_key(api_key):
-        log_security_event('unauthorized_coupons_list', {
-            'ip': get_client_identifier(request_event)
-        })
-        return error_response(401, "Unauthorized: Admin access required")
-
-    items = db.list_coupons(status=status)
+    items = db.list_coupons(status=status, tenant_id=tenant_id)
 
     coupons = []
     for item in items:
@@ -2665,16 +2724,18 @@ def get_coupon_details(coupon_code: str, request_event: Dict) -> Dict:
 
 def create_coupon(request_event: Dict) -> Dict:
     """ADMIN ONLY - POST /api/coupons"""
-
-    # SECURITY: Require admin authentication
-    auth = get_admin_authenticator()
-    api_key = auth.extract_api_key(request_event)
-
-    if not auth.verify_admin_key(api_key):
-        log_security_event('unauthorized_coupon_create', {
-            'ip': get_client_identifier(request_event)
-        })
-        return error_response(401, "Unauthorized: Admin access required")
+    tenant_id = 'yallabalagan'
+    try:
+        ctx = authenticate(request_event)
+        tenant_id = ctx.get("tenant_id", "yallabalagan")
+    except AuthError:
+        auth = get_admin_authenticator()
+        api_key = auth.extract_api_key(request_event)
+        if not auth.verify_admin_key(api_key):
+            log_security_event('unauthorized_coupon_create', {
+                'ip': get_client_identifier(request_event)
+            })
+            return error_response(401, "Unauthorized: Admin access required")
 
     try:
         body = json.loads(request_event.get('body', '{}'))
@@ -2710,7 +2771,8 @@ def create_coupon(request_event: Dict) -> Dict:
             valid_until=body.get('valid_until'),
             status=body.get('status', 'active'),
             max_uses=body.get('max_uses'),
-            description=body.get('description', '')
+            description=body.get('description', ''),
+            tenant_id=tenant_id,
         )
 
         # Сохраняем в DynamoDB
@@ -3238,6 +3300,113 @@ def handle_quick_location_create(event: Dict) -> Dict:
         return error_response(500, f"Failed to create location: {str(e)}")
 
 
+def _patch_sharing(get_fn, update_fn, id_field: str, entity_id: str, request_event: Dict) -> Dict:
+    """Shared implementation for PATCH /api/{entity}/{id}/sharing."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_platform_admin(ctx):
+        return error_response(403, "Only platform_admin can manage sharing")
+    if not get_fn(entity_id):
+        return error_response(404, "Not found")
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON")
+    allowed_tenants = body.get('allowed_tenants', [])
+    if not isinstance(allowed_tenants, list):
+        return error_response(400, "allowed_tenants must be a list of tenant IDs")
+    update_fn(entity_id, allowed_tenants)
+    return success_response({id_field: entity_id, 'allowed_tenants': allowed_tenants})
+
+
+def patch_location_sharing(location_id: str, request_event: Dict) -> Dict:
+    return _patch_sharing(db.get_location, db.update_location_sharing, 'location_id', location_id, request_event)
+
+
+def patch_performer_sharing(performer_id: str, request_event: Dict) -> Dict:
+    return _patch_sharing(db.get_performer, db.update_performer_sharing, 'performer_id', performer_id, request_event)
+
+
+def patch_show_sharing(show_id: str, request_event: Dict) -> Dict:
+    return _patch_sharing(db.get_show, db.update_show_sharing, 'show_id', show_id, request_event)
+
+
+def _delete_sharing(get_fn, update_fn, id_field: str, entity_id: str, request_event: Dict) -> Dict:
+    """DELETE /api/{entity}/{id}/sharing — self-service: removes calling tenant from allowed_tenants."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    item = get_fn(entity_id)
+    if not item:
+        return error_response(404, "Not found")
+    tenant_id = ctx.get('tenant_id')
+    current = item.get('allowed_tenants', [])
+    updated = [t for t in current if t != tenant_id]
+    update_fn(entity_id, updated)
+    return success_response({id_field: entity_id, 'allowed_tenants': updated})
+
+
+def delete_location_sharing(location_id: str, request_event: Dict) -> Dict:
+    return _delete_sharing(db.get_location, db.update_location_sharing, 'location_id', location_id, request_event)
+
+
+def delete_performer_sharing(performer_id: str, request_event: Dict) -> Dict:
+    return _delete_sharing(db.get_performer, db.update_performer_sharing, 'performer_id', performer_id, request_event)
+
+
+def delete_show_sharing(show_id: str, request_event: Dict) -> Dict:
+    return _delete_sharing(db.get_show, db.update_show_sharing, 'show_id', show_id, request_event)
+
+
+def handle_bulk_sharing(request_event: Dict) -> Dict:
+    """POST /api/sharing/bulk — platform_admin sets allowed_tenants on many records at once."""
+    try:
+        ctx = authenticate(request_event)
+    except AuthError as e:
+        return error_response(e.status_code, str(e))
+    if not is_platform_admin(ctx):
+        return error_response(403, "Only platform_admin can manage sharing")
+    try:
+        body = json.loads(request_event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return error_response(400, "Invalid JSON")
+
+    entity_type = body.get('entity_type')
+    entity_ids = body.get('entity_ids')   # list or null (= all owned by ctx tenant)
+    allowed_tenants = body.get('allowed_tenants', [])
+
+    if entity_type not in ('location', 'performer', 'show'):
+        return error_response(400, "entity_type must be location, performer, or show")
+    if not isinstance(allowed_tenants, list):
+        return error_response(400, "allowed_tenants must be a list")
+
+    tenant_id = ctx.get('tenant_id')
+    if entity_ids is None:
+        if entity_type == 'location':
+            items = db.list_locations(tenant_id=tenant_id)
+            entity_ids = [i.get('location_id') for i in items if i.get('location_id')]
+        elif entity_type == 'performer':
+            items = db.list_performers(tenant_id=tenant_id)
+            entity_ids = [i.get('performer_id') for i in items if i.get('performer_id')]
+        else:
+            items = db.list_shows(tenant_id=tenant_id)
+            entity_ids = [i.get('show_id') for i in items if i.get('show_id')]
+
+    update_fn = {
+        'location': db.update_location_sharing,
+        'performer': db.update_performer_sharing,
+        'show': db.update_show_sharing,
+    }[entity_type]
+
+    for eid in entity_ids:
+        update_fn(eid, allowed_tenants)
+
+    return success_response({'updated': len(entity_ids), 'allowed_tenants': allowed_tenants})
+
+
 def handle_regenerate_site(event: Dict) -> Dict:
     """ADMIN ONLY - Регенерация публичного сайта через Lambda site-regenerator"""
 
@@ -3295,7 +3464,7 @@ def handle_performers(event: Dict, method: str, path: str) -> Dict:
     """Обрабатывает запросы к /api/performers"""
 
     if method == 'GET' and path == '/api/performers':
-        return list_performers()
+        return list_performers(event)
 
     if method == 'GET' and path.startswith('/api/performers/slug/'):
         slug = path.split('/')[-1]
@@ -3312,6 +3481,14 @@ def handle_performers(event: Dict, method: str, path: str) -> Dict:
         performer_id = path.split('/')[-1]
         return update_performer(performer_id, event)
 
+    if method == 'PATCH' and path.endswith('/sharing'):
+        performer_id = path.split('/')[-2]
+        return patch_performer_sharing(performer_id, event)
+
+    if method == 'DELETE' and path.endswith('/sharing'):
+        performer_id = path.split('/')[-2]
+        return delete_performer_sharing(performer_id, event)
+
     if method == 'DELETE' and path.startswith('/api/performers/'):
         performer_id = path.split('/')[-1]
         return delete_performer(performer_id, event)
@@ -3319,14 +3496,24 @@ def handle_performers(event: Dict, method: str, path: str) -> Dict:
     return error_response(404, "Performers endpoint not found")
 
 
-def list_performers() -> Dict:
+def list_performers(request_event: Dict = None) -> Dict:
     """GET /api/performers — public"""
-    items = db.list_performers(status='active')
+    tenant_id = 'yallabalagan'
+    if request_event:
+        try:
+            ctx = authenticate(request_event)
+            tenant_id = ctx.get('tenant_id', 'yallabalagan')
+        except AuthError:
+            pass
+    items = db.list_performers(tenant_id=tenant_id, status='active')
     performers = []
     for item in items:
         try:
             p = Performer.from_dynamodb_item(item)
-            performers.append(p.to_dynamodb_item())
+            d = p.to_dynamodb_item()
+            if item.get('tenant_id') != tenant_id:
+                d['_readonly'] = True
+            performers.append(d)
         except Exception as e:
             print(f"Error parsing performer: {e}")
     return success_response({'performers': performers, 'count': len(performers)})
@@ -3409,6 +3596,8 @@ def update_performer(performer_id: str, request_event: Dict) -> Dict:
     item = db.get_performer(performer_id)
     if not item:
         return error_response(404, "Performer not found")
+    if not _owns_record(ctx, item):
+        return error_response(403, "This record belongs to another tenant")
 
     try:
         body = json.loads(request_event.get('body', '{}'))
@@ -3466,6 +3655,8 @@ def delete_performer(performer_id: str, request_event: Dict) -> Dict:
     item = db.get_performer(performer_id)
     if not item:
         return error_response(404, "Performer not found")
+    if not _owns_record(ctx, item):
+        return error_response(403, "This record belongs to another tenant")
 
     performer = Performer.from_dynamodb_item(item)
     performer.status = 'inactive'
@@ -3505,14 +3696,23 @@ def handle_products(event: Dict, method: str, path: str) -> Dict:
 
 def list_products(request_event: Dict) -> Dict:
     """GET /api/products — public (active). Supports ?performer_id={id}"""
+    tenant_id = None
+    try:
+        ctx = authenticate(request_event)
+        tenant_id = ctx.get('tenant_id')
+    except AuthError:
+        pass
+
     params = request_event.get('queryStringParameters') or {}
     performer_id = params.get('performer_id')
 
     if performer_id:
         items = db.list_products_by_performer(performer_id)
         items = [i for i in items if i.get('status') == 'active']
+        if tenant_id:
+            items = [i for i in items if i.get('tenant_id') == tenant_id]
     else:
-        items = db.list_products()
+        items = db.list_products(tenant_id=tenant_id)
 
     products = []
     for item in items:
@@ -3765,14 +3965,22 @@ def list_merch_orders(request_event: Dict) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, "Access denied")
 
+    tenant_id = ctx.get('tenant_id')
     params = request_event.get('queryStringParameters') or {}
     product_id = params.get('product_id', '').strip()
 
     if product_id:
+        product_item = db.get_product(product_id)
+        if tenant_id and (not product_item or product_item.get('tenant_id') != tenant_id):
+            return error_response(403, "Access denied")
         items = db.list_merchandise_orders_by_product(product_id)
     else:
         result = db.list_merchandise_orders(limit=100)
-        items = result['items']
+        if tenant_id:
+            tenant_product_ids = {p.get('product_id') for p in db.list_products(tenant_id=tenant_id, status=None)}
+            items = [o for o in result['items'] if o.get('product_id') in tenant_product_ids]
+        else:
+            items = result['items']
 
     items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
     return success_response({'orders': items})
@@ -3880,12 +4088,20 @@ def _send_merchandise_notification_email(order: 'MerchandiseOrder', product_item
 
 def handle_shows(event: Dict, method: str, path: str) -> Dict:
     if method == 'GET' and path == '/api/shows':
-        return list_shows()
+        return list_shows(event)
     if method == 'GET' and path.startswith('/api/shows/'):
         show_id = path.split('/')[-1]
         return get_show(show_id)
     if method == 'POST' and path == '/api/shows':
         return create_show(event)
+    if method == 'PATCH' and path.endswith('/sharing'):
+        show_id = path.split('/')[-2]
+        return patch_show_sharing(show_id, event)
+
+    if method == 'DELETE' and path.endswith('/sharing'):
+        show_id = path.split('/')[-2]
+        return delete_show_sharing(show_id, event)
+
     if method == 'PUT' and path.startswith('/api/shows/'):
         show_id = path.split('/')[-1]
         return update_show(show_id, event)
@@ -3895,12 +4111,21 @@ def handle_shows(event: Dict, method: str, path: str) -> Dict:
     return error_response(404, 'Not found')
 
 
-def list_shows() -> Dict:
-    items = db.list_shows()
+def list_shows(request_event: Dict) -> Dict:
+    tenant_id = None
+    try:
+        ctx = authenticate(request_event)
+        tenant_id = ctx.get("tenant_id")
+    except AuthError:
+        pass
+    items = db.list_shows(tenant_id=tenant_id)
     shows = []
     for item in items:
         try:
-            shows.append(Show.from_dynamodb_item(item).to_dynamodb_item())
+            d = Show.from_dynamodb_item(item).to_dynamodb_item()
+            if tenant_id and item.get('tenant_id') != tenant_id:
+                d['_readonly'] = True
+            shows.append(d)
         except Exception as e:
             print(f"Error parsing show: {e}")
     shows.sort(key=lambda s: s.get('name', ''))
@@ -3944,6 +4169,7 @@ def create_show(request_event: Dict) -> Dict:
             short_description=body['short_description'],
             photo_url=body.get('photo_url'),
             links=[ShowLink.from_dict(l) for l in body.get('links', [])],
+            tenant_id=ctx.get('tenant_id', 'yallabalagan'),
         )
         db.put_show(show.to_dynamodb_item())
         return success_response({'show': show.to_dynamodb_item()}, 201)
@@ -3963,6 +4189,8 @@ def update_show(show_id: str, request_event: Dict) -> Dict:
     item = db.get_show(show_id)
     if not item:
         return error_response(404, 'Show not found')
+    if not _owns_record(ctx, item):
+        return error_response(403, "This record belongs to another tenant")
     try:
         body = json.loads(request_event.get('body', '{}'))
         show = Show.from_dynamodb_item(item)
@@ -3992,8 +4220,11 @@ def delete_show(show_id: str, request_event: Dict) -> Dict:
         return error_response(e.status_code, str(e))
     if not has_permission(ctx, "shows:write"):
         return error_response(403, "Access denied")
-    if not db.get_show(show_id):
+    show_item = db.get_show(show_id)
+    if not show_item:
         return error_response(404, 'Show not found')
+    if not _owns_record(ctx, show_item):
+        return error_response(403, "This record belongs to another tenant")
     db.delete_show(show_id)
     return success_response({'deleted': show_id})
 
@@ -4087,6 +4318,9 @@ def update_episode(episode_id: str, request_event: Dict) -> Dict:
     item = db.get_episode(episode_id)
     if not item:
         return error_response(404, 'Episode not found')
+    show_item = db.get_show(item.get('show_id', ''))
+    if show_item and not _owns_record(ctx, show_item):
+        return error_response(403, "This record belongs to another tenant")
     try:
         body = json.loads(request_event.get('body', '{}'))
         ep = Episode.from_dynamodb_item(item)
@@ -4114,8 +4348,12 @@ def delete_episode_handler(episode_id: str, request_event: Dict) -> Dict:
         return error_response(e.status_code, str(e))
     if not has_permission(ctx, "episodes:write"):
         return error_response(403, "Access denied")
-    if not db.get_episode(episode_id):
+    ep_item = db.get_episode(episode_id)
+    if not ep_item:
         return error_response(404, 'Episode not found')
+    show_item = db.get_show(ep_item.get('show_id', ''))
+    if show_item and not _owns_record(ctx, show_item):
+        return error_response(403, "This record belongs to another tenant")
     db.delete_episode(episode_id)
     return success_response({'deleted': episode_id})
 
@@ -4700,10 +4938,15 @@ def get_influencer_dashboard(influencer_id: str) -> Dict:
 
 def list_influencers_admin(request_event: Dict) -> Dict:
     """GET /api/influencers — admin only"""
-    auth = get_admin_authenticator()
-    if not auth.verify_admin_key(auth.extract_api_key(request_event)):
-        return error_response(401, "Unauthorized")
-    items = db.list_influencers()
+    tenant_id = None
+    try:
+        ctx = authenticate(request_event)
+        tenant_id = ctx.get("tenant_id")
+    except AuthError:
+        auth = get_admin_authenticator()
+        if not auth.verify_admin_key(auth.extract_api_key(request_event)):
+            return error_response(401, "Unauthorized")
+    items = db.list_influencers(tenant_id=tenant_id)
     influencers = []
     for item in items:
         try:
@@ -5033,7 +5276,7 @@ def ig_list_accounts(request_event: Dict) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    items = db.list_instagram_connections()
+    items = db.list_instagram_connections(tenant_id=ctx.get('tenant_id'))
     accounts = []
     for item in items:
         accounts.append({
@@ -5064,7 +5307,8 @@ def ig_oauth_start(request_event: Dict) -> Dict:
 
     import secrets as _secrets
     from utils.instagram import get_oauth_url
-    state = _secrets.token_urlsafe(16)
+    tenant_id = ctx.get('tenant_id', 'yallabalagan')
+    state = f"{tenant_id}:{_secrets.token_urlsafe(16)}"
     redirect_uri = f"{api_base_url}/api/instagram/oauth/callback"
     oauth_url = get_oauth_url(app_id, redirect_uri, state)
     return success_response({'url': oauth_url})
@@ -5075,6 +5319,9 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
     qs = request_event.get('queryStringParameters') or {}
     code = qs.get('code')
     error = qs.get('error')
+    state = qs.get('state', '')
+    # state format: "tenant_id:random" — extract tenant_id
+    _ig_tenant_id = state.split(':')[0] if ':' in state else 'yallabalagan'
     admin_url = os.environ.get('ADMIN_BASE_URL', '')
 
     if error or not code:
@@ -5143,6 +5390,7 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
             'page_id': page_id,
             'connected_at': now,
             'status': 'active',
+            'tenant_id': _ig_tenant_id,
         }
         db.put_instagram_connection(connection)
         return _ig_redirect(admin_url, 'social-settings.html', success='connected')
@@ -5274,7 +5522,7 @@ def tiktok_list_accounts(request_event: Dict) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    accounts = db.list_tiktok_connections()
+    accounts = db.list_tiktok_connections(tenant_id=ctx.get('tenant_id'))
     safe = [{k: v for k, v in a.items() if k not in ('access_token', 'refresh_token', 'PK')} for a in accounts]
     return success_response({'accounts': safe})
 
@@ -5294,7 +5542,8 @@ def tiktok_oauth_start(request_event: Dict) -> Dict:
         return error_response(503, 'TikTok not configured')
 
     import secrets as _secrets
-    state = _secrets.token_urlsafe(16)
+    tenant_id = ctx.get('tenant_id', 'yallabalagan')
+    state = f"{tenant_id}:{_secrets.token_urlsafe(16)}"
     redirect_uri = f"{api_base_url}/api/social/tt/callback"
 
     from utils.tiktok import get_oauth_url
@@ -5307,6 +5556,8 @@ def tiktok_oauth_callback(request_event: Dict) -> Dict:
     qs = request_event.get('queryStringParameters') or {}
     admin_url = os.environ.get('ADMIN_BASE_URL', '')
     api_base_url = os.environ.get('API_BASE_URL', '')
+    _tt_state = qs.get('state', '')
+    _tt_tenant_id = _tt_state.split(':')[0] if ':' in _tt_state else 'yallabalagan'
 
     code = qs.get('code', '')
     error = qs.get('error', '')
@@ -5345,6 +5596,7 @@ def tiktok_oauth_callback(request_event: Dict) -> Dict:
             'refresh_token_expires_at': token_expires_at(refresh_expires_in),
             'connected_at': now,
             'status': 'active',
+            'tenant_id': _tt_tenant_id,
         }
         db.put_tiktok_connection(connection)
         return _tt_redirect(admin_url, success='tiktok_connected')
@@ -5401,7 +5653,7 @@ def youtube_list_accounts(request_event: Dict) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    accounts = db.list_youtube_connections()
+    accounts = db.list_youtube_connections(tenant_id=ctx.get('tenant_id'))
     safe = [{k: v for k, v in a.items() if k not in ('access_token', 'refresh_token', 'PK')} for a in accounts]
     return success_response({'accounts': safe})
 
@@ -5421,7 +5673,8 @@ def youtube_oauth_start(request_event: Dict) -> Dict:
         return error_response(503, 'YouTube not configured')
 
     import secrets as _secrets
-    state = _secrets.token_urlsafe(16)
+    tenant_id = ctx.get('tenant_id', 'yallabalagan')
+    state = f"{tenant_id}:{_secrets.token_urlsafe(16)}"
     redirect_uri = f"{api_base_url}/api/youtube/oauth/callback"
 
     from utils.youtube import get_oauth_url
@@ -5434,6 +5687,9 @@ def youtube_oauth_callback(request_event: Dict) -> Dict:
     qs = request_event.get('queryStringParameters') or {}
     admin_url = os.environ.get('ADMIN_BASE_URL', '')
     api_base_url = os.environ.get('API_BASE_URL', '')
+
+    _yt_state = qs.get('state', '')
+    _yt_tenant_id = _yt_state.split(':')[0] if ':' in _yt_state else 'yallabalagan'
 
     code = qs.get('code', '')
     error = qs.get('error', '')
@@ -5471,6 +5727,7 @@ def youtube_oauth_callback(request_event: Dict) -> Dict:
             'token_expires_at': token_expires_at(expires_in),
             'connected_at': now,
             'status': 'active',
+            'tenant_id': _yt_tenant_id,
         }
         db.put_youtube_connection(connection)
         return _yt_redirect(admin_url, success='youtube_connected')
@@ -5537,11 +5794,11 @@ def social_list_posts(request_event: Dict) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    posts = db.list_social_posts()
-
-    ig_conns = {c['SK']: c.get('ig_username', '') or c.get('ig_name', '') for c in db.list_instagram_connections()}
-    tt_conns = {c['SK']: c.get('display_name', '') for c in db.list_tiktok_connections()}
-    yt_conns = {c['SK']: c.get('channel_title', '') for c in db.list_youtube_connections()}
+    _tenant_id = ctx.get('tenant_id')
+    posts = db.list_social_posts(tenant_id=_tenant_id)
+    ig_conns = {c['SK']: c.get('ig_username', '') or c.get('ig_name', '') for c in db.list_instagram_connections(tenant_id=_tenant_id)}
+    tt_conns = {c['SK']: c.get('display_name', '') for c in db.list_tiktok_connections(tenant_id=_tenant_id)}
+    yt_conns = {c['SK']: c.get('channel_title', '') for c in db.list_youtube_connections(tenant_id=_tenant_id)}
     account_labels = {'instagram': ig_conns, 'tiktok': tt_conns, 'youtube': yt_conns}
 
     for post in posts:
@@ -5607,6 +5864,7 @@ def social_create_post(request_event: Dict) -> Dict:
     item = {
         'PK': 'POST',
         'SK': post_id,
+        'tenant_id': ctx.get('tenant_id', 'yallabalagan'),
         'status': status,
         'title': title,
         'description': description,

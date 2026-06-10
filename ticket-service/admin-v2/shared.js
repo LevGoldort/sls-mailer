@@ -136,6 +136,13 @@ const API = {
     updateEpisode: (id, data)      => apiCall(`/api/episodes/${id}`, 'PUT', data),
     deleteEpisode: (id)            => apiCall(`/api/episodes/${id}`, 'DELETE'),
 
+    // Tenants (platform_admin only)
+    getTenants:    ()          => apiCall('/api/tenants'),
+    getTenant:     (id)        => apiCall(`/api/tenants/${id}`),
+    createTenant:  (data)      => apiCall('/api/tenants', 'POST', data),
+    updateTenant:  (id, data)  => apiCall(`/api/tenants/${id}`, 'PUT', data),
+    switchTenant:  (tenantId)  => Auth.switchTenant(tenantId),
+
     // Global Search (admin only)
     search: (query) => apiCall(`/api/search?q=${encodeURIComponent(query)}`),
 };
@@ -371,9 +378,10 @@ async function regenerateSite() {
 window.regenerateSite = regenerateSite;
 
 // === Sidebar Nav ===
-// permission: show only if Auth.hasPermission(permission)
-// adminOnly:  show only if Auth.isAdmin()
-// (no flag):  show to all authenticated users
+// permission:       show only if Auth.hasPermission(permission)
+// adminOnly:        show only if Auth.isAdmin()
+// platformAdminOnly: show only if Auth.isPlatformAdmin()
+// (no flag):        show to all authenticated users
 const NAV_ITEMS = [
     { href: 'index.html',        icon: '⊞', label: 'Дашборд' },
     { href: 'events.html',       icon: '📅', label: 'События',       permission: 'events:write' },
@@ -398,6 +406,8 @@ const NAV_ITEMS = [
     { href: 'social-settings.html',    icon: '📱', label: 'Соц. сети',         adminOnly: true },
     { href: 'cross-post-studio.html', icon: '✉️', label: 'Кросс-пост',        adminOnly: true },
     { href: 'social-history.html',    icon: '🕓', label: 'История постов',     adminOnly: true },
+    { sep: true, platformAdminOnly: true },
+    { href: 'tenants.html', icon: '🏢', label: 'Тенанты', platformAdminOnly: true },
 ];
 
 // Pages whose active state rolls up to a parent item
@@ -421,6 +431,7 @@ function renderSidebar() {
     const activeHref  = PARENT_MAP[currentFile] || currentFile;
 
     const navHtml = NAV_ITEMS.map(item => {
+        if (item.platformAdminOnly && !Auth.isPlatformAdmin()) return '';
         if (item.sep) return '<li class="nav-sep"></li>';
         if (item.adminOnly && !Auth.isAdmin()) return '';
         if (item.permission && !Auth.hasPermission(item.permission)) return '';
@@ -448,13 +459,14 @@ function renderUserBar() {
     const bar = document.getElementById('user-bar');
     if (!bar) return;
 
+    const role = Auth.getRole();
     bar.innerHTML = `
         <div class="user-info">
             <div class="user-avatar">${escapeHtml((user.name || '?')[0].toUpperCase())}</div>
             <span class="user-name">${escapeHtml(user.name)}</span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <span class="role-badge role-${escapeHtml(user.role)}">${escapeHtml(user.role)}</span>
+            <span class="role-badge role-${escapeHtml(role)}">${escapeHtml(role)}</span>
             <button onclick="Auth.logout()" class="btn-logout">Выйти</button>
         </div>
     `;
@@ -463,6 +475,85 @@ function renderUserBar() {
         el.style.display = Auth.isAdmin() ? '' : 'none';
     });
 }
+
+// === Mimic Banner ===
+function renderMimicBanner() {
+    if (!Auth.isMimicking()) return;
+
+    const token = Auth.getAccessToken();
+    let tenantId = '';
+    try {
+        const parts = token.split('.');
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        tenantId = payload.tenant_id || '';
+    } catch { /* ignore */ }
+
+    const banner = document.createElement('div');
+    banner.id = 'mimic-banner';
+    banner.style.cssText = [
+        'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
+        'background:#d97706', 'color:#fff', 'padding:8px 16px',
+        'display:flex', 'align-items:center', 'justify-content:center', 'gap:16px',
+        'font-size:13px', 'font-weight:600',
+    ].join(';');
+    banner.innerHTML = `
+        <span>Просмотр как тенант: <strong>${escapeHtml(tenantId)}</strong></span>
+        <button onclick="exitMimic()" style="background:rgba(255,255,255,0.25);border:none;border-radius:4px;padding:4px 10px;color:#fff;font-weight:600;cursor:pointer;">Выйти →</button>
+    `;
+    document.body.prepend(banner);
+
+    // Push page content down so banner doesn't overlap
+    document.body.style.paddingTop = '40px';
+}
+
+async function exitMimic() {
+    Auth.exitTenant();
+    window.location.reload();
+}
+
+// === Tenant Switcher (for platform_admin only) ===
+async function initTenantSwitcher() {
+    if (!Auth.isPlatformAdmin() || Auth.isMimicking()) return;
+
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    let tenants = [];
+    try {
+        const data = await apiCall('/api/tenants');
+        tenants = data.tenants || [];
+    } catch { return; }
+
+    if (!tenants.length) return;
+
+    const switcher = document.createElement('div');
+    switcher.style.cssText = 'padding:10px 14px;border-top:1px solid rgba(255,255,255,0.08);';
+    switcher.innerHTML = `
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Переключить тенант</div>
+        <select id="tenant-switcher-select" style="width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#fff;font-size:12px;padding:5px 8px;cursor:pointer;">
+            <option value="">— выбрать —</option>
+            ${tenants.map(t => `<option value="${escapeHtml(t.tenant_id)}">${escapeHtml(t.name)}</option>`).join('')}
+        </select>
+    `;
+
+    const footer = sidebar.querySelector('.sidebar-footer');
+    if (footer) footer.before(switcher);
+    else sidebar.append(switcher);
+
+    document.getElementById('tenant-switcher-select').addEventListener('change', async (e) => {
+        const tenantId = e.target.value;
+        if (!tenantId) return;
+        try {
+            await Auth.switchTenant(tenantId);
+            window.location.reload();
+        } catch (err) {
+            showToast('Ошибка переключения тенанта: ' + err.message, 'error');
+            e.target.value = '';
+        }
+    });
+}
+
+window.exitMimic = exitMimic;
 
 // === Mobile sidebar toggle ===
 function initMobileMenu() {
@@ -496,6 +587,8 @@ async function initAdmin() {
     renderSidebar();
     renderUserBar();
     initMobileMenu();
+    renderMimicBanner();
+    initTenantSwitcher();
 }
 
 if (document.readyState === 'loading') {

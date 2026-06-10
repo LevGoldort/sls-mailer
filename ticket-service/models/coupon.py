@@ -23,6 +23,7 @@ class Coupon:
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     influencer_id: Optional[str] = None
     commission_rate: float = 0.0
+    tenant_id: Optional[str] = None
 
     @staticmethod
     def generate_code() -> str:
@@ -64,6 +65,8 @@ class Coupon:
             item["influencer_id"] = self.influencer_id
         if self.commission_rate:
             item["commission_rate"] = Decimal(str(self.commission_rate))
+        if self.tenant_id:
+            item["tenant_id"] = self.tenant_id
 
         return item
 
@@ -85,6 +88,7 @@ class Coupon:
             updated_at=item.get("updated_at"),
             influencer_id=item.get("influencer_id"),
             commission_rate=float(item["commission_rate"]) if item.get("commission_rate") else 0.0,
+            tenant_id=item.get("tenant_id"),
         )
 
     def is_valid(self, event_id: str, current_time: datetime = None) -> Tuple[bool, str]:

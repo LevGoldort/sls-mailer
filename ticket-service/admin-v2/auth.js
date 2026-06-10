@@ -2,9 +2,11 @@
 
 const Auth = (() => {
     const KEYS = {
-        access:  'auth_access_token',
-        refresh: 'auth_refresh_token',
-        user:    'auth_user',
+        access:       'auth_access_token',
+        refresh:      'auth_refresh_token',
+        user:         'auth_user',
+        orig_access:  'auth_orig_access_token',
+        orig_refresh: 'auth_orig_refresh_token',
     };
 
     // ── JWT helpers ──────────────────────────────────────────────────────────
@@ -39,11 +41,13 @@ const Auth = (() => {
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    async function login(email, password) {
+    async function login(email, password, tenantId) {
+        const payload = { email, password };
+        if (tenantId) payload.tenant_id = tenantId;
         const resp = await fetch(`${window.API_BASE_URL}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify(payload),
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || `Login failed (${resp.status})`);
@@ -84,11 +88,27 @@ const Auth = (() => {
     }
 
     function getRole() {
+        const token = localStorage.getItem(KEYS.access);
+        if (token) {
+            const payload = _decodePayload(token);
+            if (payload?.role) return payload.role;
+        }
         return getUser()?.role || null;
     }
 
     function isAdmin() {
-        return getRole() === 'admin';
+        const role = getRole();
+        return role === 'admin' || role === 'platform_admin';
+    }
+
+    function isPlatformAdmin() {
+        return getRole() === 'platform_admin';
+    }
+
+    function isMimicking() {
+        const token = localStorage.getItem(KEYS.access);
+        if (!token) return false;
+        return _decodePayload(token)?.is_mimicking === true;
     }
 
     // Permission matrix — mirrors utils/permissions.py:ROLE_PERMISSIONS
@@ -105,6 +125,40 @@ const Auth = (() => {
         if (isAdmin()) return true;
         const role = getRole();
         return !!role && !!_ROLE_PERMISSIONS[role]?.has(permission);
+    }
+
+    async function switchTenant(tenantId) {
+        const resp = await fetch(`${window.API_BASE_URL}/api/auth/switch-tenant`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem(KEYS.access)}`,
+            },
+            body: JSON.stringify({ tenant_id: tenantId }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `Switch failed (${resp.status})`);
+
+        localStorage.setItem(KEYS.orig_access,  localStorage.getItem(KEYS.access) || '');
+        localStorage.setItem(KEYS.orig_refresh, localStorage.getItem(KEYS.refresh) || '');
+
+        localStorage.setItem(KEYS.access, data.access_token);
+        localStorage.removeItem(KEYS.refresh);
+
+        return data;
+    }
+
+    function exitTenant() {
+        const origAccess  = localStorage.getItem(KEYS.orig_access);
+        const origRefresh = localStorage.getItem(KEYS.orig_refresh);
+        if (!origAccess) return;
+
+        localStorage.setItem(KEYS.access, origAccess);
+        if (origRefresh) localStorage.setItem(KEYS.refresh, origRefresh);
+        else localStorage.removeItem(KEYS.refresh);
+
+        localStorage.removeItem(KEYS.orig_access);
+        localStorage.removeItem(KEYS.orig_refresh);
     }
 
     async function refreshToken() {
@@ -170,6 +224,10 @@ const Auth = (() => {
         getUser,
         getRole,
         isAdmin,
+        isPlatformAdmin,
+        isMimicking,
+        switchTenant,
+        exitTenant,
         hasPermission,
         refreshToken,
         requireAuth,
