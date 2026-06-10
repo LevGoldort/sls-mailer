@@ -5295,7 +5295,7 @@ def tiktok_oauth_start(request_event: Dict) -> Dict:
 
     import secrets as _secrets
     state = _secrets.token_urlsafe(16)
-    redirect_uri = f"{api_base_url}/api/tiktok/oauth/callback"
+    redirect_uri = f"{api_base_url}/api/social/tt/callback"
 
     from utils.tiktok import get_oauth_url
     url = get_oauth_url(client_key, redirect_uri, state)
@@ -5321,7 +5321,7 @@ def tiktok_oauth_callback(request_event: Dict) -> Dict:
 
     try:
         from utils.tiktok import exchange_code, get_user_info, encrypt_token, token_expires_at
-        redirect_uri = f"{api_base_url}/api/tiktok/oauth/callback"
+        redirect_uri = f"{api_base_url}/api/social/tt/callback"
         tokens = exchange_code(client_key, client_secret, redirect_uri, code)
 
         access_token = tokens['access_token']
@@ -5523,6 +5523,8 @@ def handle_social(event: Dict, method: str, path: str) -> Dict:
     if method == 'DELETE' and path.startswith('/api/social/posts/'):
         post_id = path.split('/')[-1]
         return social_delete_post(event, post_id)
+    if method == 'GET' and path == '/api/social/tt/callback':
+        return tiktok_oauth_callback(event)
     return error_response(404, 'Not found')
 
 

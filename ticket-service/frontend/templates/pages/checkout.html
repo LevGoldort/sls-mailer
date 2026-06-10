@@ -105,8 +105,20 @@
                     </div>
                 </div>
 
+                <!-- Terms acceptance -->
+                <div style="margin-top: 1.25rem; display: flex; align-items: flex-start; gap: 0.625rem;">
+                    <input type="checkbox" id="terms-accept" name="terms_accept"
+                           style="margin-top: 0.25rem; flex-shrink: 0; width: 1rem; height: 1rem; cursor: pointer;"
+                           required>
+                    <label for="terms-accept"
+                           style="font-size: 0.875rem; line-height: 1.5; color: var(--gray-700); cursor: pointer;">
+                        Я прочитал(а) и принимаю <a href="/terms.html" target="_blank" style="color: var(--primary); text-decoration: underline;">Условия использования</a>
+                        и <a href="/privacy.html" target="_blank" style="color: var(--primary); text-decoration: underline;">Политику конфиденциальности</a>
+                    </label>
+                </div>
+
                 <!-- Payment Button -->
-                <button type="submit" class="btn btn-primary btn-large" style="margin-top: 1.5rem;" data-i18n="checkout.to_payment">
+                <button type="submit" id="submit-btn" class="btn btn-primary btn-large" style="margin-top: 1.5rem;" disabled data-i18n="checkout.to_payment">
                     Перейти к оплате
                 </button>
 
@@ -280,6 +292,7 @@
 }
 
 .btn-primary { background: var(--yb-magenta); color: white; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-large   { width: 100%; padding: 1rem; font-size: 1rem; }
 
 /* ── Spinner ── */
@@ -970,6 +983,11 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
         submitButton.disabled = false;
         submitButton.textContent = 'Перейти к оплате';
     }
+});
+
+// Enable submit button only when terms checkbox is checked
+document.getElementById('terms-accept').addEventListener('change', function () {
+    document.getElementById('submit-btn').disabled = !this.checked;
 });
 
 // Payment button click handler
