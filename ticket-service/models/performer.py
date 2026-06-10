@@ -46,6 +46,7 @@ class Performer:
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     status: str = "active"  # "active" | "inactive"
+    allowed_tenants: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -68,6 +69,7 @@ class Performer:
             'photos': self.photos,
             'social': self.social.to_dict(),
             'status': self.status,
+            'allowed_tenants': self.allowed_tenants,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
             # GSI keys
@@ -100,6 +102,7 @@ class Performer:
             contact_email=item.get('contact_email'),
             contact_phone=item.get('contact_phone'),
             status=item.get('status', 'active'),
+            allowed_tenants=item.get('allowed_tenants', []),
             created_at=item.get('created_at'),
             updated_at=item.get('updated_at'),
         )

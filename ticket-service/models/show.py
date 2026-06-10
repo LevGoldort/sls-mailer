@@ -28,6 +28,8 @@ class Show:
     short_description: str
     photo_url: Optional[str] = None
     links: List[ShowLink] = field(default_factory=list)
+    tenant_id: Optional[str] = None
+    allowed_tenants: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -56,6 +58,8 @@ class Show:
             'links': [l.to_dict() for l in self.links],
             'created_at': self.created_at,
             'updated_at': self.updated_at,
+            'allowed_tenants': self.allowed_tenants,
+            **({'tenant_id': self.tenant_id} if self.tenant_id else {}),
         }
 
     @classmethod
@@ -68,6 +72,8 @@ class Show:
             short_description=item['short_description'],
             photo_url=item.get('photo_url'),
             links=[ShowLink.from_dict(l) for l in item.get('links', [])],
+            tenant_id=item.get('tenant_id'),
+            allowed_tenants=item.get('allowed_tenants', []),
             created_at=item.get('created_at', ''),
             updated_at=item.get('updated_at', ''),
         )

@@ -75,6 +75,20 @@
         </div>
       </div>
     </form>
+
+    <div id="sharing-card" style="display:none; margin-top:24px;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Доступ для тенантов</span></div>
+        <div class="card-body">
+          <p style="color:var(--gray-mid);font-size:13px;margin:0 0 12px;">Выберите тенанты, которым будет доступно это шоу и его эпизоды (только для чтения).</p>
+          <div id="sharing-tenants-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <div style="margin-top:16px;">
+            <button class="btn btn-secondary" id="sharing-save-btn" onclick="saveSharing()">Сохранить доступ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 <script src="auth.js"></script>
@@ -133,6 +147,7 @@
         document.getElementById('photo-placeholder').style.display = 'none';
       }
       (s.links || []).forEach(l => addLink(l.label, l.url));
+      initSharing(s.allowed_tenants || []);
     } catch (err) { handleError(err, 'Ошибка загрузки'); }
   }
 
@@ -162,6 +177,41 @@
       handleError(err, 'Ошибка сохранения');
       btn.disabled = false;
       btn.textContent = 'Сохранить';
+    }
+  }
+
+  /* ── Sharing (platform_admin only) ── */
+  async function initSharing(allowedTenants) {
+    if (!showId || !Auth.isPlatformAdmin()) return;
+    document.getElementById('sharing-card').style.display = 'block';
+    try {
+      const data = await API.getTenants();
+      const myTenantId = Auth.getUser()?.tenant_id;
+      const tenants = (data.tenants || []).filter(t => t.tenant_id !== myTenantId);
+      const list = document.getElementById('sharing-tenants-list');
+      list.innerHTML = tenants.length === 0
+        ? '<span style="color:var(--gray-mid);font-size:13px;">Других тенантов нет.</span>'
+        : tenants.map(t => `
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" value="${t.tenant_id}"
+              ${(allowedTenants || []).includes(t.tenant_id) ? 'checked' : ''}>
+            <span>${t.name} <span style="color:var(--gray-mid);font-size:12px;">(${t.slug})</span></span>
+          </label>`).join('');
+    } catch (e) { console.error('Failed to load tenants', e); }
+  }
+
+  async function saveSharing() {
+    const btn = document.getElementById('sharing-save-btn');
+    btn.disabled = true;
+    const checked = [...document.querySelectorAll('#sharing-tenants-list input[type=checkbox]:checked')]
+      .map(cb => cb.value);
+    try {
+      await apiCall(`/api/shows/${showId}/sharing`, 'PATCH', { allowed_tenants: checked });
+      showToast('Доступ обновлён', 'success');
+    } catch (e) {
+      handleError(e, 'Ошибка сохранения доступа');
+    } finally {
+      btn.disabled = false;
     }
   }
 

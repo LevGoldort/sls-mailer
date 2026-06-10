@@ -222,6 +222,7 @@ Globals:
         SOCIAL_POSTS_TABLE: !Ref SocialPostsTable
         SOCIAL_POSTER_LAMBDA: yallabalagan-social-poster
         CONFIG_TABLE: !Ref ConfigTable
+        TENANTS_TABLE: !Ref TenantsTable
         META_APP_ID: !Ref MetaAppId
         META_APP_SECRET: !Ref MetaAppSecret
         INSTAGRAM_TOKEN_KEY: !Ref InstagramTokenKey
@@ -320,6 +321,8 @@ Resources:
           AttributeType: S
         - AttributeName: slug
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
@@ -329,6 +332,12 @@ Resources:
         - IndexName: SlugIndex
           KeySchema:
             - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -396,6 +405,8 @@ Resources:
           AttributeType: S
         - AttributeName: valid_until
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
@@ -408,6 +419,12 @@ Resources:
               KeyType: HASH
             - AttributeName: valid_until
               KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
           Projection:
             ProjectionType: ALL
       Tags:
@@ -666,6 +683,8 @@ Resources:
           AttributeType: S
         - AttributeName: slug
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
@@ -675,6 +694,12 @@ Resources:
         - IndexName: SlugIndex
           KeySchema:
             - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -694,11 +719,20 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -715,11 +749,20 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -736,11 +779,20 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -757,11 +809,20 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: TenantIndex
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -817,6 +878,36 @@ Resources:
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: YallaBalagan-TicketService
+        - Key: Environment
+          Value: !Ref Environment
+
+  TenantsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: yallabalagan-tenants
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: slug
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SlugIndex
+          KeySchema:
+            - AttributeName: slug
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: YallaBalagan-TicketService
@@ -1036,6 +1127,8 @@ Resources:
             TableName: !Ref SocialPostsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ConfigTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TenantsTable
         - S3CrudPolicy:
             BucketName: !Ref MediaBucket
         - Version: '2012-10-17'
@@ -1067,6 +1160,8 @@ Resources:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref RefreshTokensTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TenantsTable
 
   # Site Regenerator
   SiteRegeneratorFunction:

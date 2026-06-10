@@ -199,6 +199,7 @@ img { max-width: 100%; }
   font-weight: 600;
 }
 
+.role-platform_admin  { background: #fef3c7; color: #92400e; }
 .role-admin           { background: var(--purple-light); color: var(--purple); }
 .role-organizer       { background: var(--blue-bg); color: var(--blue); }
 .role-content_manager { background: #e6f4ea; color: #2d7a3a; }

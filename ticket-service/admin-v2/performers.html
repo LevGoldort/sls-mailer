@@ -72,12 +72,24 @@
           ${p.bio ? `<div class="performer-bio">${escapeHtml(p.bio)}</div>` : ''}
         </div>
         <div class="performer-actions">
-          <button class="btn btn-ghost btn-sm" onclick="navigateTo('performer-edit.html?id=${p.performer_id}')">Редактировать</button>
-          <button class="btn btn-danger btn-sm" onclick="deletePerformer('${p.performer_id}','${escapeHtml(p.name).replace(/'/g,"\\'")}')">Удалить</button>
+          ${p._readonly
+            ? `<button class="btn btn-ghost btn-sm" onclick="removeSharing('${p.performer_id}')">Убрать</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="navigateTo('performer-edit.html?id=${p.performer_id}')">Редактировать</button>
+               <button class="btn btn-danger btn-sm" onclick="deletePerformer('${p.performer_id}','${escapeHtml(p.name).replace(/'/g,"\\'")}')">Удалить</button>`
+          }
         </div>
       </div>`;
     }).join('');
     container.innerHTML = `<div class="performers-grid">${cards}</div>`;
+  }
+
+  async function removeSharing(id) {
+    if (!confirm('Убрать этого перформера из вашего доступа?')) return;
+    try {
+      await apiCall(`/api/performers/${id}/sharing`, 'DELETE');
+      showToast('Убрано');
+      load();
+    } catch (err) { handleError(err, 'Ошибка'); }
   }
 
   async function deletePerformer(id, name) {

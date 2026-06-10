@@ -258,6 +258,11 @@ EOF
     echo "   ✓ Environment variables updated"
 fi
 
+# Update UserApiFunction
+if [ -d "$SCRIPT_DIR/.aws-sam/build/UserApiFunction" ]; then
+    update_lambda "yallabalagan-user-api" ".aws-sam/build/UserApiFunction" "lambdas/user-api-handler.lambda_handler"
+fi
+
 # Update EmailSenderFunction
 if [ -d "$SCRIPT_DIR/.aws-sam/build/EmailSenderFunction" ]; then
     update_lambda "yallabalagan-email-sender" ".aws-sam/build/EmailSenderFunction" "lambdas/email-sender.lambda_handler"

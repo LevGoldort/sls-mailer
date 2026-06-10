@@ -42,7 +42,7 @@ deploy_admin() {
 
     # Sync admin files to S3
     echo -e "${BLUE}📤 Syncing admin files to S3...${NC}"
-    aws s3 sync "$PROJECT_DIR/admin/" "s3://$ADMIN_BUCKET/" \
+    aws s3 sync "$PROJECT_DIR/admin-v2/" "s3://$ADMIN_BUCKET/" \
         --region "$REGION" \
         --exclude ".DS_Store" \
         --delete

@@ -73,6 +73,10 @@
 <script>
 const FRONTEND_URL = 'https://yallabalagan.org';
 
+if (!Auth.isPlatformAdmin()) {
+  window.location.replace('index.html');
+}
+
 async function loadInfluencers() {
   try {
     const data = await apiCall('/api/influencers');

@@ -117,6 +117,8 @@ class Location:
     amenities: List[str] = field(default_factory=list)
     contact: Contact = field(default_factory=Contact)
     venue_config: VenueConfig = field(default_factory=VenueConfig)
+    tenant_id: Optional[str] = None
+    allowed_tenants: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -155,7 +157,9 @@ class Location:
             "contact": self.contact.to_dict(),
             "venue_config": self.venue_config.to_dict(),
             "created_at": self.created_at,
-            "updated_at": self.updated_at
+            "updated_at": self.updated_at,
+            "allowed_tenants": self.allowed_tenants,
+            **({"tenant_id": self.tenant_id} if self.tenant_id else {}),
         }
 
     @classmethod
@@ -212,5 +216,7 @@ class Location:
             contact=contact,
             venue_config=venue_config,
             created_at=item.get("created_at"),
-            updated_at=item.get("updated_at")
+            updated_at=item.get("updated_at"),
+            tenant_id=item.get("tenant_id"),
+            allowed_tenants=item.get("allowed_tenants", []),
         )
