@@ -153,10 +153,7 @@ async function prefillSlot(key) {
     if (!mainImageUrl) return;
     try {
         const slot = SLOTS.find(s => s.key === key);
-        const resp = await fetch(mainImageUrl);
-        const blob = await resp.blob();
-        const file = new File([blob], 'event-image.jpg', { type: blob.type || 'image/jpeg' });
-        await cropAndUploadImage(key, file, slot.cropW, slot.cropH);
+        await cropAndUploadImage(key, mainImageUrl, slot.cropW, slot.cropH);
     } catch (err) {
         showToast('Не удалось загрузить изображение: ' + err.message, 'error');
     }
@@ -172,7 +169,8 @@ async function cropAndUploadImage(key, file, cropW, cropH) {
     return new Promise(resolve => {
         showCropModal(file, cropW, cropH, 0.88, async blob => {
             try {
-                const croppedFile = new File([blob], file.name, { type: 'image/jpeg' });
+                const name = (typeof file === 'string') ? 'image.jpg' : (file.name || 'image.jpg');
+                const croppedFile = new File([blob], name, { type: 'image/jpeg' });
                 const url = await uploadToS3(croppedFile, `fb-ads/${key}-${Date.now()}.jpg`);
                 slotUrls[key] = url;
                 markSlotFilled(key, `<img src="${url}" alt="${key}">`);
