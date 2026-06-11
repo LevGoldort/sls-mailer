@@ -19,7 +19,9 @@ def _post(path, token, data):
         print(f"FB API error on POST /{path}: code={err.get('code')} subcode={err.get('error_subcode')} "
               f"type={err.get('type')} msg={err.get('message')} user_msg={err.get('error_user_msg')} "
               f"data={err.get('error_data')}", file=sys.stderr)
-        raise RuntimeError(err.get("message", "Facebook API error"))
+        detail = err.get("error_user_msg") or err.get("error_data") or ""
+        msg = err.get("message", "Facebook API error")
+        raise RuntimeError(f"{msg} (code={err.get('code')}, path=/{path})" + (f": {detail}" if detail else ""))
     resp.raise_for_status()
     return body
 

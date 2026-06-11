@@ -234,6 +234,7 @@ Globals:
         FB_AD_ACCOUNT_ID: !Ref FbAdAccountId
         FB_PAGE_ID: !Ref FbPageId
         FB_SYSTEM_USER_TOKEN: !Ref FbSystemUserToken
+        FB_PIXEL_ID: !Ref FBPixelId
         API_BASE_URL: !Ref ApiBaseUrl
         ADMIN_BASE_URL: !Ref AdminBaseUrl
         MEDIA_BUCKET: !Ref MediaBucket
