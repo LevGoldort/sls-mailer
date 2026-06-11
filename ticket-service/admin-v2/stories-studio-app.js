@@ -225,9 +225,13 @@ function Studio() {
     window.loadYBData().then(data => {
       window.YB_DATA = data;
       setYbData(data);
+      const today = new Date().toISOString().slice(0, 10);
+      const firstUpcomingEvt = data.events
+        .filter(e => e.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
       setSubjects({
         performer: data.performers[0]?.id || null,
-        event:     data.events[0]?.id     || null,
+        event:     firstUpcomingEvt?.id || data.events[0]?.id || null,
         episode:   data.episodes[0]?.id   || null,
         product:   data.merch[0]?.id      || null,
       });
