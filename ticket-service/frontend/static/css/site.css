@@ -807,7 +807,8 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 .yb-event-hero { padding: 4px 60px 0; }
 .yb-event-hero__banner {
   position: relative;
-  height: 520px;
+  aspect-ratio: 16/9;
+  height: auto;
   border: var(--yb-border);
   overflow: hidden;
   background: var(--yb-ink);
@@ -1762,7 +1763,6 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
   .yb-socials__grid { grid-template-columns: repeat(2, 1fr); }
   .yb-performer-grid { grid-template-columns: repeat(2, 1fr); }
   .yb-event-body { grid-template-columns: 1fr; padding: 24px 24px 16px; }
-  .yb-event-body > .yb-loyalty-banner { grid-column: 1; }
   .yb-ticket-widget { position: static; }
   .yb-venue__box { grid-template-columns: 1fr; }
   .yb-venue__map { border-right: none; border-bottom: var(--yb-border); }
@@ -2032,6 +2032,9 @@ hr.yb-rule-solid { border: 0; border-top: var(--yb-border); margin: 0; }
 }
 .yb-event-body > .yb-loyalty-banner {
   grid-column: 2;
+}
+@media (max-width: 900px) {
+  .yb-event-body > .yb-loyalty-banner { grid-column: 1; }
 }
 .yb-loyalty-banner__link {
   color: var(--yb-ink);

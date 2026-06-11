@@ -247,6 +247,7 @@ function addExistingImageCard(container, url, containerId, onRemove) {
 
     const preview = document.createElement('img');
     preview.className = 'image-preview';
+    preview.crossOrigin = 'anonymous';
     preview.src = url;
     preview.onerror = () => {
         preview.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50" x="50" text-anchor="middle" font-size="14">Image</text></svg>';
@@ -271,19 +272,21 @@ function addExistingImageCard(container, url, containerId, onRemove) {
 }
 
 const RESIZE_PRESETS = {
-    'events':     { width: 1200, height: 675 },
-    'performers': { width: 800,  height: 800 },
-    'products':   { width: 1000, height: 1000 },
-    'locations':  { width: 1200, height: 675 },
-    'shows':      { width: 800,  height: 800  },
-    'episodes':   { width: 1280, height: 720 },
+    'events':          { width: 1200, height: 675 },
+    'events_listing':  { width: 900,  height: 600 },
+    'performers':      { width: 800,  height: 800 },
+    'products':        { width: 1000, height: 1000 },
+    'locations':       { width: 1200, height: 675 },
+    'shows':           { width: 800,  height: 800  },
+    'episodes':        { width: 1280, height: 720 },
 };
 
 // ── Crop Modal ──────────────────────────────────────────────────────────────
 
 let _crop = null; // active crop session
 
-function showCropModal(file, targetW, targetH, quality, onDone) {
+function showCropModal(fileOrUrl, targetW, targetH, quality, onDone) {
+    const file = (typeof fileOrUrl === 'string') ? null : fileOrUrl;
     const MARGIN = 40;
     // 340px = dialog chrome (title+subtitle+slider+buttons+padding ~206px) + modal outer padding (32px) + MARGIN*2 (80px) + safety buffer
     const MAX_CROP_H = window.innerHeight - 340;
@@ -351,7 +354,8 @@ function showCropModal(file, targetW, targetH, quality, onDone) {
     slider.value = 1;
     label.textContent = '1×';
 
-    const objectUrl = URL.createObjectURL(file);
+    const objectUrl = file ? URL.createObjectURL(file) : null;
+    const imgSrc = objectUrl || (fileOrUrl + (String(fileOrUrl).includes('?') ? '&' : '?') + '_c=' + Date.now());
 
     _crop = {
         targetW, targetH, quality, onDone,
@@ -381,7 +385,8 @@ function showCropModal(file, targetW, targetH, quality, onDone) {
         _cropClamp();
         _cropApply();
     };
-    img.src = objectUrl;
+    img.crossOrigin = 'anonymous';
+    img.src = imgSrc;
 
     // Drag
     viewport.onmousedown = e => {
@@ -485,7 +490,7 @@ function _cropConfirm() {
     const srcH = c.cropH / totalScale;
     ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, c.targetW, c.targetH);
     canvas.toBlob(blob => {
-        URL.revokeObjectURL(c.objectUrl);
+        if (c.objectUrl) URL.revokeObjectURL(c.objectUrl);
         _cropClose();
         c.onDone(blob);
     }, 'image/jpeg', c.quality);
@@ -493,7 +498,7 @@ function _cropConfirm() {
 
 function _cropCancel() {
     const onDone = _crop?.onDone;
-    if (_crop) URL.revokeObjectURL(_crop.objectUrl);
+    if (_crop?.objectUrl) URL.revokeObjectURL(_crop.objectUrl);
     _cropClose();
     if (onDone) onDone(null);
 }
@@ -719,6 +724,26 @@ function setCoordinatesFromUrl(urlInputId, latInputId, lngInputId) {
             showToast('Не удалось извлечь координаты. Проверьте ссылку.', 'error');
         }
     });
+}
+
+// ── Crop existing URL for listing ───────────────────────────────────────────
+
+async function cropUrlForListing(imageUrl, folder, onSuccess, onError) {
+    const preset = RESIZE_PRESETS[folder];
+    if (!preset) { onError && onError(new Error('Unknown folder')); return; }
+    try {
+        // Pass URL directly — showCropModal loads it with crossOrigin=anonymous, no fetch needed
+        const croppedBlob = await new Promise(resolve =>
+            showCropModal(imageUrl, preset.width, preset.height, 0.88, resolve)
+        );
+        if (!croppedBlob) return; // cancelled
+        const croppedFile = new File([croppedBlob], 'listing.jpg', { type: 'image/jpeg' });
+        const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`;
+        const url = await uploadToS3(croppedFile, filename);
+        onSuccess && onSuccess(url);
+    } catch (err) {
+        onError && onError(err);
+    }
 }
 
 // ── Cover upload with crop (overrides shared.js initCoverUpload) ─────────────

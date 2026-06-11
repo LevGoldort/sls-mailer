@@ -14,7 +14,8 @@ parameter_overrides = [
     "SenderEmail=tickets@yallabalagan.org",
     "GA4Id=G-RP1612BFV9",
     "FBPixelId=738718761834602",
-    "FrontendDistributionId=E395U4QHM2AOIF"
+    "FrontendDistributionId=E395U4QHM2AOIF",
+    "InfluencerTgInvite=https://t.me/+BAaOOkOYDqQ4ZTEy"
     # AllPay credentials loaded from .env.prod via deploy script
     # FB Ads credentials loaded from .env.prod via deploy script
 ]

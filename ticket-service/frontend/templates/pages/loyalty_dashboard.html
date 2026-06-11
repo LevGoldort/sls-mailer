@@ -59,6 +59,17 @@
     </div>
   </div>
 
+  {# Telegram invite #}
+  {% if influencer_tg_invite %}
+  <div class="yb-dash-tg">
+    <span class="yb-dash-tg__icon">✈</span>
+    <div class="yb-dash-tg__body">
+      <p class="yb-dash-tg__text">Присоединяйся к телеграм-чату наших инфлюенсеров — там можно задавать любые вопросы, получать дополнительные промо-коды, ну и вообще, всякое!</p>
+      <a class="yb-btn yb-btn--paper" href="{{ influencer_tg_invite }}" target="_blank" rel="noopener">Вступить в чат →</a>
+    </div>
+  </div>
+  {% endif %}
+
   {# Orders table #}
   <div class="yb-dash-section">
     <div class="yb-dash-section__title">История продаж</div>
@@ -141,6 +152,30 @@
 }
 .yb-dash-stat__value--highlight {
   color: var(--yb-magenta);
+}
+.yb-dash-tg {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border: var(--yb-border);
+  background: var(--yb-paper);
+  padding: 20px 24px;
+  margin-bottom: 2rem;
+}
+.yb-dash-tg__icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.yb-dash-tg__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.yb-dash-tg__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .yb-dash-section__title {
   font-family: var(--yb-font-mono);

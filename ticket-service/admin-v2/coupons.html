@@ -310,7 +310,8 @@
     document.getElementById('discount_value').value = c.discount_value || '';
     document.getElementById('max_uses').value       = c.max_uses || '';
     document.getElementById('expires_at').value     = c.expires_at ? c.expires_at.slice(0,10) : '';
-    document.getElementById('event_id_filter').value = c.event_id || '';
+    const _evIds = c.event_ids || [];
+    document.getElementById('event_id_filter').value = (_evIds.length === 1 && _evIds[0] !== '*') ? _evIds[0] : '';
     document.getElementById('coupon-status').value  = c.status || 'active';
     document.getElementById('coupon-modal').classList.add('active');
   }
@@ -326,7 +327,7 @@
       discount_value: parseFloat(document.getElementById('discount_value').value) || 0,
       max_uses:       parseInt(document.getElementById('max_uses').value) || null,
       expires_at:     document.getElementById('expires_at').value || null,
-      event_id:       document.getElementById('event_id_filter').value || null,
+      event_ids:      document.getElementById('event_id_filter').value ? [document.getElementById('event_id_filter').value] : ['*'],
       status:         document.getElementById('coupon-status').value,
     };
     try {

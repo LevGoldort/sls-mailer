@@ -77,6 +77,11 @@ Parameters:
     Default: "738718761834602"
     Description: Facebook Pixel ID
 
+  InfluencerTgInvite:
+    Type: String
+    Default: "https://t.me/+BAaOOkOYDqQ4ZTEy"
+    Description: Telegram invite link shown on the influencer loyalty dashboard
+
   AdminApiKeys:
     Type: String
     NoEcho: true
@@ -1179,6 +1184,7 @@ Resources:
           GA4_ID: !Ref GA4Id
           FB_PIXEL_ID: !Ref FBPixelId
           CLOUDFRONT_DISTRIBUTION_ID: !Ref FrontendDistributionId
+          INFLUENCER_TG_INVITE: !Ref InfluencerTgInvite
       Layers:
         - !Ref SiteTemplatesLayer
       Policies:

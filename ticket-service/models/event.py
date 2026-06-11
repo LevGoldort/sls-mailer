@@ -63,6 +63,7 @@ class Event:
     external_url: Optional[str] = None  # обязателен когда event_type="external"
     performer_ids: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
+    listing_image_url: str = ''
     allow_auto_discounts: bool = False  # 10% от 3 билетов, 15% от 5+
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
@@ -122,6 +123,9 @@ class Event:
         if self.allow_auto_discounts:
             item["allow_auto_discounts"] = True
 
+        if self.listing_image_url:
+            item["listing_image_url"] = self.listing_image_url
+
         return item
 
     @classmethod
@@ -162,6 +166,7 @@ class Event:
             performer_ids=item.get("performer_ids", []),
             tags=item.get("tags", []),
             allow_auto_discounts=item.get("allow_auto_discounts", False),
+            listing_image_url=item.get("listing_image_url", ""),
             created_at=item.get("created_at"),
             updated_at=item.get("updated_at")
         )

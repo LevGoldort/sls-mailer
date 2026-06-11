@@ -109,7 +109,7 @@
       const isExternal = event.event_type === 'external';
       const stats = calculateEventStats(event);
       const statusClass = `badge-${event.status}`;
-      const publicUrl = event.slug ? `/events/${event.slug}.html` : `/events/${event.event_id}.html`;
+      const publicUrl = event.slug ? `https://yallabalagan.org/events/${event.slug}.html` : `https://yallabalagan.org/events/${event.event_id}.html`;
       const salesMeta = isExternal
         ? ''
         : `<span>Продано: ${stats.soldTickets}/${stats.totalTickets} (${stats.capacity}%)</span><span>${formatCurrency(stats.revenue)}</span>`;

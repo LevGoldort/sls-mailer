@@ -36,7 +36,8 @@
 
     var qty = {};
     var prices = {};
-    var discount = 0;
+    var couponType = null;   // 'percentage' or 'fixed_amount', null when no coupon
+    var couponValue = 0;
     var autoDiscounts = widget.dataset.autoDiscounts === 'true';
 
     tiers.forEach(function (tier) {
@@ -51,10 +52,18 @@
         totalCount += qty[id];
         totalPrice += qty[id] * prices[id];
       });
-      totalPrice = Math.max(0, totalPrice - discount);
+
+      // Recalculate coupon discount dynamically — mirrors server-side logic
+      var couponDiscount = 0;
+      if (couponType === 'percentage') {
+        couponDiscount = Math.round(totalPrice * (couponValue / 100) * 100) / 100;
+      } else if (couponType === 'fixed_amount') {
+        couponDiscount = Math.min(couponValue * totalCount, totalPrice);
+      }
+      totalPrice = Math.max(0, totalPrice - couponDiscount);
 
       var autoDiscountPct = 0;
-      if (autoDiscounts && discount === 0) {
+      if (autoDiscounts && couponType === null) {
         if (totalCount >= 5) autoDiscountPct = 0.15;
         else if (totalCount >= 3) autoDiscountPct = 0.10;
       }
@@ -73,7 +82,7 @@
         if (t.autoDiscountPct > 0) label += ' (−' + (t.autoDiscountPct * 100) + '%)';
         totalLabelEl.textContent = label;
       }
-      if (discountInfoEl) discountInfoEl.style.display = discount > 0 ? 'none' : '';
+      if (discountInfoEl) discountInfoEl.style.display = couponType !== null ? 'none' : '';
       if (buyBtn) {
         if (t.count > 0) {
           buyBtn.style.opacity = '1';
@@ -163,7 +172,8 @@
           .then(function (r) { return r.json(); })
           .then(function (data) {
             if (data.valid) {
-              discount = data.discount_amount || 0;
+              couponType  = data.coupon.discount_type;
+              couponValue = data.coupon.discount_value;
               promoInput.style.borderColor = 'var(--yb-cyan)';
               showPromoMsg('✓ ' + (data.discount_description || 'Промокод применён'), false);
               update();
@@ -179,11 +189,13 @@
       });
     }
 
-    // Pre-fill promo code from URL ?c=CODE (influencer deep links)
+    // Pre-fill and auto-apply promo code from URL ?c=CODE (influencer deep links)
     var urlCode = new URLSearchParams(window.location.search).get('c');
     if (urlCode && promoInput) {
       promoInput.value = urlCode.toUpperCase();
-      if (promoMsg) {
+      if (promoApply) {
+        promoApply.click();
+      } else if (promoMsg) {
         promoMsg.textContent = 'Промокод из ссылки — нажми «Применить» для расчёта скидки';
         promoMsg.style.color = 'var(--yb-ink, #333)';
         promoMsg.style.display = 'block';

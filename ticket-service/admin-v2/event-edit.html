@@ -196,6 +196,16 @@
           <div class="card-header"><span class="card-title">Изображения</span></div>
           <div class="card-body">
             <div id="event-images-upload"></div>
+            <div style="margin-top:20px;border-top:1px solid var(--border-color);padding-top:16px;">
+              <div style="margin-bottom:10px;font-size:13px;color:var(--text-secondary);">
+                Фото для карточки (3:2) — кроп основного фото под листинг. Если не задано, используется основное фото.
+              </div>
+              <div id="listing-crop-preview" style="display:none;align-items:center;gap:10px;margin-bottom:10px;">
+                <img id="listing-crop-img" style="height:80px;border-radius:6px;border:1px solid var(--border-color);object-fit:cover;" alt="">
+                <button type="button" onclick="removeListingImage()" style="padding:4px 10px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">✕ Убрать</button>
+              </div>
+              <button type="button" id="btn-crop-listing" onclick="cropListingImage()" style="padding:8px 16px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">✂ Кроп под карточку</button>
+            </div>
           </div>
         </div>
 
@@ -246,6 +256,7 @@
   let eventId = null;
   let ticketTypeCounter = 0;
   let imageUrls = [];
+  let listingImageUrl = '';
   let slugManuallyEdited = false;
   let allEventOrders = [];
   let currentEventData = null;
@@ -413,7 +424,8 @@
       slug:        document.getElementById('slug').value.trim() || null,
       event_type:  currentEventType,
       performer_ids: getSelectedPerformerIds(),
-      images:      imageUrls,
+      images:            imageUrls,
+      listing_image_url: listingImageUrl,
       allow_auto_discounts: document.getElementById('allow_auto_discounts').checked,
     };
     if (currentEventType === 'external') {
@@ -494,7 +506,7 @@
       renderPerformersChecklist(event.performer_ids || []);
 
       if (event.images?.length) { imageUrls = event.images; }
-      initImageUploadComponent(imageUrls);
+      initImageUploadComponent(imageUrls, event.listing_image_url || '');
 
       // Ticket types
       const container = document.getElementById('ticket-types-container');
@@ -653,13 +665,48 @@
     });
   }
 
-  function initImageUploadComponent(existing = []) {
+  function initImageUploadComponent(existing = [], existingListing = '') {
     if (typeof initImageUpload !== 'function') return;
     initImageUpload('event-images-upload', 'events',
       (url) => { imageUrls.push(url); markDirty(); },
       (err) => { showToast('Ошибка загрузки фото', 'error'); },
       { existingImages: existing, onRemove: (url) => { imageUrls = imageUrls.filter(u => u !== url); markDirty(); } }
     );
+    listingImageUrl = existingListing;
+    renderListingCropPreview();
+  }
+
+  function renderListingCropPreview() {
+    const preview = document.getElementById('listing-crop-preview');
+    const img = document.getElementById('listing-crop-img');
+    if (!preview || !img) return;
+    if (listingImageUrl) {
+      img.src = listingImageUrl;
+      preview.style.display = 'flex';
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  async function cropListingImage() {
+    const sourceUrl = imageUrls[0] || currentEventData?.photo_url;
+    if (!sourceUrl) { showToast('Сначала загрузи основное фото', 'error'); return; }
+    const btn = document.getElementById('btn-crop-listing');
+    if (btn) btn.disabled = true;
+    if (typeof cropUrlForListing !== 'function') { showToast('Ошибка: компонент загрузки не инициализирован', 'error'); if (btn) btn.disabled = false; return; }
+    await cropUrlForListing(
+      sourceUrl,
+      'events_listing',
+      (url) => { listingImageUrl = url; markDirty(); renderListingCropPreview(); },
+      (err) => { showToast('Ошибка кропа: ' + (err?.message || err), 'error'); }
+    );
+    if (btn) btn.disabled = false;
+  }
+
+  function removeListingImage() {
+    listingImageUrl = '';
+    markDirty();
+    renderListingCropPreview();
   }
 
   async function init() {

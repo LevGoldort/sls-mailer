@@ -64,7 +64,7 @@
 
   {# Photo column #}
   <div class="yb-event-card__img">
-    <img src="{{ event.get('photo_url') or pick_placeholder(event['event_id']) }}" alt="{{ event['title'] }}" loading="lazy">
+    <img src="{{ event.get('listing_photo_url') or pick_placeholder(event['event_id']) }}" alt="{{ event['title'] }}" loading="lazy">
     <div class="yb-halftone yb-halftone--magenta" aria-hidden="true"></div>
   </div>
 

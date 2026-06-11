@@ -176,6 +176,7 @@ def _enrich_event(event, performer_map):
     if 'photo_url' not in event:
         imgs = event.get('images', [])
         event['photo_url'] = imgs[0] if imgs else ''
+    event['listing_photo_url'] = event.get('listing_image_url') or event.get('photo_url', '')
 
 
 def fetch_data():
@@ -371,6 +372,7 @@ def generate_html_files(site_data, output_dir, templates_dir):
         'api_url': API_URL,
         'location_map': location_map,
         'pick_placeholder': pick_placeholder,
+        'influencer_tg_invite': os.environ.get('INFLUENCER_TG_INVITE', ''),
     })
 
     pages_generated = 0

@@ -285,6 +285,7 @@ def list_events(request_event: Dict = None) -> Dict:
                 'external_url': item.get('external_url', ''),
                 'tags': item.get('tags', []),
                 'allow_auto_discounts': evt.allow_auto_discounts,
+                'listing_image_url': evt.listing_image_url,
             })
         except Exception as e:
             print(f"Error parsing event: {e}")
@@ -309,6 +310,7 @@ def get_event(event_id: str) -> Dict:
     event_dict['event_type'] = item.get('event_type', 'internal')
     event_dict['performer_ids'] = item.get('performer_ids', [])
     event_dict['external_url'] = item.get('external_url', '')
+    event_dict['listing_image_url'] = evt.listing_image_url
 
     return success_response({
         'event': event_dict
@@ -636,9 +638,11 @@ def create_event(request_event: Dict) -> Dict:
             ticket_types=ticket_types,
             currency=body.get('currency', 'ILS'),
             images=body.get('images', []),
+            listing_image_url=body.get('listing_image_url', ''),
             slug=slug_value,
             seat_allocation=seat_allocation,
             owner_id=ctx.get('user_id'),
+            tenant_id=ctx.get('tenant_id'),
             allow_auto_discounts=bool(body.get('allow_auto_discounts', False)),
         )
 
@@ -779,6 +783,8 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
             evt.currency = body['currency']
         if 'images' in body:
             evt.images = body['images']
+        if 'listing_image_url' in body:
+            evt.listing_image_url = body['listing_image_url']
         if 'status' in body:
             evt.status = body['status']
         if 'ticket_types' in body:
@@ -1567,7 +1573,7 @@ def create_order(request_event: Dict) -> Dict:
         subtotal = sum(t.get_total() for t in order_tickets)
 
         # Process coupon if provided
-        coupon_code = body.get('coupon_code')
+        coupon_code = body.get('coupon_code', '').strip().upper() or None
         discount_amount = 0
         coupon = None
 
