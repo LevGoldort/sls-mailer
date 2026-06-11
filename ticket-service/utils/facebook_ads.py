@@ -1,6 +1,7 @@
 import requests
 
 GRAPH_URL = "https://graph.facebook.com/v22.0"
+RUSSIAN_LOCALE_ID = 39  # ru_RU — from GET /search?type=adlocale&q=Russian
 CAMPAIGN_PREFIX = "YB | "
 
 
@@ -153,5 +154,6 @@ def build_targeting(city_lat, city_lng, radius_km=10):
                 "distance_unit": "kilometer",
             }]
         },
+        "locales": [RUSSIAN_LOCALE_ID],
         "age_min": 18,
     }
