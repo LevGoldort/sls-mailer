@@ -90,7 +90,7 @@ def create_image_ad_creative(page_id, message, image_hash, link_url, token, ad_a
                 "message": message,
                 "image_hash": image_hash,
                 "link": link_url,
-                "call_to_action": {"type": "BUY_TICKETS"},
+                "call_to_action": {"type": "LEARN_MORE"},
             },
         },
     })
@@ -105,7 +105,7 @@ def create_video_ad_creative(page_id, message, video_id, link_url, token, ad_acc
                 "video_id": video_id,
                 "message": message,
                 "call_to_action": {
-                    "type": "BUY_TICKETS",
+                    "type": "LEARN_MORE",
                     "value": {"link": link_url},
                 },
             },
