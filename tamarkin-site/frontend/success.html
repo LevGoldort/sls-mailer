@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дело Тамаркина</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap&subset=cyrillic,cyrillic-ext,latin" rel="stylesheet">
+  <link rel="stylesheet" href="css/accessibility-toolbar.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100vh; }
+    body { background: #f4f3ef; font-family: 'IBM Plex Sans', sans-serif; color: #1f1d18; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; }
+    .card { background: #faf9f5; border: 1px solid #e0dccf; border-radius: 8px; padding: clamp(40px, 7vw, 72px) clamp(32px, 6vw, 64px); max-width: 560px; width: 100%; text-align: center; }
+    .icon { width: 56px; height: 56px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 28px; }
+    .icon-success { background: #14223f; }
+    .icon-error { background: #b03a2e; }
+    .icon-loading { background: #e3dfd3; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    h1 { font-family: 'Spectral', serif; font-size: clamp(28px, 5vw, 42px); font-weight: 800; color: #14223f; margin: 0 0 14px; line-height: 1.1; }
+    p { font-size: 17px; color: #57534a; line-height: 1.6; margin: 0 0 32px; }
+    a.btn { display: inline-block; font-size: 15px; font-weight: 600; color: #14223f; text-decoration: none; border: 1px solid #14223f; border-radius: 6px; padding: 12px 28px; transition: all .15s; }
+    a.btn:hover { background: #14223f; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <!-- filled by JS -->
+  </div>
+
+  <script src="js/accessibility-toolbar.js"></script>
+  <script>
+    const API_URL = '__API_URL__';
+    const MAX_ATTEMPTS = 8;
+    const POLL_INTERVAL = 2500;
+
+    const id = new URLSearchParams(window.location.search).get('id');
+    const card = document.getElementById('card');
+
+    function renderLoading() {
+      card.innerHTML = `
+        <div class="icon icon-loading" aria-hidden="true"></div>
+        <h1>Проверяем платёж…</h1>
+        <p>Это займёт несколько секунд.</p>`;
+    }
+
+    function renderSuccess() {
+      card.innerHTML = `
+        <div class="icon icon-success" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h1>Спасибо за поддержку!</h1>
+        <p>Ваше пожертвование получено. Вместе мы помогаем Вове Тамаркину отстоять право говорить со сцены.</p>
+        <a href="/" class="btn">← Вернуться на страницу</a>`;
+    }
+
+    function renderError(msg) {
+      card.innerHTML = `
+        <div class="icon icon-error" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+        <h1>Платёж не прошёл</h1>
+        <p>${msg}</p>
+        <a href="/" class="btn">← Попробовать снова</a>`;
+    }
+
+    async function checkStatus(attempt) {
+      try {
+        const res = await fetch(`${API_URL}/api/payment-status?id=${encodeURIComponent(id)}`);
+        const data = await res.json();
+
+        if (data.status === 'completed') {
+          renderSuccess();
+          return;
+        }
+        if (data.status === 'not_found') {
+          renderError('Платёж не найден. Если средства были списаны, свяжитесь с нами.');
+          return;
+        }
+        // still pending
+        if (attempt < MAX_ATTEMPTS) {
+          setTimeout(() => checkStatus(attempt + 1), POLL_INTERVAL);
+        } else {
+          renderError('Платёж обрабатывается дольше обычного. Если средства были списаны — они будут учтены. Можете закрыть эту страницу.');
+        }
+      } catch (e) {
+        if (attempt < MAX_ATTEMPTS) {
+          setTimeout(() => checkStatus(attempt + 1), POLL_INTERVAL);
+        } else {
+          renderError('Не удалось проверить статус платежа. Попробуйте обновить страницу.');
+        }
+      }
+    }
+
+    if (!id) {
+      renderError('Неверная ссылка. Вернитесь и попробуйте ещё раз.');
+    } else {
+      renderLoading();
+      setTimeout(() => checkStatus(1), 1500);
+    }
+  </script>
+</body>
+</html>

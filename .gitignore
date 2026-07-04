@@ -50,6 +50,7 @@ Thumbs.db
 .env.dev
 .env.production
 .env.development
+.env.tamarkin
 
 # AWS
 *.zip

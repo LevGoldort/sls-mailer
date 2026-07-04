@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Tamarkin Fundraising Site - Isolated Serverless Stack
+
+Parameters:
+  AllPayLogin:
+    Type: String
+    NoEcho: true
+    Description: AllPay login for Tamarkin merchant account
+
+  AllPayApiKey:
+    Type: String
+    NoEcho: true
+    Description: AllPay API key for request signatures
+
+  DonationGoal:
+    Type: Number
+    Default: 20000
+    Description: Fundraising goal in NIS
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        DONATIONS_TABLE: tamarkin-donations
+        DONATION_GOAL: !Ref DonationGoal
+
+Resources:
+
+  # ── DynamoDB ──────────────────────────────────────────────────────────────
+
+  DonationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: tamarkin-donations
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: donation_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: donation_id
+          KeyType: HASH
+
+  # ── S3 static site ────────────────────────────────────────────────────────
+
+  TamarkinSiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: tamarkin-donations-site
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  TamarkinSiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TamarkinSiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${TamarkinSiteBucket.Arn}/*"
+
+  # ── API Gateway ───────────────────────────────────────────────────────────
+
+  TamarkinApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+
+  # ── Lambda: initiate donation ──────────────────────────────────────────────
+
+  DonationInitiatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: tamarkin-donation-initiator
+      CodeUri: lambdas/
+      Handler: donation_initiator.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: tamarkin-donations
+      Environment:
+        Variables:
+          ALLPAY_LOGIN: !Ref AllPayLogin
+          ALLPAY_API_KEY: !Ref AllPayApiKey
+          API_URL: placeholder
+      Events:
+        DonatePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TamarkinApi
+            Path: /api/donate
+            Method: POST
+
+  # ── Lambda: AllPay webhook ─────────────────────────────────────────────────
+
+  WebhookHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: tamarkin-webhook-handler
+      CodeUri: lambdas/
+      Handler: webhook_handler.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: tamarkin-donations
+      Environment:
+        Variables:
+          ALLPAY_API_KEY: !Ref AllPayApiKey
+      Events:
+        AllPayWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TamarkinApi
+            Path: /webhook/allpay
+            Method: POST
+
+  # ── Lambda: progress bar data ──────────────────────────────────────────────
+
+  ProgressHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: tamarkin-progress-handler
+      CodeUri: lambdas/
+      Handler: progress_handler.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: tamarkin-donations
+      Events:
+        ProgressGet:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TamarkinApi
+            Path: /api/progress
+            Method: GET
+
+  # ── Lambda: payment status check ──────────────────────────────────────────
+
+  PaymentStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: tamarkin-payment-status
+      CodeUri: lambdas/
+      Handler: payment_status.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: tamarkin-donations
+      Events:
+        StatusGet:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TamarkinApi
+            Path: /api/payment-status
+            Method: GET
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL — copy to .env.tamarkin as TAMARKIN_API_URL after first deploy
+    Value: !Sub "https://${TamarkinApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  SiteUrl:
+    Description: S3 website URL (before CloudFront)
+    Value: !GetAtt TamarkinSiteBucket.WebsiteURL

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ошибка оплаты — Дело Тамаркина</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap&subset=cyrillic,cyrillic-ext,latin" rel="stylesheet">
+  <link rel="stylesheet" href="css/accessibility-toolbar.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100vh; }
+    body { background: #f4f3ef; font-family: 'IBM Plex Sans', sans-serif; color: #1f1d18; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; }
+    .card { background: #faf9f5; border: 1px solid #e0dccf; border-radius: 8px; padding: clamp(40px, 7vw, 72px) clamp(32px, 6vw, 64px); max-width: 560px; width: 100%; text-align: center; }
+    h1 { font-family: 'Spectral', serif; font-size: clamp(28px, 5vw, 40px); font-weight: 800; color: #14223f; margin: 0 0 16px; line-height: 1.1; }
+    p { font-size: 17px; color: #57534a; line-height: 1.6; margin: 0 0 32px; }
+    a.back-link { display: inline-block; font-size: 15px; font-weight: 600; color: #14223f; text-decoration: none; border: 1px solid #14223f; border-radius: 6px; padding: 12px 28px; transition: all .15s; }
+    a.back-link:hover { background: #14223f; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Что-то пошло не так</h1>
+    <p>Платёж не был завершён. Пожалуйста, вернитесь и попробуйте ещё раз — ваши данные сохранены.</p>
+    <a href="/" class="back-link">← Попробовать снова</a>
+  </div>
+  <script src="js/accessibility-toolbar.js"></script>
+</body>
+</html>

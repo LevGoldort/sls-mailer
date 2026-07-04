@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дело Тамаркина</title>
+  <meta name="description" content="Сбор средств для комика Вовы Тамаркина">
+  <meta property="og:title" content="Дело Тамаркина">
+  <meta property="og:description" content="Сбор средств для комика Вовы Тамаркина">
+  <meta property="og:type" content="website">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap&subset=cyrillic,cyrillic-ext,latin" rel="stylesheet">
+  <link rel="stylesheet" href="css/accessibility-toolbar.css">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { background: #f4f3ef; font-family: 'IBM Plex Sans', sans-serif; color: #1f1d18; }
+    ::selection { background: #1b2a4a; color: #fff; }
+    input::placeholder { color: #9a978f; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    .skip-link {
+      position: absolute; top: -40px; left: 0;
+      background: #14223f; color: #fff; padding: 8px 16px;
+      text-decoration: none; z-index: 9999;
+    }
+    .skip-link:focus { top: 0; }
+
+    input:focus { border-color: #14223f !important; outline: none; box-shadow: 0 0 0 3px rgba(20,34,63,.12); }
+
+    .preset-btn {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 16px; font-weight: 600;
+      padding: 13px 0; flex: 1 1 90px; min-width: 84px;
+      border-radius: 6px; cursor: pointer; transition: all .12s;
+      background: #fff; color: #1f1d18; border: 1px solid #d2cdbe;
+    }
+    .preset-btn:hover { border-color: #14223f; }
+    .preset-btn.active { background: #14223f; color: #fff; border-color: #14223f; }
+
+    .doc-download {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 14px; font-weight: 600; color: #14223f;
+      text-decoration: none; border: 1px solid #c8c3b4;
+      border-radius: 5px; padding: 8px 15px; background: #fff;
+      transition: all .15s;
+    }
+    .doc-download:hover { border-color: #14223f; background: #14223f; color: #fff; }
+    .doc-download:hover svg { stroke: #fff; }
+
+    .submit-btn {
+      font-family: 'IBM Plex Sans', sans-serif;
+      width: 100%; font-size: 17px; font-weight: 600;
+      color: #fff; background: #14223f; border: none;
+      border-radius: 7px; padding: 17px; cursor: pointer;
+      letter-spacing: 0.01em; transition: background .15s;
+    }
+    .submit-btn:hover { background: #1d3157; }
+    .submit-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+
+    .footer-link { transition: color .15s; }
+    .footer-link:hover { color: #14223f !important; }
+
+    .fn-term {
+      border-bottom: 1px dashed #57534a;
+      cursor: help;
+      position: relative;
+      display: inline;
+    }
+    .fn-popup {
+      display: none;
+      position: absolute;
+      left: 0; top: calc(100% + 8px);
+      width: 320px; max-width: 90vw;
+      background: #faf9f5;
+      border: 1px solid #d2cdbe;
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px; line-height: 1.6;
+      color: #2c2a24;
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      z-index: 100;
+      cursor: auto;
+    }
+    .fn-term.open .fn-popup { display: block; }
+
+    #form-error {
+      font-size: 14px; color: #b03a2e;
+      margin-bottom: 16px; display: none;
+    }
+
+    @media (max-width: 640px) {
+      .layout-row { flex-direction: column !important; }
+      .sticky-col { position: static !important; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">К содержимому</a>
+
+  <div style="min-height: 100vh; padding: 0 24px;">
+    <div style="max-width: 1080px; margin: 0 auto;">
+
+      <!-- Header -->
+      <header style="padding: 96px 0 56px; border-bottom: 1px solid #ddd9cf;">
+        <h1 style="font-family: 'Spectral', serif; font-weight: 800; font-size: clamp(48px, 8vw, 92px); line-height: 0.98; letter-spacing: -0.01em; margin: 0; color: #14223f;">Дело Тамаркина</h1>
+      </header>
+
+      <main id="main-content">
+
+        <!-- Photo + Text -->
+        <section style="display: flex; flex-wrap: wrap; gap: 56px; padding: 72px 0; align-items: flex-start;" class="layout-row">
+
+          <div style="flex: 1 1 300px; min-width: 280px; position: sticky; top: 32px;" class="sticky-col">
+            <div style="width: 100%; aspect-ratio: 1/1; border-radius: 4px; overflow: hidden; background: #4a1f22;">
+              <img src="tamarkin-portrait.jpg" alt="Вова Тамаркин" style="width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; display: block;">
+            </div>
+            <div style="margin-top: 22px; aspect-ratio: 16/9; background: #14223f; border-radius: 4px; overflow: hidden;">
+              <iframe style="width: 100%; height: 100%; border: 0; display: block;"
+                src="https://www.youtube.com/embed/vByTtH06pgQ"
+                title="Видеообращение Ильи Тамаркина о ситуации с делом"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen loading="lazy"></iframe>
+            </div>
+          </div>
+
+          <article style="flex: 3 1 460px; min-width: 320px; font-family: 'Spectral', serif; font-size: 19px; line-height: 1.72; color: #2c2a24;">
+            <p style="margin: 0 0 24px;">Привет! Меня зовут Вова Тамаркин, я комик и организатор стендапа. На меня подала в суд зрительница, я проиграл, и это довольно трагикомичная история - потому что осудили меня за слова, которых я не говорил. Те слова что я говорил, суд оскорбительными не счёл.</p>
+            <p style="margin: 0 0 24px;"><strong style="font-weight: 700; color: #14223f;">Что произошло.</strong> Я проводил <span class="fn-term" tabindex="0" role="button" aria-expanded="false">открытый микрофон<span class="fn-popup">Мероприятие для проверки новых шуток в маленьком зале для танцев в Бат-Яме, поэтому никакой охраны, которая должна вывести хеклера, нет и быть не может, все существует в рамках общественного договора и зачитываемых в начале вечера правил. В этих правилах ведущий как правило просит не разговаривать с комиками и друг другом и предупреждает, что будет обсценная лексика.</span></span> в Бат-Яме, выступали комики с новыми шутками. В первом ряду сидела женщина, которая выкрикивала с места и мешала вести мероприятие. Я пытался уговорить ее замолчать, пересаживал с места на место, она участвовала но не переставала мешать мероприятию. В какой-то момент я сказал что если она будет мешать, то другие комики будет ее "<span class="fn-term" tabindex="0" role="button" aria-expanded="false">хуесосить<span class="fn-popup">Генеральный Интернет-корпус Русского Языка (ГИКРЯ) показывает, что это слово практически всегда употребляется в значении «ругать» («хуесосить последними словами»). <a href="https://ruscorpora.ru/results?search=CqMBEnUKcwoXCgdkaXN0bW9kEgwKCndpdGhfemVyb3MSWAowCgNsZXgSKQon0YXRg9C10YHQvtGB0LjRgtGMfCLRhdGD0LXRgdC%252B0YHQuNGC0YwiCgoKBGZvcm0SAgoACgsKBWdyYW1tEgIKAAoLCgVmbGFncxICCgAqIwoICAAQMhgyIAogACivjZWP8tn3DjIFZ3JzdGRABXgBoAEBMgIIGDoBAQ%253D%253D" target="_blank" rel="noopener" style="color: #14223f; font-weight: 600;">Открыть ГИКРЯ →</a></span></span>". А ближе к концу вечера, когда она не перестала мешать, вынес табличку, где был написан призыв замолчать. Она решила пойти в суд. У нас не вышло помириться через посредничество других комиков и общих знакомых.</p>
+            <p style="margin: 0 0 24px;"><strong style="font-weight: 700; color: #14223f;">А теперь главное - что с этим сделал суд.</strong> Ровно эти мои слова и действия - слово «хуесосить» и таблички - судья рассмотрела и оскорбительными не признала. Осудили меня за другое: за то, что я якобы оскорбил зрительницу по признаку веса. Этих слов я не говорил. То, что я отрицаю, что произносил это, тоже прямо записано в вердикте. Вероятно, их говорил кто-то другой из выступавших комиков - потому что другие свидетели с её стороны эти слова слышали и приписали мне.</p>
+            <p style="margin: 0 0 24px;">В итоге судья решила, что показания её свидетелей правдоподобнее показаний моих. Печально, что мы не смогли доказать, что слов, за которые меня осудили, я не говорил. Теперь мне нужно заплатить зрительнице 10 000 шекелей по вердикту. Плюс к этому, мои сопутствующие расходы на суд.</p>
+            <p style="margin: 0 0 24px;"><strong style="font-weight: 700; color: #14223f;">Как я это вижу.</strong> Занимаясь комедией, я хочу, чтобы зрители могли посмеяться и уйти домой в хорошем настроении. То, что человек ушёл с моего вечера в настолько плохом настроении, что довёл это до суда - конечно же противоречит тому, ради чего я занимаюсь стендапом. Я никогда не выхожу на сцену с желанием кого-то обидеть. И надеюсь, такого больше никогда не повторится.</p>
+            <p style="margin: 0 0 24px;"><strong style="font-weight: 700; color: #14223f;">Это история не только про меня.</strong> Теперь это не просто рассказ о комике и хеклере, а судебный прецедент. И вот это уже касается кого угодно, кто ведёт живое мероприятие - не обязательно стендап. Плэйбэк театр, музыкальный вечер - что угодно, куда можно прийти и начать провоцировать людей на сцене разговорами, дожидаясь реакции. Под наибольшим ударом ведущий вечера – на живом мероприятии реагируют многие, а отвечать будет тот, кого чаще видят у микрофона.</p>
+            <p style="margin: 0 0 16px;"><strong style="font-weight: 700; color: #14223f;">О чём я прошу.</strong> Во-первых - пожалуйста, не ищите зрительницу в соцсетях и ничего ей не пишите! Это меня не поддержит и никому не поможет.</p>
+            <p style="margin: 0 0 16px;">Если считаете вердикт несправедливым и хотите помочь с выплатой штрафа - ниже форма для оплаты.</p>
+            <p style="margin: 0 0 16px;">А если просто хотите поддержать меня как комика - вот моё стендап-видео (сбоку и <a href="https://youtu.be/vByTtH06pgQ" target="_blank" rel="noopener" style="color: #14223f; font-weight: 600;">вот тут</a>). И можете подписаться на мои каналы в <a href="https://t.me/vova_tamarkin" target="_blank" rel="noopener" style="color: #14223f; font-weight: 600;">телеграме</a>, <a href="https://instagram.com/vova.tamarkin" target="_blank" rel="noopener" style="color: #14223f; font-weight: 600;">инстаграме</a> или <a href="https://www.tiktok.com/@vova.tamarkin" target="_blank" rel="noopener" style="color: #14223f; font-weight: 600;">тиктоке</a>.</p>
+            <p style="margin: 0 0 16px;">Прикладываю вердикт суда для тех кто любопытен. Когда появится протокол допросов добавим его тоже.</p>
+            <p style="margin: 0;">Спасибо за внимание к этому вопросу!</p>
+          </article>
+        </section>
+
+        <!-- Documents -->
+        <section style="padding: 8px 0 72px;">
+          <h2 style="font-family: 'Spectral', serif; font-weight: 700; font-size: 28px; margin: 0 0 24px; color: #14223f;">Документы по делу</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 20px;" class="layout-row">
+
+            <div style="flex: 1 1 280px; min-width: 0; max-width: 100%; display: flex; gap: 18px; align-items: flex-start; background: #faf9f5; border: 1px solid #e0dccf; border-radius: 6px; padding: 20px;">
+              <div style="flex: 0 0 auto; width: 44px; height: 56px; border-radius: 4px; background: #14223f; position: relative; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 9px;" aria-hidden="true">
+                <div style="position: absolute; top: 0; right: 0; width: 14px; height: 14px; background: #2e4068; border-bottom-left-radius: 4px;"></div>
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: #fff;">PDF</span>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; font-size: 16px; color: #1f1d18; margin-bottom: 4px;">Решение суда.pdf</div>
+                <div style="font-size: 13.5px; color: #7d7a70; line-height: 1.45; margin-bottom: 16px;"></div>
+                <a href="documents/%D0%A0%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D0%B5%20%D1%81%D1%83%D0%B4%D0%B0.pdf" download="Решение суда.pdf" class="doc-download">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+                  Скачать
+                </a>
+              </div>
+            </div>
+
+            <div style="flex: 1 1 280px; min-width: 0; max-width: 100%; display: flex; gap: 18px; align-items: flex-start; background: #faf9f5; border: 1px solid #e0dccf; border-radius: 6px; padding: 20px;">
+              <div style="flex: 0 0 auto; width: 44px; height: 56px; border-radius: 4px; background: #14223f; position: relative; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 9px;" aria-hidden="true">
+                <div style="position: absolute; top: 0; right: 0; width: 14px; height: 14px; background: #2e4068; border-bottom-left-radius: 4px;"></div>
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: #fff;">PDF</span>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; font-size: 16px; color: #1f1d18; margin-bottom: 4px;">Протокол заседания.pdf</div>
+                <div style="font-size: 13.5px; color: #7d7a70; line-height: 1.45;">Добавим как только появится в доступе.</div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Progress -->
+        <section style="padding: 0 0 64px;" aria-label="Прогресс сбора">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+            <div style="font-size: 15px; color: #57534a;">Собрано
+              <span id="collected-amount" style="font-family: 'Spectral', serif; font-size: 30px; font-weight: 700; color: #14223f; margin-left: 6px;">…</span>
+            </div>
+            <div style="font-size: 15px; color: #8a877d;">Цель: <span style="font-weight: 600; color: #57534a;">20 000 ₪</span></div>
+          </div>
+          <div id="progress-bar-wrap" style="width: 100%; height: 14px; background: #e3dfd3; border-radius: 8px; overflow: hidden;"
+               role="progressbar" aria-valuemin="0" aria-valuemax="20000" aria-valuenow="0" aria-label="Прогресс сбора">
+            <div id="progress-bar" style="width: 0%; height: 100%; background: #14223f; border-radius: 8px; transition: width .7s ease;"></div>
+          </div>
+          <div style="font-size: 14px; color: #7d7a70; margin-top: 12px;">
+            <strong id="donor-count" style="color: #14223f; font-weight: 600;">…</strong>
+            <span id="donor-label"></span>
+          </div>
+        </section>
+
+        <!-- Donation form -->
+        <section style="padding: 0 0 80px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start;" class="layout-row">
+
+          <!-- Info sidebar -->
+          <div style="flex: 1 1 240px; min-width: 220px; padding-top: 4px;">
+            <p style="font-size: 15px; line-height: 1.65; color: #2c2a24; margin: 0 0 18px;">Вова принимает платежи как Осек Заир и отчитается о них как о доходах. Мы собираем сумму штрафа + расходы на адвокатов + 20% на налоги и сборы.</p>
+            <p style="font-size: 15px; line-height: 1.65; color: #2c2a24; margin: 0 0 24px;">Если вам нужна персональная квитанция от Вовы — поставьте галочку, он пришлёт её вам на почту.</p>
+            <div style="border-top: 1px solid #ddd9cf; padding-top: 20px;">
+              <div style="font-size: 13px; font-weight: 600; color: #7d7a70; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;">Связаться с Вовой</div>
+              <a href="https://t.me/vova_tamarkin?direct" style="display: flex; align-items: center; gap: 9px; font-size: 15px; color: #14223f; text-decoration: none; margin-bottom: 10px; font-weight: 500;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                @vova_tamarkin
+              </a>
+              <a href="mailto:tamarkinvova@gmail.com" style="display: flex; align-items: center; gap: 9px; font-size: 15px; color: #14223f; text-decoration: none; font-weight: 500;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                tamarkinvova@gmail.com
+              </a>
+            </div>
+          </div>
+
+          <!-- Form card -->
+          <div style="flex: 2 1 360px; min-width: 300px;">
+          <div style="background: #faf9f5; border: 1px solid #e0dccf; border-radius: 8px; padding: clamp(28px, 5vw, 48px);">
+            <h2 style="font-family: 'Spectral', serif; font-weight: 700; font-size: 34px; margin: 0 0 28px; color: #14223f;">Поддержать</h2>
+
+            <div style="font-size: 14px; font-weight: 600; color: #57534a; margin-bottom: 11px;" id="presets-label">Выберите сумму</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 11px; margin-bottom: 24px;" role="group" aria-labelledby="presets-label">
+              <button type="button" class="preset-btn" data-amount="50">50 ₪</button>
+              <button type="button" class="preset-btn active" data-amount="100">100 ₪</button>
+              <button type="button" class="preset-btn" data-amount="200">200 ₪</button>
+              <button type="button" class="preset-btn" data-amount="500">500 ₪</button>
+              <button type="button" class="preset-btn" data-amount="custom">Своя сумма</button>
+            </div>
+
+            <div id="custom-amount-wrap" style="display: none; margin-bottom: 24px;">
+              <label for="custom-amount" style="display: block; font-size: 14px; font-weight: 600; color: #57534a; margin-bottom: 8px;">Введите сумму</label>
+              <input type="number" id="custom-amount" placeholder="Минимум 10 ₪" min="10" max="50000"
+                style="font-family: 'IBM Plex Sans', sans-serif; width: 100%; font-size: 16px; padding: 13px 15px; border: 1px solid #d2cdbe; border-radius: 6px; background: #fff; color: #1f1d18;">
+            </div>
+
+            <label for="donor-name" style="display: block; font-size: 14px; font-weight: 600; color: #57534a; margin-bottom: 8px;">
+              Ваше имя <span style="color: #b03a2e;" aria-hidden="true">*</span>
+            </label>
+            <input type="text" id="donor-name" placeholder="Имя и фамилия" autocomplete="name" required
+              style="font-family: 'IBM Plex Sans', sans-serif; width: 100%; font-size: 16px; padding: 13px 15px; border: 1px solid #d2cdbe; border-radius: 6px; background: #fff; color: #1f1d18; margin-bottom: 18px;">
+
+            <label for="donor-email" style="display: block; font-size: 14px; font-weight: 600; color: #57534a; margin-bottom: 8px;">
+              Email <span style="color: #b03a2e;" aria-hidden="true">*</span>
+            </label>
+            <input type="email" id="donor-email" placeholder="you@example.com" autocomplete="email" required
+              style="font-family: 'IBM Plex Sans', sans-serif; width: 100%; font-size: 16px; padding: 13px 15px; border: 1px solid #d2cdbe; border-radius: 6px; background: #fff; color: #1f1d18; margin-bottom: 22px;">
+
+            <label style="display: flex; align-items: flex-start; gap: 11px; font-size: 15px; color: #2c2a24; margin-bottom: 28px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="kabala-checkbox" style="width: 19px; height: 19px; margin: 1px 0 0; accent-color: #14223f; flex: 0 0 auto;">
+              <span>Мне нужна кабала на моё имя</span>
+            </label>
+
+            <p id="form-error" role="alert" aria-live="polite"></p>
+
+            <button type="button" id="submit-btn" class="submit-btn">Перейти к оплате →</button>
+
+            <div style="text-align: center; font-size: 13px; color: #8a877d; margin-top: 14px;">Оплата через AllPay — безопасно</div>
+          </div>
+          </div><!-- /form card -->
+          </div><!-- /layout-row -->
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer style="border-top: 1px solid #ddd9cf; padding: 36px 24px;">
+      <div style="max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+        <div style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;">
+          <a href="https://yallabalagan.org/terms.html" class="footer-link" style="font-size: 13px; color: #7d7a70; text-decoration: none;">Условия использования</a>
+          <a href="https://yallabalagan.org/privacy.html" class="footer-link" style="font-size: 13px; color: #7d7a70; text-decoration: none;">Политика конфиденциальности</a>
+          <a href="https://yallabalagan.org/accessibility.html" class="footer-link" style="font-size: 13px; color: #7d7a70; text-decoration: none;">Декларация о доступности</a>
+        </div>
+        <div style="font-size: 13px; color: #a3a097;">© 2026 YallaBalagan</div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/accessibility-toolbar.js"></script>
+  <script>
+    const API_URL = '__API_URL__';
+
+    // ── Progress ──────────────────────────────────────────────────────────────
+    async function loadProgress() {
+      try {
+        const res = await fetch(API_URL + '/api/progress');
+        if (!res.ok) return;
+        const { collected = 0, goal = 20000, count = 0 } = await res.json();
+
+        const pct = Math.min(collected / goal * 100, 100).toFixed(1);
+        document.getElementById('collected-amount').textContent =
+          collected.toLocaleString('ru-RU') + ' ₪';
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress-bar-wrap').setAttribute('aria-valuenow', collected);
+        document.getElementById('donor-count').textContent = count.toLocaleString('ru-RU');
+        document.getElementById('donor-label').textContent = ' ' + pluralize(count);
+      } catch (e) {
+        console.error('Progress load error:', e);
+      }
+    }
+
+    function pluralize(n) {
+      if (n % 10 === 1 && n % 100 !== 11) return 'человек уже поддержал';
+      if ([2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)) return 'человека уже поддержали';
+      return 'человек уже поддержали';
+    }
+
+    // ── Presets ───────────────────────────────────────────────────────────────
+    let selectedPreset = 100;
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.amount === 'custom') {
+          selectedPreset = 'custom';
+          document.getElementById('custom-amount-wrap').style.display = 'block';
+          document.getElementById('custom-amount').focus();
+        } else {
+          selectedPreset = parseInt(btn.dataset.amount, 10);
+          document.getElementById('custom-amount').value = '';
+          document.getElementById('custom-amount-wrap').style.display = 'none';
+        }
+        syncPresets();
+      });
+    });
+
+    function syncPresets() {
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        const isActive = btn.dataset.amount === 'custom'
+          ? selectedPreset === 'custom'
+          : selectedPreset === parseInt(btn.dataset.amount, 10);
+        btn.classList.toggle('active', isActive);
+      });
+    }
+
+    // ── Submit ────────────────────────────────────────────────────────────────
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      const customVal = document.getElementById('custom-amount').value.trim();
+      const amount    = selectedPreset === 'custom' ? parseInt(customVal, 10) : selectedPreset;
+      const name      = document.getElementById('donor-name').value.trim();
+      const email     = document.getElementById('donor-email').value.trim();
+      const needs_receipt = document.getElementById('kabala-checkbox').checked;
+      const btn       = document.getElementById('submit-btn');
+
+      clearError();
+      if (!name)                       return showError('Пожалуйста, укажите ваше имя.');
+      if (!email || !email.includes('@')) return showError('Пожалуйста, укажите корректный email.');
+      if (!amount || amount < 10)      return showError('Минимальная сумма — 10 ₪.');
+      if (amount > 50000)              return showError('Максимальная сумма — 50 000 ₪.');
+
+      btn.textContent = 'Загрузка…';
+      btn.disabled = true;
+
+      try {
+        const res  = await fetch(API_URL + '/api/donate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, amount, needs_receipt }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+        if (!data.payment_url) throw new Error('Не получен адрес оплаты');
+        window.location.href = data.payment_url;
+      } catch (e) {
+        showError(e.message || 'Ошибка. Попробуйте ещё раз.');
+        btn.textContent = 'Перейти к оплате →';
+        btn.disabled = false;
+      }
+    });
+
+    function showError(msg) {
+      const el = document.getElementById('form-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function clearError() {
+      const el = document.getElementById('form-error');
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+
+    // Footnote popups
+    document.querySelectorAll('.fn-term').forEach(term => {
+      term.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = term.classList.contains('open');
+        document.querySelectorAll('.fn-term').forEach(t => {
+          t.classList.remove('open');
+          t.setAttribute('aria-expanded', 'false');
+          const p = t.querySelector('.fn-popup');
+          if (p) { p.style.left = ''; p.style.right = ''; }
+        });
+        if (!isOpen) {
+          term.classList.add('open');
+          term.setAttribute('aria-expanded', 'true');
+          requestAnimationFrame(() => {
+            const popup = term.querySelector('.fn-popup');
+            if (!popup) return;
+            popup.style.left = '0';
+            popup.style.right = '';
+            const rect = popup.getBoundingClientRect();
+            if (rect.right > window.innerWidth - 12) {
+              popup.style.left = 'auto';
+              popup.style.right = '0';
+            }
+          });
+        }
+      });
+      term.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); term.click(); } });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.fn-term').forEach(t => { t.classList.remove('open'); t.setAttribute('aria-expanded', 'false'); });
+    });
+
+    loadProgress();
+  </script>
+</body>
+</html>

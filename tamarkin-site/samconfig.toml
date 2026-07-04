@@ -1,0 +1,19 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "tamarkin-site-prod"
+s3_bucket = "yallabalagan-sam-artifacts-prod"
+s3_prefix = "tamarkin-site"
+region = "eu-north-1"
+profile = "prod"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+image_repositories = []
+# Secrets passed via deploy.sh from .env.tamarkin
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = true
