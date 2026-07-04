@@ -1,12 +1,16 @@
 #!/bin/bash
 # Deploy ticket-service to dev or prod
-# Usage: ./deploy.sh [dev|prod] [admin]
-#   admin — fast mode: only sync admin panel to S3, skip Lambda rebuilds
+# Usage: ./deploy.sh [dev|prod] [admin] [no-cache]
+#   admin    — fast mode: only sync admin panel to S3, skip Lambda rebuilds
+#   no-cache — skip sam build --cached (full rebuild of all Lambda packages)
 
 set -e
 
-ENV=${1:?Usage: ./deploy.sh [dev|prod] [admin]}
+ENV=${1:?Usage: ./deploy.sh [dev|prod] [admin] [no-cache]}
 MODE=${2:-full}  # 'admin' for S3-only, anything else = full deploy
+
+NO_CACHE=""
+for arg in "$@"; do [[ "$arg" == "no-cache" ]] && NO_CACHE=1; done
 
 if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
   echo "Error: environment must be 'dev' or 'prod'"
@@ -76,7 +80,11 @@ fi
 
 # Build
 echo "Building SAM application..."
-sam build
+if [[ -n "$NO_CACHE" ]]; then
+  sam build
+else
+  sam build --cached
+fi
 echo "Build complete"
 
 # Helper: create Lambda function if it doesn't exist yet
@@ -266,9 +274,6 @@ aws lambda update-function-configuration \
   --function-name yallabalagan-user-api \
   --environment file:///tmp/user-api-env.json \
   --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
-aws lambda wait function-updated \
-  --function-name yallabalagan-user-api \
-  --region "$REGION" --profile "$PROFILE"
 rm -f /tmp/user-api-env.json
 echo "  Environment variables updated"
 
@@ -367,7 +372,7 @@ cat > /tmp/site-regen-env.json <<EOF
   "Variables": {
     "API_URL": "${API_URL}",
     "S3_BUCKET": "${S3_BUCKET}",
-    "CLOUDFRONT_DISTRIBUTION_ID": "E1QVQ0JRE575WR",
+    "CLOUDFRONT_DISTRIBUTION_ID": "E395U4QHM2AOIF",
     "GA4_ID": "${GA4_ID}",
     "FB_PIXEL_ID": "${FB_PIXEL_ID}",
     "YOUTUBE_API_KEY": "${YOUTUBE_API_KEY}",
@@ -473,9 +478,6 @@ aws lambda update-function-configuration \
   --function-name yallabalagan-pending-orders-cleaner \
   --environment file:///tmp/pending-cleaner-env.json \
   --region "$REGION" --profile "$PROFILE" --no-cli-pager > /dev/null
-aws lambda wait function-updated \
-  --function-name yallabalagan-pending-orders-cleaner \
-  --region "$REGION" --profile "$PROFILE"
 rm -f /tmp/pending-cleaner-env.json
 
 update_lambda "yallabalagan-event-status-updater" \
@@ -499,9 +501,6 @@ cat > /tmp/event-updater-env.json <<EOF
   }
 }
 EOF
-aws lambda wait function-updated \
-  --function-name yallabalagan-event-status-updater \
-  --region "$REGION" --profile "$PROFILE"
 aws lambda update-function-configuration \
   --function-name yallabalagan-event-status-updater \
   --environment file:///tmp/event-updater-env.json \
@@ -633,9 +632,6 @@ cat > /tmp/ig-refresher-env.json <<EOF
   }
 }
 EOF
-aws lambda wait function-updated \
-  --function-name yallabalagan-instagram-token-refresher \
-  --region "$REGION" --profile "$PROFILE"
 aws lambda update-function-configuration \
   --function-name yallabalagan-instagram-token-refresher \
   --environment file:///tmp/ig-refresher-env.json \
@@ -675,9 +671,6 @@ cat > /tmp/social-poster-env.json <<EOF
   }
 }
 EOF
-aws lambda wait function-updated \
-  --function-name yallabalagan-social-poster \
-  --region "$REGION" --profile "$PROFILE"
 aws lambda update-function-configuration \
   --function-name yallabalagan-social-poster \
   --environment file:///tmp/social-poster-env.json \
@@ -755,26 +748,16 @@ aws s3api put-bucket-website \
   --profile "$PROFILE" --region "$REGION" --no-cli-pager
 echo "  ErrorDocument set to 404.html"
 
-# Regenerate site
+# Regenerate site (async — fires and continues, Lambda runs in background)
 echo ""
-echo "Regenerating site..."
+echo "Triggering site regeneration (async)..."
 aws lambda invoke \
   --function-name yallabalagan-site-regenerator \
-  --invocation-type RequestResponse \
+  --invocation-type Event \
   --region "$REGION" --profile "$PROFILE" \
-  --cli-read-timeout 120 \
   /tmp/site-regenerator-output.json > /dev/null 2>&1
-
-if [ -f /tmp/site-regenerator-output.json ]; then
-  REGEN_STATUS=$(cat /tmp/site-regenerator-output.json | grep -o '"statusCode": [0-9]*' | grep -o '[0-9]*')
-  if [ "$REGEN_STATUS" = "200" ]; then
-    echo "  Site regenerated"
-  else
-    echo "  Site regeneration returned status: $REGEN_STATUS"
-    cat /tmp/site-regenerator-output.json
-  fi
-  rm -f /tmp/site-regenerator-output.json
-fi
+rm -f /tmp/site-regenerator-output.json
+echo "  Site regeneration triggered"
 
 # CloudFront invalidation (prod only)
 if [[ "$ENV" == "prod" ]]; then

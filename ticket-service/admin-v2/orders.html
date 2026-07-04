@@ -86,7 +86,9 @@
     if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
     try {
       const [ordersData, eventsData] = await Promise.all([API.getOrders(), API.getEvents()]);
-      allOrders = ordersData.orders || [];
+      allOrders = (ordersData.orders || []).sort((a, b) =>
+        (b.created_at || '').localeCompare(a.created_at || '')
+      );
       allEvents = eventsData.events || [];
 
       // Populate event filter
@@ -97,9 +99,6 @@
         opt.textContent = e.title;
         sel.appendChild(opt);
       });
-
-      document.getElementById('count-all').textContent    = allOrders.length;
-      document.getElementById('count-active').textContent = allOrders.length;
 
       render();
     } catch (err) { handleError(err, 'Ошибка загрузки заказов'); }
@@ -172,10 +171,15 @@
   }
 
   function render() {
+    const now = new Date();
+    const activeEventIds = new Set(
+      allEvents.filter(e => e.status !== 'cancelled' && new Date(e.date) >= now).map(e => e.event_id)
+    );
     const filtered = filter(allOrders);
+    const active   = filtered.filter(o => activeEventIds.has(o.event_id));
+    document.getElementById('count-active').textContent = active.length;
     document.getElementById('count-all').textContent    = filtered.length;
-    document.getElementById('count-active').textContent = filtered.length;
-    renderRows(filtered, 'tbody-active');
+    renderRows(active,   'tbody-active');
     renderRows(filtered, 'tbody-all');
   }
 
@@ -209,6 +213,7 @@
       const fresh = await API.getOrder(detail.orderId);
       const idx = allOrders.findIndex(o => o.order_id === detail.orderId);
       if (idx !== -1) allOrders[idx] = fresh.order;
+      allOrders.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
       render();
     } catch (e) {
       console.warn('Failed to refresh order after update:', e);

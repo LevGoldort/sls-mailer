@@ -38,6 +38,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     },
     "organizer": {
         "events:write_own",
+        "media:upload",
+        "site:regenerate",
     },
 }
 

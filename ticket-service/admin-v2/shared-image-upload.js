@@ -275,7 +275,7 @@ const RESIZE_PRESETS = {
     'events':          { width: 1200, height: 675 },
     'events_listing':  { width: 900,  height: 600 },
     'performers':      { width: 800,  height: 800 },
-    'products':        { width: 1000, height: 1000 },
+    'products':        { width: 1200, height: 800 },
     'locations':       { width: 1200, height: 675 },
     'shows':           { width: 800,  height: 800  },
     'episodes':        { width: 1280, height: 720 },

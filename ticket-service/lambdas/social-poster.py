@@ -61,6 +61,7 @@ def process_post(post_id: str):
     cover = post.get('cover')  # { type, timestamp_ms?, s3_key }
     collaborators = post.get('collaborators', [])
     targets = post.get('targets', [])
+    tenant_id = post.get('tenant_id', '')
 
     all_ok = True
     any_ok = False
@@ -71,7 +72,7 @@ def process_post(post_id: str):
             updated_targets.append(target)
             continue
         try:
-            platform_post_id = _post_to_platform(target, media, title, description, tags, cover, collaborators)
+            platform_post_id = _post_to_platform(target, media, title, description, tags, cover, collaborators, tenant_id)
             updated_targets.append({**target, 'status': 'published', 'platform_post_id': platform_post_id})
             any_ok = True
         except Exception as e:
@@ -95,12 +96,12 @@ def process_post(post_id: str):
 
 
 def _post_to_platform(target: dict, media: list, title: str, description: str,
-                      tags: list, cover: dict, collaborators: list) -> str:
+                      tags: list, cover: dict, collaborators: list, tenant_id: str = '') -> str:
     platform = target.get('platform')
     account_id = target.get('account_id')
 
     if platform == 'instagram':
-        conn = db.get_instagram_connection(account_id)
+        conn = db.get_instagram_connection(account_id, tenant_id=tenant_id)
         if not conn:
             raise ValueError(f"Instagram account {account_id} not found")
         token = ig_decrypt_token(conn['access_token'], INSTAGRAM_TOKEN_KEY)
@@ -119,7 +120,7 @@ def _post_to_platform(target: dict, media: list, title: str, description: str,
                                    collaborators=collaborators or None)
 
     elif platform == 'tiktok':
-        conn = db.get_tiktok_connection(account_id)
+        conn = db.get_tiktok_connection(account_id, tenant_id=tenant_id)
         if not conn:
             raise ValueError(f"TikTok account {account_id} not found")
         first = media[0] if media else None
@@ -136,7 +137,7 @@ def _post_to_platform(target: dict, media: list, title: str, description: str,
         return _wait_for_tiktok_publish(access_token, publish_id)
 
     elif platform == 'youtube':
-        conn = db.get_youtube_connection(account_id)
+        conn = db.get_youtube_connection(account_id, tenant_id=tenant_id)
         if not conn:
             raise ValueError(f"YouTube account {account_id} not found")
         first = media[0] if media else None

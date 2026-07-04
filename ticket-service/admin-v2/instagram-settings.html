@@ -160,12 +160,19 @@
   }
 
   async function disconnect(igUserId, handle) {
-    if (!confirm(`Отключить ${handle}? Публикация через этот аккаунт станет недоступна.`)) return;
+    console.log('[disconnect] called with', igUserId, handle);
+    if (!confirm(`Отключить ${handle}? Публикация через этот аккаунт станет недоступна.`)) {
+      console.log('[disconnect] cancelled by user');
+      return;
+    }
     try {
-      await apiCall(`/api/instagram/accounts/${igUserId}`, 'DELETE');
+      console.log('[disconnect] calling DELETE /api/instagram/accounts/' + igUserId);
+      const result = await apiCall(`/api/instagram/accounts/${igUserId}`, 'DELETE');
+      console.log('[disconnect] success', result);
       showToast(`${handle} отключён`, 'success');
       loadAccounts();
     } catch (e) {
+      console.error('[disconnect] error', e);
       showToast(`Ошибка: ${e.message}`, 'error');
     }
   }
@@ -173,9 +180,12 @@
   function showToast(msg, type = 'info') {
     const el = document.getElementById('toast');
     el.textContent = msg;
-    el.className = `toast toast-${type}`;
+    el.className = `toast toast-${type} toast-show`;
     el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 4000);
+    setTimeout(() => {
+      el.classList.remove('toast-show');
+      setTimeout(() => { el.style.display = 'none'; }, 260);
+    }, 4000);
   }
 </script>
 </body>

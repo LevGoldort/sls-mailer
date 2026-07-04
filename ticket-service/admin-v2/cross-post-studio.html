@@ -356,14 +356,14 @@
       }));
       const ttAccounts = (ttData.accounts || []).map(a => ({
         platform: 'tiktok',
-        account_id: a.SK || a.tiktok_user_id,
+        account_id: a.tiktok_user_id,
         handle: a.display_name || a.tiktok_user_id,
         name: '',
         avatar: a.avatar_url || '',
       }));
       const ytAccounts = (ytData.accounts || []).map(a => ({
         platform: 'youtube',
-        account_id: a.SK || a.youtube_channel_id,
+        account_id: a.youtube_channel_id,
         handle: a.channel_title || a.youtube_channel_id,
         name: '',
         avatar: a.channel_thumbnail_url || '',

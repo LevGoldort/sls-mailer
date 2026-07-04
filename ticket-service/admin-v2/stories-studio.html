@@ -28,7 +28,7 @@
 <!-- CDN: React 18, Babel, html-to-image, JSZip -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 
@@ -87,9 +87,10 @@ window.loadYBData = async function () {
     showMap[s.show_id] = s.name || s.show_id;
   }
 
-  /* normalise events — skip cancelled */
+  /* normalise events — skip cancelled, sort by event date ascending */
   const events = (evRes.events || [])
     .filter(ev => ev.status !== 'cancelled')
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
     .map(ev => {
     const loc = locMap[ev.location_id] || {};
     const minPrice = (ev.ticket_types || [])

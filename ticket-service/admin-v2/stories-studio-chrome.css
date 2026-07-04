@@ -259,6 +259,68 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .st-body { grid-template-columns: 180px 1fr 260px; }
 }
 
+@media (max-width: 768px) {
+  /* Page scrolls vertically */
+  body { overflow: auto; }
+  #root { height: auto; }
+  .st-app { height: auto; min-height: 100dvh; grid-template-rows: auto auto auto; }
+
+  /* Top bar: compact, horizontal scroll */
+  .st-top { overflow-x: auto; padding: 0 10px; height: 48px; gap: 8px; flex-shrink: 0; }
+  .st-logo { display: none; }
+  .st-top__spacer { display: none; }
+  .st-select { max-width: 130px; font-size: 10px; padding: 6px 8px; }
+  .st-seg button { padding: 6px 10px; font-size: 10px; }
+  .st-btn { padding: 7px 11px; font-size: 10px; }
+  .st-recipe-tab { padding: 5px 10px; font-size: 9px; }
+
+  /* Filter bar: horizontal scroll */
+  .st-filter-bar { overflow-x: auto; flex-wrap: nowrap; padding: 6px 10px; }
+
+  /* Body: stack vertically */
+  .st-body { display: flex; flex-direction: column; overflow: visible; }
+
+  /* Filmstrip → horizontal number strip */
+  .st-strip {
+    flex-direction: row; align-items: center;
+    overflow-x: auto; overflow-y: hidden;
+    border-right: none; border-bottom: 2px solid var(--st-line);
+    padding: 6px 10px; height: 68px; flex-shrink: 0;
+  }
+  .st-strip__head { display: none; }
+  .st-thumb {
+    flex-shrink: 0; width: 46px;
+    margin-bottom: 0; margin-right: 8px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .st-thumb__wrap { display: none; }
+  .st-thumb__n {
+    position: static;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; padding: 0;
+    border: 2px solid var(--st-line); background: var(--st-panel2);
+  }
+  .st-thumb.is-active .st-thumb__n { background: var(--st-yellow); color: #16130f; border-color: var(--st-yellow); }
+  .st-thumb__label { font-size: 7px; padding: 3px 0 0; text-align: center; border-top: none; line-height: 1.2; white-space: normal; }
+
+  /* Stage: fixed height so ResizeObserver can scale slide to fit */
+  .st-stage { height: 62vh; min-height: 300px; padding: 14px 42px; }
+  .st-stage__hint { display: none; }
+  .st-nav { width: 34px; height: 34px; font-size: 15px; }
+  .st-nav--prev { left: 4px; }
+  .st-nav--next { right: 4px; }
+
+  /* Inspector: full width below stage */
+  .st-insp {
+    border-left: none; border-top: 2px solid var(--st-line);
+    overflow-y: visible; padding: 16px 14px 60px;
+  }
+
+  /* Modal: full width on mobile */
+  .st-modal { min-width: 0; width: calc(100vw - 40px); max-width: none; padding: 20px; }
+}
+
 /* Instagram modal */
 .st-modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex;

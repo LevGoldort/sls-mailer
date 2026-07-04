@@ -63,7 +63,7 @@ class DynamoDBClient:
         )
         return response.get('Item')
 
-    def list_events(self, limit: int = 50, tenant_id: str = None) -> List[Dict]:
+    def list_events(self, tenant_id: str = None) -> List[Dict]:
         """Получает список событий; если задан tenant_id — фильтрует по нему."""
         if tenant_id:
             from boto3.dynamodb.conditions import Attr
@@ -71,16 +71,21 @@ class DynamoDBClient:
                 FilterExpression=Attr('tenant_id').eq(tenant_id),
             )
             return response.get('Items', [])
-        response = self.events_table.query(
-            IndexName='GSI1',
-            KeyConditionExpression='GSI1PK = :pk',
-            ExpressionAttributeValues={
-                ':pk': 'EVENT'
-            },
-            Limit=limit,
-            ScanIndexForward=True
-        )
-        return response.get('Items', [])
+        items = []
+        kwargs = {
+            'IndexName': 'GSI1',
+            'KeyConditionExpression': 'GSI1PK = :pk',
+            'ExpressionAttributeValues': {':pk': 'EVENT'},
+            'ScanIndexForward': True,
+        }
+        while True:
+            response = self.events_table.query(**kwargs)
+            items.extend(response.get('Items', []))
+            last = response.get('LastEvaluatedKey')
+            if not last:
+                break
+            kwargs['ExclusiveStartKey'] = last
+        return items
 
     def get_event_by_slug(self, slug: str) -> Optional[Dict]:
         """Получает событие по slug (требует GSI `SlugIndex` по атрибуту slug)"""
@@ -933,8 +938,9 @@ class DynamoDBClient:
         """Store or overwrite an Instagram connection record."""
         self.instagram_table.put_item(Item=item)
 
-    def get_instagram_connection(self, ig_user_id: str) -> Optional[dict]:
-        resp = self.instagram_table.get_item(Key={'PK': 'CONNECTION', 'SK': ig_user_id})
+    def get_instagram_connection(self, ig_user_id: str, tenant_id: str = '') -> Optional[dict]:
+        sk = f"{tenant_id}#{ig_user_id}"
+        resp = self.instagram_table.get_item(Key={'PK': 'CONNECTION', 'SK': sk})
         return resp.get('Item')
 
     def list_instagram_connections(self, tenant_id: str = None) -> List[dict]:
@@ -944,6 +950,7 @@ class DynamoDBClient:
                 IndexName='TenantIndex',
                 KeyConditionExpression='tenant_id = :tid',
                 ExpressionAttributeValues={':tid': tenant_id},
+                FilterExpression=Attr('PK').eq('CONNECTION'),
             )
         else:
             resp = self.instagram_table.query(
@@ -951,12 +958,13 @@ class DynamoDBClient:
             )
         return resp.get('Items', [])
 
-    def delete_instagram_connection(self, ig_user_id: str):
-        self.instagram_table.delete_item(Key={'PK': 'CONNECTION', 'SK': ig_user_id})
+    def delete_instagram_connection(self, ig_user_id: str, tenant_id: str = ''):
+        sk = f"{tenant_id}#{ig_user_id}"
+        self.instagram_table.delete_item(Key={'PK': 'CONNECTION', 'SK': sk})
 
-    def update_instagram_token(self, ig_user_id: str, access_token_enc: str, expires_at: str):
+    def update_instagram_token(self, sk: str, access_token_enc: str, expires_at: str):
         self.instagram_table.update_item(
-            Key={'PK': 'CONNECTION', 'SK': ig_user_id},
+            Key={'PK': 'CONNECTION', 'SK': sk},
             UpdateExpression='SET access_token = :t, token_expires_at = :e',
             ExpressionAttributeValues={':t': access_token_enc, ':e': expires_at},
         )
@@ -981,17 +989,19 @@ class DynamoDBClient:
     def put_tiktok_connection(self, item: dict):
         self.tiktok_table.put_item(Item=item)
 
-    def get_tiktok_connection(self, tiktok_user_id: str) -> Optional[dict]:
-        resp = self.tiktok_table.get_item(Key={'PK': 'CONNECTION', 'SK': tiktok_user_id})
+    def get_tiktok_connection(self, tiktok_user_id: str, tenant_id: str = '') -> Optional[dict]:
+        sk = f"{tenant_id}#{tiktok_user_id}"
+        resp = self.tiktok_table.get_item(Key={'PK': 'CONNECTION', 'SK': sk})
         return resp.get('Item')
 
     def list_tiktok_connections(self, tenant_id: str = None) -> List[dict]:
-        from boto3.dynamodb.conditions import Key as DKey
+        from boto3.dynamodb.conditions import Key as DKey, Attr
         if tenant_id:
             resp = self.tiktok_table.query(
                 IndexName='TenantIndex',
                 KeyConditionExpression='tenant_id = :tid',
                 ExpressionAttributeValues={':tid': tenant_id},
+                FilterExpression=Attr('PK').eq('CONNECTION'),
             )
         else:
             resp = self.tiktok_table.query(
@@ -999,14 +1009,15 @@ class DynamoDBClient:
             )
         return resp.get('Items', [])
 
-    def delete_tiktok_connection(self, tiktok_user_id: str):
-        self.tiktok_table.delete_item(Key={'PK': 'CONNECTION', 'SK': tiktok_user_id})
+    def delete_tiktok_connection(self, tiktok_user_id: str, tenant_id: str = ''):
+        sk = f"{tenant_id}#{tiktok_user_id}"
+        self.tiktok_table.delete_item(Key={'PK': 'CONNECTION', 'SK': sk})
 
-    def update_tiktok_tokens(self, tiktok_user_id: str, access_token_enc: str,
+    def update_tiktok_tokens(self, sk: str, access_token_enc: str,
                              token_expires_at: str, refresh_token_enc: str,
                              refresh_token_expires_at: str):
         self.tiktok_table.update_item(
-            Key={'PK': 'CONNECTION', 'SK': tiktok_user_id},
+            Key={'PK': 'CONNECTION', 'SK': sk},
             UpdateExpression='SET access_token = :a, token_expires_at = :e, refresh_token = :r, refresh_token_expires_at = :re',
             ExpressionAttributeValues={
                 ':a': access_token_enc,
@@ -1021,17 +1032,19 @@ class DynamoDBClient:
     def put_youtube_connection(self, item: dict):
         self.youtube_table.put_item(Item=item)
 
-    def get_youtube_connection(self, channel_id: str) -> Optional[dict]:
-        resp = self.youtube_table.get_item(Key={'PK': 'CONNECTION', 'SK': channel_id})
+    def get_youtube_connection(self, channel_id: str, tenant_id: str = '') -> Optional[dict]:
+        sk = f"{tenant_id}#{channel_id}"
+        resp = self.youtube_table.get_item(Key={'PK': 'CONNECTION', 'SK': sk})
         return resp.get('Item')
 
     def list_youtube_connections(self, tenant_id: str = None) -> List[dict]:
-        from boto3.dynamodb.conditions import Key as DKey
+        from boto3.dynamodb.conditions import Key as DKey, Attr
         if tenant_id:
             resp = self.youtube_table.query(
                 IndexName='TenantIndex',
                 KeyConditionExpression='tenant_id = :tid',
                 ExpressionAttributeValues={':tid': tenant_id},
+                FilterExpression=Attr('PK').eq('CONNECTION'),
             )
         else:
             resp = self.youtube_table.query(
@@ -1039,12 +1052,13 @@ class DynamoDBClient:
             )
         return resp.get('Items', [])
 
-    def delete_youtube_connection(self, channel_id: str):
-        self.youtube_table.delete_item(Key={'PK': 'CONNECTION', 'SK': channel_id})
+    def delete_youtube_connection(self, channel_id: str, tenant_id: str = ''):
+        sk = f"{tenant_id}#{channel_id}"
+        self.youtube_table.delete_item(Key={'PK': 'CONNECTION', 'SK': sk})
 
-    def update_youtube_token(self, channel_id: str, access_token_enc: str, token_expires_at: str):
+    def update_youtube_token(self, sk: str, access_token_enc: str, token_expires_at: str):
         self.youtube_table.update_item(
-            Key={'PK': 'CONNECTION', 'SK': channel_id},
+            Key={'PK': 'CONNECTION', 'SK': sk},
             UpdateExpression='SET access_token = :a, token_expires_at = :e',
             ExpressionAttributeValues={':a': access_token_enc, ':e': token_expires_at},
         )

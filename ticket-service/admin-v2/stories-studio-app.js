@@ -347,7 +347,7 @@ function Studio() {
     if (!node) throw new Error('no capture node ' + i);
     await document.fonts.ready;
     await new Promise(r => requestAnimationFrame(r));
-    const dataUri = await window.htmlToImage.toSvg(node, { width: dims.w, height: dims.h, backgroundColor: '#f3eee1' });
+    const dataUri = await window.htmlToImage.toSvg(node, { width: dims.w, height: dims.h, backgroundColor: '#f3eee1', cacheBust: true });
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('svg load failed')); img.src = dataUri; });
     const c = document.createElement('canvas');
@@ -434,7 +434,7 @@ function Studio() {
       }
       setIgResult({ ok: true, count: posted });
     } catch (e) {
-      setIgResult({ ok: false, error: e.message, count: posted });
+      setIgResult({ ok: false, error: (e instanceof Error ? e.message : null) || 'Ошибка захвата слайда (CORS?)', count: posted });
     } finally {
       setIgPosting(null);
     }

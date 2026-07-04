@@ -106,11 +106,12 @@
       </div>
     </div>
 
-    <!-- Seating tab -->
+    <!-- Seating tab — just a shortcut into the modal -->
     <div id="tab-seating" class="tab-content">
       <div class="card">
-        <div class="card-body">
-          <div id="seat-allocation-container"></div>
+        <div class="card-body" style="display:flex;flex-direction:column;align-items:flex-start;gap:12px;">
+          <p style="color:var(--gray);font-size:14px;margin:0;">Назначьте типы билетов на конкретные места в зале.</p>
+          <button class="btn btn-primary" onclick="openSeatingModal()">Открыть редактор мест</button>
         </div>
       </div>
     </div>
@@ -226,7 +227,10 @@
         <div class="card" id="ticket-types-section" style="display:none;">
           <div class="card-header">
             <span class="card-title">Типы билетов</span>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addTicketType()">+ Добавить тип</button>
+            <div style="display:flex;gap:8px;">
+              <button type="button" id="btn-open-seating" class="btn btn-ghost btn-sm" onclick="openSeatingModal()" style="display:none;">🗺 Распределить по местам</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addTicketType()">+ Добавить тип</button>
+            </div>
           </div>
           <div class="card-body">
             <div id="ticket-types-container"></div>
@@ -235,6 +239,32 @@
       </form>
     </div>
   </main>
+</div>
+
+<!-- Seating allocation modal -->
+<div id="seating-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.5);overflow:auto;">
+  <div style="background:var(--white);border-radius:12px;max-width:900px;margin:40px auto;padding:24px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;font-size:18px;">Распределение мест</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeSeatingModal()">✕ Закрыть</button>
+    </div>
+    <!-- Ticket type palette -->
+    <div id="allocation-palette" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;"></div>
+    <!-- Toolbar -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" id="undo-alloc-btn" onclick="seatAllocator?.undo()" disabled>↩ Отменить</button>
+      <button class="btn btn-ghost btn-sm" id="redo-alloc-btn" onclick="seatAllocator?.redo()" disabled>↪ Повторить</button>
+      <button class="btn btn-ghost btn-sm" onclick="seatAllocator?.zoomIn()">+ Zoom</button>
+      <button class="btn btn-ghost btn-sm" onclick="seatAllocator?.zoomOut()">− Zoom</button>
+      <button class="btn btn-ghost btn-sm" onclick="seatAllocator?.resetZoom()">100%</button>
+      <button class="btn btn-ghost btn-sm" id="row-mode-btn" onclick="toggleRowMode()">Режим ряда: выкл</button>
+      <button class="btn btn-ghost btn-sm" onclick="seatAllocator?.clearSelection()">Снять выбор</button>
+    </div>
+    <!-- Map canvas -->
+    <div id="seat-map-container" style="overflow:auto;border:1px solid rgba(28,26,36,0.1);border-radius:8px;background:#f9f9fb;">
+      <svg id="allocation-canvas"></svg>
+    </div>
+  </div>
 </div>
 
 <!-- Sticky save bar -->
@@ -418,7 +448,7 @@
     const data = {
       title:       document.getElementById('title').value.trim(),
       description: document.getElementById('description').value.trim(),
-      date:        date && time ? `${date}T${time}:00Z` : '',
+      date:        date && time ? `${date}T${time}:00` : '',
       location_id: document.getElementById('location_id').value,
       status:      document.getElementById('status').value,
       slug:        document.getElementById('slug').value.trim() || null,
@@ -526,6 +556,7 @@
           if (loc.venue_config?.venue_type === 'seated' && loc.venue_config?.seating_map) {
             currentVenueMap = loc.venue_config.seating_map;
             document.getElementById('mtab-seating').style.display = '';
+            document.getElementById('btn-open-seating').style.display = '';
           }
         } catch { /* ok */ }
       }
@@ -665,6 +696,92 @@
     });
   }
 
+  function openSeatingModal() {
+    if (!currentVenueMap) return;
+    document.getElementById('seating-modal').style.display = '';
+    initSeatingAllocator();
+  }
+
+  function closeSeatingModal() {
+    document.getElementById('seating-modal').style.display = 'none';
+    if (seatAllocator) {
+      const exported = seatAllocator.exportAllocation();
+      seatAllocationData   = exported.seatAllocation;
+      seatAllocationColors = exported.ticketTypeColors;
+    }
+    markDirty();
+  }
+
+  async function onLocationChange() {
+    const locId = document.getElementById('location_id').value;
+    currentVenueMap = null;
+    seatAllocator = null;
+    document.getElementById('mtab-seating').style.display = 'none';
+    document.getElementById('btn-open-seating').style.display = 'none';
+    if (!locId) return;
+    try {
+      const locData = await API.getLocation(locId);
+      const loc = locData.location;
+      if (loc.venue_config?.venue_type === 'seated' && loc.venue_config?.seating_map) {
+        currentVenueMap = loc.venue_config.seating_map;
+        document.getElementById('mtab-seating').style.display = '';
+        document.getElementById('btn-open-seating').style.display = '';
+      }
+    } catch { /* ok */ }
+  }
+
+  function initSeatingAllocator() {
+    if (!currentVenueMap) return;
+    const ticketTypes = collectTicketTypes().filter(tt => tt.name && tt.total > 0);
+    if (!seatAllocator) seatAllocator = new SeatingAllocationEditor();
+    seatAllocator.loadConfig(
+      currentVenueMap,
+      ticketTypes,
+      seatAllocationData,
+      seatAllocationColors,
+      eventId || null
+    );
+    renderAllocationPalette();
+  }
+
+  function renderAllocationPalette() {
+    if (!seatAllocator) return;
+    const palette = document.getElementById('allocation-palette');
+    if (!palette) return;
+    palette.innerHTML = seatAllocator.ticketTypes.map(tt => {
+      const color = seatAllocator.ticketTypeColors[tt.id] || '#6b5acf';
+      const allocated = Object.values(seatAllocator.seatAllocation).filter(id => id === tt.id).length;
+      const isActive = seatAllocator.activeTicketTypeId === tt.id;
+      return `<div onclick="seatAllocator.setActiveTicketType('${tt.id}'); renderAllocationPalette();"
+        style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:6px;cursor:pointer;
+               border:2px solid ${isActive ? color : 'rgba(28,26,36,0.12)'};
+               background:${isActive ? color + '18' : 'var(--white)'};user-select:none;">
+        <span style="width:16px;height:16px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+        <span style="font-size:13px;font-weight:500;">${escapeHtml(tt.name)}</span>
+        <span style="font-size:12px;color:var(--gray);">${allocated} / ${tt.total}</span>
+        <input type="color" value="${color}" style="width:24px;height:24px;border:none;background:none;cursor:pointer;padding:0;"
+          onclick="event.stopPropagation()"
+          onchange="seatAllocator.setTicketTypeColor('${tt.id}', this.value); renderAllocationPalette();">
+      </div>`;
+    }).join('');
+  }
+
+  function updateAllocationCounters() {
+    renderAllocationPalette();
+  }
+
+  function toggleRowMode() {
+    if (!seatAllocator) return;
+    seatAllocator.rowSelectionMode = !seatAllocator.rowSelectionMode;
+    const btn = document.getElementById('row-mode-btn');
+    if (btn) {
+      btn.textContent = `Режим ряда: ${seatAllocator.rowSelectionMode ? 'вкл' : 'выкл'}`;
+      btn.style.background = seatAllocator.rowSelectionMode ? 'var(--purple-light)' : '';
+      btn.style.borderColor = seatAllocator.rowSelectionMode ? 'var(--purple)' : '';
+      btn.style.color       = seatAllocator.rowSelectionMode ? 'var(--purple)' : '';
+    }
+  }
+
   function initImageUploadComponent(existing = [], existingListing = '') {
     if (typeof initImageUpload !== 'function') return;
     initImageUpload('event-images-upload', 'events',
@@ -718,6 +835,7 @@
 
     // Wire up form change tracking
     document.getElementById('event-form').addEventListener('change', markDirty);
+    document.getElementById('location_id').addEventListener('change', onLocationChange);
     document.getElementById('orders-search').addEventListener('input', filterOrders);
 
     if (eventId) {

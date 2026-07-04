@@ -38,7 +38,8 @@ def lambda_handler(event, context):
     errors = 0
 
     for conn in connections:
-        ig_user_id = conn.get('SK')
+        sk = conn.get('SK')
+        ig_user_id = conn.get('ig_user_id', sk)
         expires_at_str = conn.get('token_expires_at', '')
 
         try:
@@ -58,7 +59,7 @@ def lambda_handler(event, context):
             new_expires_in = new_token_data.get('expires_in', 5183944)
 
             db.update_instagram_token(
-                ig_user_id,
+                sk,
                 encrypt_token(new_token, token_key),
                 token_expires_at(new_expires_in),
             )

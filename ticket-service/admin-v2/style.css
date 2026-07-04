@@ -1111,7 +1111,7 @@ img { max-width: 100%; }
     transition: width 0.2s ease;
   }
 
-  .sidebar.open { width: var(--sidebar-width); }
+  .sidebar.open { width: var(--sidebar-width); overflow-y: auto; }
 
   .main { padding: 60px 12px 80px; }
 

@@ -67,7 +67,11 @@ def upload_image(image_url, token, ad_account_id):
     )
     body = resp.json()
     if "error" in body:
-        raise RuntimeError(body["error"].get("message", "Facebook API error"))
+        err = body["error"]
+        import sys
+        print(f"FB API error on POST /{ad_account_id}/adimages: code={err.get('code')} subcode={err.get('error_subcode')} "
+              f"type={err.get('type')} msg={err.get('message')} fbtrace={err.get('fbtrace_id')}", file=sys.stderr)
+        raise RuntimeError(err.get("message", "Facebook API error"))
     resp.raise_for_status()
     images = body.get("images", {})
     first = next(iter(images.values()))

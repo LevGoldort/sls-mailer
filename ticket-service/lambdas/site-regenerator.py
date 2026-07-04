@@ -192,11 +192,22 @@ def fetch_data():
     PUBLIC_STATUSES = {'active', 'sold_out'}
     all_events_raw = [e for e in all_events_raw if e.get('status') in PUBLIC_STATUSES]
 
+    import pytz
+    from datetime import timedelta
+    _israel_tz = pytz.timezone('Asia/Jerusalem')
+    _one_week_ago = datetime.now(_israel_tz) - timedelta(weeks=1)
+
+    def _event_dt(date_str):
+        clean = date_str.replace('Z', '').split('+')[0]
+        return _israel_tz.localize(datetime.fromisoformat(clean))
+
     upcoming_events = [e for e in all_events_raw if not is_event_past(e['date'])]
-    past_events = [e for e in all_events_raw if is_event_past(e['date'])]
-    filtered_count = len(past_events)
-    if filtered_count:
-        print(f"Filtered out {filtered_count} past events (kept for archive)")
+    past_events = [
+        e for e in all_events_raw
+        if is_event_past(e['date']) and _event_dt(e['date']) >= _one_week_ago
+    ]
+    skipped_old = sum(1 for e in all_events_raw if is_event_past(e['date']) and _event_dt(e['date']) < _one_week_ago)
+    print(f"Past events: {len(past_events)} kept (last 7 days), {skipped_old} skipped (older than a week)")
 
     # Locations
     response = requests.get(f"{API_URL}/api/locations", timeout=10)

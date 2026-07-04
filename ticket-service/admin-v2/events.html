@@ -62,12 +62,21 @@
 <script src="auth.js"></script>
 <script src="shared.js"></script>
 <script>
-  let allEvents = [], upcomingEvents = [], pastEvents = [];
+  let allEvents = [], upcomingEvents = [], pastEvents = [], ordersByEventId = {};
 
   async function loadEvents() {
     try {
-      const data = await API.getEvents();
-      allEvents = data.events || [];
+      const [eventsData, ordersData] = await Promise.all([
+        API.getEvents(),
+        Auth.isAdmin() ? API.getOrders() : Promise.resolve(null),
+      ]);
+      allEvents = eventsData.events || [];
+
+      ordersByEventId = {};
+      (ordersData?.orders || []).forEach(o => {
+        if (!ordersByEventId[o.event_id]) ordersByEventId[o.event_id] = [];
+        ordersByEventId[o.event_id].push(o);
+      });
 
       const now = new Date();
       upcomingEvents = allEvents.filter(e => new Date(e.date) >= now).sort((a,b) => new Date(a.date)-new Date(b.date));
@@ -107,7 +116,7 @@
     }
     return events.map(event => {
       const isExternal = event.event_type === 'external';
-      const stats = calculateEventStats(event);
+      const stats = calculateEventStats(event, ordersByEventId[event.event_id] ?? null);
       const statusClass = `badge-${event.status}`;
       const publicUrl = event.slug ? `https://yallabalagan.org/events/${event.slug}.html` : `https://yallabalagan.org/events/${event.event_id}.html`;
       const salesMeta = isExternal
@@ -152,7 +161,7 @@
     } catch (err) { handleError(err, 'Ошибка удаления'); }
   }
 
-  function exportEvents() {
+function exportEvents() {
     const all = [...upcomingEvents, ...pastEvents];
     exportToCSV(all.map(e => {
       const s = calculateEventStats(e);

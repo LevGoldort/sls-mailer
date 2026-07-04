@@ -199,12 +199,19 @@
   }
 
   async function disconnectIg(igUserId, handle) {
-    if (!confirm(`Отключить ${handle}? Публикация через этот аккаунт станет недоступна.`)) return;
+    console.log('[disconnectIg] called with', igUserId, handle);
+    if (!confirm(`Отключить ${handle}? Публикация через этот аккаунт станет недоступна.`)) {
+      console.log('[disconnectIg] cancelled by user');
+      return;
+    }
     try {
-      await apiCall(`/api/instagram/accounts/${igUserId}`, 'DELETE');
+      console.log('[disconnectIg] calling DELETE /api/instagram/accounts/' + igUserId);
+      const result = await apiCall(`/api/instagram/accounts/${igUserId}`, 'DELETE');
+      console.log('[disconnectIg] success', result);
       showToast(`${handle} отключён`, 'success');
       loadIgAccounts();
     } catch (e) {
+      console.error('[disconnectIg] error', e);
       showToast(`Ошибка: ${e.message}`, 'error');
     }
   }
@@ -237,7 +244,7 @@
       const statusClass = expiring ? 'expiring' : 'active';
       const expiryText = refreshExpires ? `Подключён до ${refreshExpires.toLocaleDateString('ru-RU')}` : 'Активен';
       const connectedAt = acc.connected_at ? new Date(acc.connected_at).toLocaleDateString('ru-RU') : '—';
-      const name = acc.display_name || acc.tiktok_user_id || acc.SK || '';
+      const name = acc.display_name || acc.tiktok_user_id || '';
       return `
         <div class="social-card">
           <div class="social-avatar">${acc.avatar_url ? `<img src="${acc.avatar_url}" alt="">` : '🎵'}</div>
@@ -247,7 +254,7 @@
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
             <span class="social-status ${statusClass}">${statusLabel}</span>
-            <button class="btn btn-secondary btn-sm" onclick="disconnectTikTok('${acc.SK || acc.tiktok_user_id}', '${escapeHtml(name)}')">Отключить</button>
+            <button class="btn btn-secondary btn-sm" onclick="disconnectTikTok('${acc.tiktok_user_id}', '${escapeHtml(name)}')">Отключить</button>
           </div>
         </div>
       `;
@@ -299,7 +306,7 @@
     }
     const connectedAt = acc => acc.connected_at ? new Date(acc.connected_at).toLocaleDateString('ru-RU') : '—';
     container.innerHTML = `<div class="social-accounts">${accounts.map(acc => {
-      const name = acc.channel_title || acc.youtube_channel_id || acc.SK || '';
+      const name = acc.channel_title || acc.youtube_channel_id || '';
       return `
         <div class="social-card">
           <div class="social-avatar">${acc.channel_thumbnail_url ? `<img src="${acc.channel_thumbnail_url}" alt="">` : '▶️'}</div>
@@ -309,7 +316,7 @@
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
             <span class="social-status active">● Активен</span>
-            <button class="btn btn-secondary btn-sm" onclick="disconnectYouTube('${acc.SK || acc.youtube_channel_id}', '${escapeHtml(name)}')">Отключить</button>
+            <button class="btn btn-secondary btn-sm" onclick="disconnectYouTube('${acc.youtube_channel_id}', '${escapeHtml(name)}')">Отключить</button>
           </div>
         </div>
       `;
@@ -350,9 +357,12 @@
   function showToast(msg, type = 'info') {
     const el = document.getElementById('toast');
     el.textContent = msg;
-    el.className = `toast toast-${type}`;
+    el.className = `toast toast-${type} toast-show`;
     el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 4000);
+    setTimeout(() => {
+      el.classList.remove('toast-show');
+      setTimeout(() => { el.style.display = 'none'; }, 260);
+    }, 4000);
   }
 </script>
 </body>

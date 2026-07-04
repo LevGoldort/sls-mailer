@@ -92,7 +92,7 @@
 <script src="auth.js"></script>
 <script src="shared.js"></script>
 <script>
-  let allEvents = [];
+  let allEvents = [], ordersByEventId = {};
 
   async function loadDashboard() {
     try {
@@ -111,6 +111,12 @@
       const coupons   = couponsData?.coupons   || [];
 
       const stats = calculateOrdersStats(orders);
+
+      ordersByEventId = {};
+      orders.forEach(o => {
+        if (!ordersByEventId[o.event_id]) ordersByEventId[o.event_id] = [];
+        ordersByEventId[o.event_id].push(o);
+      });
 
       document.getElementById('stat-events').textContent    = allEvents.length;
       document.getElementById('stat-orders').textContent    = isAdmin ? stats.totalOrders  : '—';
@@ -146,7 +152,7 @@
       return `<div class="empty"><span class="empty-text">${emptyMessage}</span></div>`;
     }
     return events.map(event => {
-      const stats = calculateEventStats(event);
+      const stats = calculateEventStats(event, ordersByEventId[event.event_id] || []);
       const statusClass = `badge-${event.status}`;
       const isExternal = event.event_type === 'external';
       const externalTag = isExternal ? '<span class="badge" style="background:var(--orange-bg);color:var(--orange);font-size:10px;margin-left:6px;">external</span>' : '';

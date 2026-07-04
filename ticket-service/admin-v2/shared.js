@@ -150,7 +150,7 @@ const API = {
 // === Formatting ===
 function formatDate(isoString) {
     if (!isoString) return '-';
-    return new Date(isoString).toLocaleDateString('ru-RU', {
+    return new Date(isoString.replace('Z', '')).toLocaleDateString('ru-RU', {
         year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit',
     });
@@ -158,7 +158,7 @@ function formatDate(isoString) {
 
 function formatDateShort(isoString) {
     if (!isoString) return '-';
-    return new Date(isoString).toLocaleDateString('ru-RU', {
+    return new Date(isoString.replace('Z', '')).toLocaleDateString('ru-RU', {
         year: 'numeric', month: '2-digit', day: '2-digit',
     });
 }
@@ -234,7 +234,7 @@ function getCurrentISOTime() {
 }
 
 // === Statistics ===
-function calculateEventStats(event) {
+function calculateEventStats(event, ordersForEvent = null) {
     if (!event || !event.ticket_types) {
         return { totalTickets: 0, soldTickets: 0, availableTickets: 0, revenue: 0, capacity: 0 };
     }
@@ -246,6 +246,11 @@ function calculateEventStats(event) {
         soldTickets  += sold;
         revenue      += sold * (tt.price || 0);
     });
+    if (ordersForEvent !== null) {
+        revenue = ordersForEvent
+            .filter(o => o.payment?.status === 'completed')
+            .reduce((s, o) => s + (o.total_amount || 0), 0);
+    }
     return {
         totalTickets, soldTickets,
         availableTickets: totalTickets - soldTickets,

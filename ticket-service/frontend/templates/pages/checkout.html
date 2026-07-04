@@ -343,13 +343,12 @@ let appliedCoupon = null;
 
 // Date/time formatting functions
 function formatDate(dateStr) {
-    const dt = new Date(dateStr);
-    const months = {
-        0: 'января', 1: 'февраля', 2: 'марта', 3: 'апреля',
-        4: 'мая', 5: 'июня', 6: 'июля', 7: 'августа',
-        8: 'сентября', 9: 'октября', 10: 'ноября', 11: 'декабря'
-    };
-    return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+    const cleanStr = dateStr.replace('Z', '');
+    const datePart = cleanStr.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    const months = ['января','февраля','марта','апреля','мая','июня',
+                    'июля','августа','сентября','октября','ноября','декабря'];
+    return `${day} ${months[month - 1]} ${year}`;
 }
 
 function formatTime(dateStr) {

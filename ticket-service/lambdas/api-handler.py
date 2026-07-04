@@ -519,24 +519,16 @@ def save_seat_allocation(event_id: str, request_event: Dict) -> Dict:
         for seat_id, ticket_type_id in seat_allocation.items():
             allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
 
-        # Validate against ticket type totals
-        for tt in evt.ticket_types:
-            allocated = allocation_counts.get(tt.id, 0)
-            if allocated > tt.total:
-                return error_response(400,
-                    f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
-
         # Count already sold tickets per type (to preserve sold count)
         sold_counts = {}
         for tt in evt.ticket_types:
             sold_counts[tt.id] = tt.total - tt.available
 
-        # Update ticket type availability based on seat allocation
+        # Seat allocation defines total; update total and available accordingly
         for tt in evt.ticket_types:
             allocated_seats = allocation_counts.get(tt.id, 0)
             already_sold = sold_counts.get(tt.id, 0)
-
-            # Available = allocated seats - already sold
+            tt.total = allocated_seats
             tt.available = max(0, allocated_seats - already_sold)
             print(f"Updated ticket type '{tt.name}': allocated={allocated_seats}, sold={already_sold}, available={tt.available}")
 
@@ -615,17 +607,12 @@ def create_event(request_event: Dict) -> Dict:
             for seat_id, ticket_type_id in seat_allocation.items():
                 allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
 
-            # Проверяем что количество не превышает total для каждого типа
-            # И обновляем available на основе выделенных мест
+            # Seat allocation defines total; update total and available accordingly
             for tt in ticket_types:
                 allocated = allocation_counts.get(tt.id, 0)
-                if allocated > tt.total:
-                    return error_response(400,
-                        f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
-
-                # For seated events, available = allocated seats (not total)
+                tt.total = allocated
                 tt.available = allocated
-                print(f"Set ticket type '{tt.name}' available={allocated} based on seat allocation")
+                print(f"Set ticket type '{tt.name}' total={allocated}, available={allocated} based on seat allocation")
 
         # Создаем событие
         event_id = Event.generate_id()
@@ -842,19 +829,9 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
                 for seat_id, ticket_type_id in seat_allocation.items():
                     allocation_counts[ticket_type_id] = allocation_counts.get(ticket_type_id, 0) + 1
 
-                # Проверяем против обновлённых типов билетов
-                types_to_validate = evt.ticket_types
-
-                for tt in types_to_validate:
-                    allocated = allocation_counts.get(tt.id, 0)
-                    if allocated > tt.total:
-                        return error_response(400,
-                            f"Seat allocation exceeds total for ticket type '{tt.name}': allocated {allocated}, total {tt.total}")
-
             evt.seat_allocation = seat_allocation
 
-            # Recalculate available for each ticket type based on seat allocation
-            # (same logic as save_seat_allocation)
+            # Seat allocation defines total; recalculate total and available
             purchased_seats = get_purchased_seats_dict(event_id)
             sold_by_type = {}
             for seat_id, details in purchased_seats.items():
@@ -865,6 +842,7 @@ def update_event(event_id: str, request_event: Dict) -> Dict:
             for tt in evt.ticket_types:
                 allocated = allocation_counts.get(tt.id, 0)
                 sold = sold_by_type.get(tt.id, 0)
+                tt.total = allocated
                 tt.available = max(0, allocated - sold)
                 print(f"Recalculated '{tt.name}': allocated={allocated}, sold={sold}, available={tt.available}")
 
@@ -5312,7 +5290,7 @@ def ig_list_accounts(request_event: Dict) -> Dict:
     accounts = []
     for item in items:
         accounts.append({
-            'ig_user_id': item.get('SK'),
+            'ig_user_id': item.get('ig_user_id'),
             'ig_username': item.get('ig_username'),
             'ig_name': item.get('ig_name'),
             'token_expires_at': item.get('token_expires_at'),
@@ -5412,7 +5390,7 @@ def ig_oauth_callback(request_event: Dict) -> Dict:
         now = datetime.now(timezone.utc).isoformat()
         connection = {
             'PK': 'CONNECTION',
-            'SK': ig_user_id,
+            'SK': f"{_ig_tenant_id}#{ig_user_id}",
             'ig_user_id': ig_user_id,
             'ig_username': ig_info.get('username', ''),
             'ig_name': ig_info.get('name', ''),
@@ -5453,10 +5431,7 @@ def ig_disconnect(request_event: Dict, ig_user_id: str) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    if not db.get_instagram_connection(ig_user_id):
-        return error_response(404, 'Account not found')
-
-    db.delete_instagram_connection(ig_user_id)
+    db.delete_instagram_connection(ig_user_id, tenant_id=ctx.get('tenant_id'))
     return success_response({'message': 'Disconnected'})
 
 
@@ -5485,7 +5460,7 @@ def ig_post_story(request_event: Dict) -> Dict:
     except ValueError as e:
         return error_response(500, str(e))
 
-    connection = db.get_instagram_connection(ig_user_id)
+    connection = db.get_instagram_connection(ig_user_id, tenant_id=ctx.get('tenant_id', ''))
     if not connection:
         return error_response(404, 'Instagram account not connected')
 
@@ -5618,7 +5593,7 @@ def tiktok_oauth_callback(request_event: Dict) -> Dict:
 
         connection = {
             'PK': 'CONNECTION',
-            'SK': open_id,
+            'SK': f"{_tt_tenant_id}#{open_id}",
             'tiktok_user_id': open_id,
             'display_name': user_info.get('display_name', ''),
             'avatar_url': user_info.get('avatar_url', ''),
@@ -5659,10 +5634,7 @@ def tiktok_disconnect(request_event: Dict, tiktok_user_id: str) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    if not db.get_tiktok_connection(tiktok_user_id):
-        return error_response(404, 'Account not found')
-
-    db.delete_tiktok_connection(tiktok_user_id)
+    db.delete_tiktok_connection(tiktok_user_id, tenant_id=ctx.get('tenant_id', ''))
     return success_response({'message': 'Disconnected'})
 
 
@@ -5750,7 +5722,7 @@ def youtube_oauth_callback(request_event: Dict) -> Dict:
 
         connection = {
             'PK': 'CONNECTION',
-            'SK': channel_id,
+            'SK': f"{_yt_tenant_id}#{channel_id}",
             'youtube_channel_id': channel_id,
             'channel_title': channel.get('channel_title', ''),
             'channel_thumbnail_url': channel.get('channel_thumbnail_url', ''),
@@ -5790,10 +5762,7 @@ def youtube_disconnect(request_event: Dict, channel_id: str) -> Dict:
     if not is_admin(ctx, ctx.get('tenant_id', '')):
         return error_response(403, 'Access denied')
 
-    if not db.get_youtube_connection(channel_id):
-        return error_response(404, 'Account not found')
-
-    db.delete_youtube_connection(channel_id)
+    db.delete_youtube_connection(channel_id, tenant_id=ctx.get('tenant_id', ''))
     return success_response({'message': 'Disconnected'})
 
 
@@ -5828,9 +5797,9 @@ def social_list_posts(request_event: Dict) -> Dict:
 
     _tenant_id = ctx.get('tenant_id')
     posts = db.list_social_posts(tenant_id=_tenant_id)
-    ig_conns = {c['SK']: c.get('ig_username', '') or c.get('ig_name', '') for c in db.list_instagram_connections(tenant_id=_tenant_id)}
-    tt_conns = {c['SK']: c.get('display_name', '') for c in db.list_tiktok_connections(tenant_id=_tenant_id)}
-    yt_conns = {c['SK']: c.get('channel_title', '') for c in db.list_youtube_connections(tenant_id=_tenant_id)}
+    ig_conns = {c['ig_user_id']: c.get('ig_username', '') or c.get('ig_name', '') for c in db.list_instagram_connections(tenant_id=_tenant_id)}
+    tt_conns = {c['tiktok_user_id']: c.get('display_name', '') for c in db.list_tiktok_connections(tenant_id=_tenant_id)}
+    yt_conns = {c['youtube_channel_id']: c.get('channel_title', '') for c in db.list_youtube_connections(tenant_id=_tenant_id)}
     account_labels = {'instagram': ig_conns, 'tiktok': tt_conns, 'youtube': yt_conns}
 
     for post in posts:
@@ -5870,16 +5839,17 @@ def social_create_post(request_event: Dict) -> Dict:
     if not media:
         return error_response(400, 'At least one media item is required')
 
+    _tenant_id = ctx.get('tenant_id', '')
     # Validate targets
     for t in targets:
         if t.get('platform') == 'instagram':
-            if not db.get_instagram_connection(t.get('account_id', '')):
+            if not db.get_instagram_connection(t.get('account_id', ''), tenant_id=_tenant_id):
                 return error_response(400, f"Instagram account {t.get('account_id')} not connected")
         elif t.get('platform') == 'tiktok':
-            if not db.get_tiktok_connection(t.get('account_id', '')):
+            if not db.get_tiktok_connection(t.get('account_id', ''), tenant_id=_tenant_id):
                 return error_response(400, f"TikTok account {t.get('account_id')} not connected")
         elif t.get('platform') == 'youtube':
-            if not db.get_youtube_connection(t.get('account_id', '')):
+            if not db.get_youtube_connection(t.get('account_id', ''), tenant_id=_tenant_id):
                 return error_response(400, f"YouTube account {t.get('account_id')} not connected")
 
     import uuid
